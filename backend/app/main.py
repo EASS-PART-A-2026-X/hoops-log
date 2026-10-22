@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="My Product API")
+app = FastAPI(title="Hoops Log API")
 
 @app.get("/health")
 def health() -> dict[str, str]:
