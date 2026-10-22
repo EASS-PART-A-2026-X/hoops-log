@@ -53,3 +53,12 @@ Tools: Claude Code (Opus 5.5) · Help received: it reviewed the repo against the
 | Repository | Stars (date checked) | License | Why it fits me |
 |---|---|---|---|
 | udecode/plate | 16.5k (21 Oct 2026) | MIT | React/TS editor; I already have a merged PR there |
+
+## Open-source contributions
+Student: Yuly Cohen ([@yulman2207](https://github.com/yulman2207))
+
+| # | Repository | License | Stars (date checked) | PR | Contribution summary | Merge evidence (on main) |
+|---|---|---|---|---|---|---|
+| 1 | [udecode/plate](https://github.com/udecode/plate) | [MIT](https://github.com/udecode/plate/blob/main/LICENSE) | 16.7k (22 Oct 2026) | [#5219](https://github.com/udecode/plate/pull/5219) | TODO | [ffb2807](https://github.com/udecode/plate/commit/ffb28077a40e82ee07fff468da99b03c65693410) |
+| 2 | [udecode/plate](https://github.com/udecode/plate) | [MIT](https://github.com/udecode/plate/blob/main/LICENSE) | 16.7k (22 Oct 2026) | [#5232](https://github.com/udecode/plate/pull/5232) | TODO | [b3c826e](https://github.com/udecode/plate/commit/b3c826ee68af1e28472e29fef0d71a742f0c9b42) |
+| 3 | [maplibre/maplibre-gl-js](https://github.com/maplibre/maplibre-gl-js) | [BSD-3-Clause](https://github.com/maplibre/maplibre-gl-js/blob/main/LICENSE.txt) | 11.9k (22 Oct 2026) | [#8847](https://github.com/maplibre/maplibre-gl-js/pull/8847) | TODO | [0391300](https://github.com/maplibre/maplibre-gl-js/commit/03913009ee17311cead1afe55919589d4ed72988) |
