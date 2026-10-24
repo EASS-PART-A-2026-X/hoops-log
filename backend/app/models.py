@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, computed_field
@@ -6,24 +6,31 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, computed_fiel
 from app.court import ShotType, Zone, shot_type_of, zone_of
 
 
-def _not_in_future(value: date) -> date:
-    if value > date.today():
+def _not_too_far_ahead(value: date) -> date:
+    # The server may run in UTC while the player is hours ahead (Israel), so "today"
+    # for the player can be tomorrow here. One day of slack covers every time zone.
+    if value > date.today() + timedelta(days=1):
         raise ValueError("game_date cannot be in the future")
     return value
 
 
-GameDate = Annotated[date, AfterValidator(_not_in_future)]
+# Each limit is defined once and used by both ShotBase and ShotUpdate.
+Player = Annotated[str, Field(min_length=1, max_length=50)]
+CourtX = Annotated[float, Field(ge=0, le=50)]
+CourtY = Annotated[float, Field(ge=0, le=47)]
+GameDate = Annotated[date, AfterValidator(_not_too_far_ahead)]
+Note = Annotated[str, Field(max_length=200)]
 
 
 class ShotBase(BaseModel):
     """Fields shared by every shot schema. Text is stored as typed (Hebrew is fine)."""
 
-    player: str = Field(min_length=1, max_length=50)
-    x: float = Field(ge=0, le=50)
-    y: float = Field(ge=0, le=47)
+    player: Player
+    x: CourtX
+    y: CourtY
     made: bool
     game_date: GameDate = Field(default_factory=date.today)
-    note: str = Field(default="", max_length=200)
+    note: Note = ""
 
 
 class ShotCreate(ShotBase):
@@ -37,12 +44,12 @@ class ShotUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    player: str | None = Field(default=None, min_length=1, max_length=50)
-    x: float | None = Field(default=None, ge=0, le=50)
-    y: float | None = Field(default=None, ge=0, le=47)
+    player: Player | None = None
+    x: CourtX | None = None
+    y: CourtY | None = None
     made: bool | None = None
     game_date: GameDate | None = None
-    note: str | None = Field(default=None, max_length=200)
+    note: Note | None = None
 
 
 class ShotPublic(ShotBase):

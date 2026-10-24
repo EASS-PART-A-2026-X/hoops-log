@@ -12,7 +12,7 @@ A shot-chart tracker for basketball players and coaches: log shots on a court, s
 4. As a player, I can ask "where should I shoot more?" so that I get recommendations backed by my own numbers.
 
 ## Data sketch
-Shot: player (text, 1-50), x (float, 0-50 ft), y (float, 0-47 ft), made (bool), game_date (date, not in the future), note (text, max 200)
+Shot: player (text, 1-50), x (float, 0-50 ft), y (float, 0-47 ft), made (bool), game_date (date, at most one day ahead of the server's date to allow for time zones), note (text, max 200)
 
 Computed by backend code, never stored or sent by a client:
 - **zone**: named area from x, y (left_corner_3, left_wing_3, top_3, right_wing_3, right_corner_3, left_elbow, right_elbow, mid_range, paint, restricted_area)
@@ -69,7 +69,7 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 72 passed
+uv run pytest                 # 130 passed
 uv run ruff check .
 uv run ruff format --check .
 ```

@@ -2,6 +2,9 @@
 
 Coordinates are feet. x runs 0-50 across the court, y runs 0-47 from the baseline
 out to half court, and the hoop is at (25, 5.25).
+
+"left" means smaller x (x < 25) and "right" means larger x (x > 25), as seen with the
+baseline at the bottom of the court drawing and half court at the top.
 """
 
 from enum import StrEnum

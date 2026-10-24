@@ -65,6 +65,58 @@ def test_three_point_line_edges(x, y, expected):
     assert shot_type_of(x, y) == expected
 
 
+# One point exactly on, and one just across, each threshold of the 2PT and wing zones.
+# Edges: the restricted circle includes its edge, the lane does not, the elbows include theirs.
+BOUNDARIES = {
+    "restricted circle: on the edge": ((25, 9.25), Zone.RESTRICTED_AREA),
+    "restricted circle: just outside": ((25, 9.35), Zone.PAINT),
+    "lane edge: just inside (left)": ((17.1, 10), Zone.PAINT),
+    "lane edge: on it, below the elbow (left)": ((17, 10), Zone.MID_RANGE),
+    "lane edge: just inside (right)": ((32.9, 10), Zone.PAINT),
+    "lane edge: on it, below the elbow (right)": ((33, 10), Zone.MID_RANGE),
+    "free-throw line: on it": ((25, 19), Zone.PAINT),
+    "free-throw line: just past it": ((25, 19.1), Zone.MID_RANGE),
+    "elbow: on the lane edge (left)": ((17, 15), Zone.LEFT_ELBOW),
+    "elbow: just inside the lane (left)": ((17.1, 15), Zone.PAINT),
+    "elbow: on the lane edge (right)": ((33, 15), Zone.RIGHT_ELBOW),
+    "elbow: just inside the lane (right)": ((32.9, 15), Zone.PAINT),
+    "elbow bottom: on y=13": ((17, 13), Zone.LEFT_ELBOW),
+    "elbow bottom: just below": ((17, 12.9), Zone.MID_RANGE),
+    "elbow top: on y=25": ((17, 25), Zone.LEFT_ELBOW),
+    "elbow top: just above": ((17, 25.1), Zone.MID_RANGE),
+    "elbow outer edge: 14 ft out (left)": ((11, 19), Zone.LEFT_ELBOW),
+    "elbow outer edge: just beyond (left)": ((10.9, 19), Zone.MID_RANGE),
+    "elbow outer edge: 14 ft out (right)": ((39, 19), Zone.RIGHT_ELBOW),
+    "elbow outer edge: just beyond (right)": ((39.1, 19), Zone.MID_RANGE),
+    "out wide, below the elbow": ((10, 8), Zone.MID_RANGE),
+    "top of the arc: 8 ft from centre (left)": ((17, 30), Zone.TOP_3),
+    "top of the arc: just wider (left)": ((16.9, 30), Zone.LEFT_WING_3),
+    "top of the arc: 8 ft from centre (right)": ((33, 30), Zone.TOP_3),
+    "top of the arc: just wider (right)": ((33.1, 30), Zone.RIGHT_WING_3),
+    "corner three: just below where the line meets the arc (left)": (
+        (1.5, 14.19),
+        Zone.LEFT_CORNER_3,
+    ),
+    "wing three: just above where the line meets the arc (left)": (
+        (1.5, 14.21),
+        Zone.LEFT_WING_3,
+    ),
+    "corner three: just below where the line meets the arc (right)": (
+        (48.5, 14.19),
+        Zone.RIGHT_CORNER_3,
+    ),
+    "wing three: just above where the line meets the arc (right)": (
+        (48.5, 14.21),
+        Zone.RIGHT_WING_3,
+    ),
+}
+
+
+@pytest.mark.parametrize(("point", "zone"), BOUNDARIES.values(), ids=BOUNDARIES.keys())
+def test_zone_boundaries(point, zone):
+    assert zone_of(*point) == zone
+
+
 def three_by_definition(x: float, y: float) -> bool:
     """The rule as written, independent of how app.court implements it."""
     return (

@@ -7,17 +7,21 @@
 #   x:         -0.1 | 0 | 50 | 50.1 | missing | not a number
 #   y:         -0.1 | 0 | 47 | 47.1
 #   made:      true | false | missing | not a bool ("maybe")
-#   game_date: omitted (defaults to today) | today | in the past | tomorrow | not a date
+#   game_date: omitted (defaults to today) | in the past | tomorrow (one day of slack for
+#              time zones) | two days ahead | far future | not a date
 #   note:      omitted (defaults to "") | 200 chars | 201 chars | Hebrew
 #   fields:    only known ones | an unknown one ("chef") | computed ones sent by the
 #              client ("zone", "shot_type")
 #
 # Routes
 #   shot id:   exists | missing (GET, PATCH, DELETE) | not an int (422)
-#   list:      empty | several | offset/limit pages | limit 0 and 101 | offset -1
-#   PATCH:     field absent | field null (leave unchanged) | new value | invalid value
-#              on a missing id (422 comes before 404) | moving x, y changes the zone
+#   list:      empty | several | offset/limit pages | limit 0, 100 and 101 | offset -1
+#   PATCH:     field absent | field null (leave unchanged) | new value | every invalid
+#              value that POST rejects, one field at a time | limits inclusive on both
+#              sides | invalid value on a missing id (422 comes before 404) | moving
+#              x, y changes the zone
 #   DELETE:    first call 204 with empty body | second call 404
+#   ids:       never reused after a delete
 #   isolation: every test starts with an empty store
 #
 # Computed values (court geometry)
@@ -25,6 +29,8 @@
 #   3PT line: on the corner line is 2PT | just beyond it is 3PT
 #             on the arc is 2PT | just beyond it is 3PT
 #             where the corner line meets the arc (about 14 ft) there is no gap
+#   2PT and wing boundaries: a point on and a point just across each threshold
+#             (restricted circle, lane edge, free-throw line, elbow edges, top/wing)
 #   left and right zones mirror each other
 #   shot_type is 3PT exactly when the zone ends in "_3"
 #   the response carries the computed zone and shot_type, and they follow x, y
@@ -35,7 +41,6 @@ import pytest
 from fastapi import status
 
 SHOT = {"player": "Yuly", "x": 15, "y": 19, "made": True}  # a left-elbow 2PT
-TODAY = date.today()
 
 
 def test_health(client):
@@ -43,7 +48,9 @@ def test_health(client):
 
 
 def test_create_returns_201_with_defaults_and_computed_fields(client):
+    before = date.today()
     r = client.post("/shots", json=SHOT)
+    after = date.today()  # a run that crosses midnight must not flake
     assert r.status_code == status.HTTP_201_CREATED
     body = r.json()
     assert body["id"] >= 1
@@ -53,7 +60,7 @@ def test_create_returns_201_with_defaults_and_computed_fields(client):
         19,
         True,
     )
-    assert body["game_date"] == TODAY.isoformat()  # default
+    assert body["game_date"] in (before.isoformat(), after.isoformat())  # default
     assert body["note"] == ""  # default
     assert (body["zone"], body["shot_type"]) == ("left_elbow", "2PT")  # computed
 
@@ -82,27 +89,32 @@ def test_unknown_and_computed_fields_are_rejected(client, field):
     assert r.json()["detail"][0]["type"] == "extra_forbidden"
 
 
-INVALID_BODIES = {
+# One field at a time: POST sends it on top of a valid shot, PATCH sends it alone.
+INVALID_VALUES = {
+    "player empty": {"player": ""},
+    "player whitespace only": {"player": "   "},
+    "player 51 chars": {"player": "x" * 51},
+    "player 51 Hebrew chars": {"player": "א" * 51},
+    "x below 0": {"x": -0.1},
+    "x above 50": {"x": 50.1},
+    "x not a number": {"x": "abc"},
+    "y below 0": {"y": -0.1},
+    "y above 47": {"y": 47.1},
+    "made not a bool": {"made": "maybe"},
+    "game_date far in the future": {"game_date": "2999-01-01"},
+    "game_date not a date": {"game_date": "not-a-date"},
+    "note 201 chars": {"note": "n" * 201},
+}
+# A missing field is invalid for POST only; PATCH may leave any field out.
+MISSING_FIELDS = {
     "player missing": {"x": 1, "y": 1, "made": True},
-    "player empty": {**SHOT, "player": ""},
-    "player whitespace only": {**SHOT, "player": "   "},
-    "player 51 chars": {**SHOT, "player": "x" * 51},
-    "player 51 Hebrew chars": {**SHOT, "player": "א" * 51},
-    "x below 0": {**SHOT, "x": -0.1},
-    "x above 50": {**SHOT, "x": 50.1},
-    "x not a number": {**SHOT, "x": "abc"},
     "x missing": {"player": "a", "y": 1, "made": True},
-    "y below 0": {**SHOT, "y": -0.1},
-    "y above 47": {**SHOT, "y": 47.1},
     "y missing": {"player": "a", "x": 1, "made": True},
     "made missing": {"player": "a", "x": 1, "y": 1},
-    "made not a bool": {**SHOT, "made": "maybe"},
-    "game_date tomorrow": {
-        **SHOT,
-        "game_date": (TODAY + timedelta(days=1)).isoformat(),
-    },
-    "game_date not a date": {**SHOT, "game_date": "not-a-date"},
-    "note 201 chars": {**SHOT, "note": "n" * 201},
+}
+INVALID_BODIES = {
+    **{name: {**SHOT, **change} for name, change in INVALID_VALUES.items()},
+    **MISSING_FIELDS,
 }
 
 
@@ -114,25 +126,34 @@ def test_invalid_bodies_are_422(client, body):
 
 
 VALID_EDGES = {
-    "player 1 char": {**SHOT, "player": "x"},
-    "player 50 chars": {**SHOT, "player": "x" * 50},
-    "player 50 Hebrew chars": {**SHOT, "player": "א" * 50},
-    "x is 0": {**SHOT, "x": 0},
-    "x is 50": {**SHOT, "x": 50},
-    "y is 0": {**SHOT, "y": 0},
-    "y is 47": {**SHOT, "y": 47},
-    "note 200 chars": {**SHOT, "note": "n" * 200},
-    "game_date today": {**SHOT, "game_date": TODAY.isoformat()},
-    "game_date in the past": {
-        **SHOT,
-        "game_date": (TODAY - timedelta(days=30)).isoformat(),
-    },
+    "player 1 char": {"player": "x"},
+    "player 50 chars": {"player": "x" * 50},
+    "player 50 Hebrew chars": {"player": "א" * 50},
+    "x is 0": {"x": 0},
+    "x is 50": {"x": 50},
+    "y is 0": {"y": 0},
+    "y is 47": {"y": 47},
+    "note 200 chars": {"note": "n" * 200},
+    "note cleared": {"note": ""},
+    "game_date in the past": {"game_date": "2000-01-01"},
 }
 
 
-@pytest.mark.parametrize("body", VALID_EDGES.values(), ids=VALID_EDGES.keys())
-def test_limits_are_inclusive(client, body):
-    assert client.post("/shots", json=body).status_code == status.HTTP_201_CREATED
+@pytest.mark.parametrize("change", VALID_EDGES.values(), ids=VALID_EDGES.keys())
+def test_limits_are_inclusive(client, change):
+    r = client.post("/shots", json={**SHOT, **change})
+    assert r.status_code == status.HTTP_201_CREATED
+    for key, value in change.items():
+        assert r.json()[key] == value
+
+
+def test_game_date_allows_one_day_of_slack_for_time_zones(client):
+    # The server may be a day behind the player (UTC versus Israel).
+    today = date.today()
+    tomorrow = {**SHOT, "game_date": (today + timedelta(days=1)).isoformat()}
+    too_far = {**SHOT, "game_date": (today + timedelta(days=2)).isoformat()}
+    assert client.post("/shots", json=tomorrow).status_code == status.HTTP_201_CREATED
+    assert client.post("/shots", json=too_far).status_code == 422
 
 
 def test_missing_shot_is_404(client):
@@ -163,6 +184,13 @@ def test_list_is_paginated(client):
     page = client.get("/shots", params={"offset": 1, "limit": 1}).json()
     assert [s["player"] for s in page] == ["P1"]
     assert client.get("/shots", params={"offset": 3}).json() == []
+
+
+def test_list_limit_100_is_accepted(client):
+    client.post("/shots", json=SHOT)
+    r = client.get("/shots", params={"limit": 100})
+    assert r.status_code == status.HTTP_200_OK
+    assert len(r.json()) == 1
 
 
 @pytest.mark.parametrize(
@@ -201,11 +229,29 @@ def test_patch_moving_the_shot_updates_zone_and_type(client):
     assert client.get(f"/shots/{sid}").json()["zone"] == "left_corner_3"
 
 
-def test_patch_invalid_value_is_422_and_changes_nothing(client):
+@pytest.mark.parametrize("change", INVALID_VALUES.values(), ids=INVALID_VALUES.keys())
+def test_patch_invalid_values_are_422_and_change_nothing(client, change):
+    created = client.post("/shots", json=SHOT).json()
+    r = client.patch(f"/shots/{created['id']}", json=change)
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert client.get(f"/shots/{created['id']}").json() == created
+
+
+@pytest.mark.parametrize("field", ["chef", "zone", "shot_type", "id"])
+def test_patch_rejects_unknown_and_computed_fields(client, field):
     sid = client.post("/shots", json=SHOT).json()["id"]
-    assert client.patch(f"/shots/{sid}", json={"x": 51}).status_code == 422
-    assert client.patch(f"/shots/{sid}", json={"zone": "top_3"}).status_code == 422
-    assert client.get(f"/shots/{sid}").json()["x"] == 15
+    r = client.patch(f"/shots/{sid}", json={field: "top_3"})
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert r.json()["detail"][0]["type"] == "extra_forbidden"
+
+
+@pytest.mark.parametrize("change", VALID_EDGES.values(), ids=VALID_EDGES.keys())
+def test_patch_limits_are_inclusive(client, change):
+    sid = client.post("/shots", json=SHOT).json()["id"]
+    r = client.patch(f"/shots/{sid}", json=change)
+    assert r.status_code == status.HTTP_200_OK
+    for key, value in change.items():
+        assert r.json()[key] == value
 
 
 def test_patch_validation_runs_before_the_404(client):
@@ -226,3 +272,11 @@ def test_delete_then_404(client):
 
 def test_each_test_starts_empty(client):
     assert client.get("/shots").json() == []
+
+
+def test_ids_are_not_reused_after_a_delete(client):
+    first = client.post("/shots", json=SHOT).json()["id"]
+    client.delete(f"/shots/{first}")
+    second = client.post("/shots", json=SHOT).json()["id"]
+    assert second != first
+    assert client.get(f"/shots/{first}").status_code == 404  # no stale record either
