@@ -50,9 +50,10 @@ Interactive API docs: http://localhost:8000/docs
 Tools: Claude Code (Opus 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section · Checks I ran: started the server with `uv run fastapi dev` from `backend/` and confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
 
 ## Open-source shortlist
-| Repository | Stars (date checked) | License | Why it fits me |
-|---|---|---|---|
-| udecode/plate | 16.5k (21 Oct 2026) | MIT | React/TS editor; I already have a merged PR there |
+| Repository | Stars (date checked) | License | CONTRIBUTING | Why it fits me |
+|---|---|---|---|---|
+| [udecode/plate](https://github.com/udecode/plate) | 16.7k (24 Oct 2026) | MIT | [CONTRIBUTING.md](https://github.com/udecode/plate/blob/main/CONTRIBUTING.md) | React/TS editor; I already have two merged PRs on main (docs, docx-io) |
+| [maplibre/maplibre-gl-js](https://github.com/maplibre/maplibre-gl-js) | 11.9k (24 Oct 2026) | BSD-3-Clause | [CONTRIBUTING.md](https://github.com/maplibre/maplibre-gl-js/blob/main/CONTRIBUTING.md) | TypeScript map renderer; I already have a merged bug fix on main |
 
 ## Open-source contributions
 Student: Yuly Cohen ([@yulman2207](https://github.com/yulman2207))
