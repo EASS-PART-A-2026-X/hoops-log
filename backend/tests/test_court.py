@@ -1,4 +1,4 @@
-from math import sqrt
+from math import hypot
 
 import pytest
 
@@ -65,27 +65,23 @@ def test_three_point_line_edges(x, y, expected):
     assert shot_type_of(x, y) == expected
 
 
+def three_by_definition(x: float, y: float) -> bool:
+    """The rule as written, independent of how app.court implements it."""
+    return (
+        abs(x - HOOP_X) > CORNER_DISTANCE or hypot(x - HOOP_X, y - HOOP_Y) > ARC_RADIUS
+    )
+
+
 def test_corner_line_meets_the_arc_without_a_gap():
-    # Walk up the left side. Just outside the line is always a 3, just inside a 2,
-    # including across the height where the straight corner line turns into the arc.
-    for y in [
-        0,
-        4,
-        10,
-        CORNER_LENGTH - 0.1,
-        CORNER_LENGTH,
-        CORNER_LENGTH + 0.1,
-        15,
-        20,
-        28,
-    ]:
-        edge = HOOP_X - (
-            CORNER_DISTANCE
-            if y <= CORNER_LENGTH
-            else sqrt(ARC_RADIUS**2 - (y - HOOP_Y) ** 2)
-        )
-        assert is_three(edge - 0.01, y), y
-        assert not is_three(edge + 0.01, y), y
+    # Scan the strip where the straight corner line turns into the arc (about 14 ft up),
+    # one hundredth of a foot at a time, on both sides of the line.
+    bad = [
+        (x, y)
+        for xi in range(250, 351)
+        for yi in range(1200, 1600, 2)
+        if is_three(x := xi / 100, y := yi / 100) != three_by_definition(x, y)
+    ]
+    assert bad == []
 
 
 def test_corner_length_is_about_14_feet():
