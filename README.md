@@ -30,8 +30,24 @@ browser -> frontend (:8501) -> backend (:8000) -> ai-service (:8001)
 
 Only the backend touches the database (SQLite) and calls the AI service.
 
+## How to run
+Requires [uv](https://docs.astral.sh/uv/) (0.12 or newer); uv installs Python 3.14 from `backend/.python-version`.
+
+```bash
+cd backend
+uv run fastapi dev
+```
+
+In a second terminal:
+
+```bash
+curl http://localhost:8000/health   # prints {"status":"ok"}
+```
+
+Interactive API docs: http://localhost:8000/docs
+
 ## AI use
-Tools: none yet · Help received: none yet · Checks I ran: none yet
+Tools: Claude Code (Opus 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section · Checks I ran: started the server with `uv run fastapi dev` from `backend/` and confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
 
 ## Open-source shortlist
 | Repository | Stars (date checked) | License | Why it fits me |
