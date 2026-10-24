@@ -89,7 +89,7 @@ Six requests, with the status code and the stage of FastAPI's pipeline that answ
 | 6 | `DELETE /shots/1` twice | 204, then 404 | 5, then 4 | The first call deletes; the second finds nothing |
 
 ## AI use
-Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
+Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (130 passed) and `uv run ruff check .`; confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
 
 ## Open-source shortlist
 | Repository | Stars (date checked) | License | CONTRIBUTING | Why it fits me |
