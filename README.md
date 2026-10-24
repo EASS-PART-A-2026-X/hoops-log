@@ -18,12 +18,16 @@ Computed by backend code, never stored or sent by a client:
 - **zone**: named area from x, y (left_corner_3, left_wing_3, top_3, right_wing_3, right_corner_3, left_elbow, right_elbow, mid_range, paint, restricted_area)
 - **shot_type**: 2PT or 3PT from the distance between x, y and the hoop
 
-Court rules: NBA half court, 50 ft wide × 47 ft deep, origin at the left baseline corner, hoop at (25, 5.25). The 3PT line is 22 ft from the hoop in the corners (the first 14 ft from the baseline) and 23.75 ft on the arc.
+Court rules: NBA half court, 50 ft wide × 47 ft deep, origin at the left baseline corner, hoop at (25, 5.25). The 3PT line is 22 ft from the hoop in the corners (up to where the straight line meets the arc, about 14 ft from the baseline) and 23.75 ft on the arc.
 
 ## The AI service
-Two jobs, both stateless (the service never touches the database). The model reads text and classifies; code does the geometry and checks the numbers.
-1. Recap to shots (built first). Input: free-text game recap. Structured output: a list of shot proposals, each with a zone, made, and an optional note. The backend maps each zone to a fixed spot on the court, so the same phrase always lands on the same x, y. Proposals are shown to the user to confirm or edit; nothing is saved until they do. If the AI service is down, logging shots by clicking still works.
-2. Shot analyst. Input: a player's shots (sent by the backend) and a question. The agent calls tools (zone stats, period comparison by game_date, hot/cold zones) and returns a typed result: summary, key findings, recommendations. Every number comes from a tool result, and code rejects answers whose numbers don't match.
+One stateless service (FastAPI + Pydantic AI); it never touches the database. The rule: the model is used only where the input is free text. Counting and geometry are plain code, which is exact and cheap.
+
+1. **Recap to shots (built first).** Input: a free-text game recap, in Hebrew or English. Structured output: a list of shot proposals, each with a zone, made, and an optional note. The zone names are always the English ones from the zone list above, whatever language the recap is in; nothing else in the app is in Hebrew. The backend maps each zone to a fixed spot on the court, so the same phrase always lands on the same x, y. Proposals are shown to the user to confirm or edit; nothing is saved until they do. If the AI service is down, logging shots by clicking still works.
+   - Why a model: the input is messy text in two languages, and one paste can hold a whole game of shots. A form or a click is slow for that.
+2. **Shot analyst (narrow).** The numbers are plain backend code, not AI: a stats endpoint returns attempts, makes and percentage per zone, hot and cold zones, and a comparison between two date ranges (by game_date). It works when the AI service is down. The AI service receives those stats and a question ("where should I shoot more?") and returns a typed result: summary, key findings, recommendations.
+   - Why a model: only for understanding the question and writing the advice.
+   - Code rejects an answer if a number in it does not appear in the stats it was given, if a recommendation does not state how many shots it rests on, or if it recommends anything from a zone with too few attempts (for example under 10).
 
 ## Data flow
 browser -> frontend (:8501) -> backend (:8000) -> ai-service (:8001)
