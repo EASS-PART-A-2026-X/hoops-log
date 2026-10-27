@@ -1,7 +1,8 @@
 from datetime import date, timedelta
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, computed_field
+from pydantic import AfterValidator, ConfigDict, computed_field
+from sqlmodel import Field, SQLModel
 
 from app.court import ShotType, Zone, shot_type_of, zone_of
 
@@ -22,7 +23,7 @@ GameDate = Annotated[date, AfterValidator(_not_too_far_ahead)]
 Note = Annotated[str, Field(max_length=200)]
 
 
-class ShotBase(BaseModel):
+class ShotBase(SQLModel):
     """Fields shared by every shot schema. Text is stored as typed (Hebrew is fine)."""
 
     player: Player
@@ -33,13 +34,19 @@ class ShotBase(BaseModel):
     note: Note = ""
 
 
+class Shot(ShotBase, table=True):
+    """The database table. Never returned directly: routes answer with ShotPublic."""
+
+    id: int | None = Field(default=None, primary_key=True)
+
+
 class ShotCreate(ShotBase):
     """POST body. Unknown fields (including zone and shot_type) -> 422."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-class ShotUpdate(BaseModel):
+class ShotUpdate(SQLModel):
     """PATCH body: every field optional; send only what changes."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
