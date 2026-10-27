@@ -3,16 +3,19 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Query, status
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app import db
 from app.db import SessionDep
 from app.models import Shot, ShotCreate, ShotPublic, ShotUpdate
+from app.seed import seed
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     db.create_db_and_tables()
+    with Session(db.engine) as session:
+        seed(session)
     yield
 
 
