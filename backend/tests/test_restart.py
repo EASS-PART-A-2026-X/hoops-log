@@ -1,34 +1,22 @@
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import create_engine
 
 from app import db
 from app.main import app
+from app.seed import SEED
 
 
-def start_server(monkeypatch: pytest.MonkeyPatch, path: Path) -> TestClient:
-    """A brand-new engine on the same file, like a freshly started process."""
-    engine = create_engine(
-        f"sqlite:///{path}", connect_args={"check_same_thread": False}
-    )
-    monkeypatch.setattr(db, "engine", engine)
-    return TestClient(app)
-
-
-def test_shot_survives_a_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    path = tmp_path / "app.db"
-
-    with start_server(monkeypatch, path) as client:  # "with" runs the lifespan
-        created = client.post(
+def test_data_survives_restart(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    url = f"sqlite:///{tmp_path / 'app.db'}"
+    monkeypatch.setattr(db, "engine", db.make_engine(url))  # "process" 1
+    with TestClient(app) as client:  # `with` runs lifespan startup + shutdown
+        assert len(client.get("/shots").json()) == len(SEED)  # seeded
+        client.post(
             "/shots", json={"player": "Restart Test", "x": 25, "y": 10, "made": True}
-        ).json()
-    db.engine.dispose()  # the first server is gone
-
-    with start_server(monkeypatch, path) as client:
-        found = client.get(f"/shots/{created['id']}")
-    db.engine.dispose()
-
-    assert found.status_code == 200
-    assert found.json()["player"] == "Restart Test"
+        )
+    monkeypatch.setattr(db, "engine", db.make_engine(url))  # "process" 2
+    with TestClient(app) as client:
+        players = [s["player"] for s in client.get("/shots").json()]
+    assert players == [row["player"] for row in SEED] + [
+        "Restart Test"
+    ]  # no double seed

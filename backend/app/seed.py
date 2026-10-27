@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from app.models import Shot
 
 # Plain dicts, so each call builds new Shot objects and no session ever shares one.
-SEED_ROWS = [
+SEED: list[dict] = [
     {
         "player": "Yuly",
         "x": 25.0,
@@ -24,9 +24,11 @@ SEED_ROWS = [
 ]
 
 
-def seed(session: Session) -> None:
-    """Insert the demo shots, but only into an empty table, so running it twice is safe."""
+def seed_if_empty(session: Session) -> int:
+    """Insert the demo shots only when the table is empty. Returns rows added."""
     if session.exec(select(Shot).limit(1)).first() is not None:
-        return
-    session.add_all(Shot.model_validate(row) for row in SEED_ROWS)
+        return 0
+    # Seeds are input too: model_validate checks the limits; Shot(**row) does not.
+    session.add_all([Shot.model_validate(row) for row in SEED])
     session.commit()
+    return len(SEED)

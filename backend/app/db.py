@@ -4,20 +4,24 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
+from sqlalchemy import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./data/app.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/app.db")
 
-if DATABASE_URL.startswith("sqlite:///") and ":memory:" not in DATABASE_URL:
-    Path(DATABASE_URL.removeprefix("sqlite:///")).parent.mkdir(
-        parents=True, exist_ok=True
-    )
 
-# FastAPI runs sync routes in a thread pool, and SQLite refuses cross-thread use by default.
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+def make_engine(url: str) -> Engine:
+    # FastAPI runs sync routes in a thread pool, and SQLite refuses cross-thread use by default.
+    return create_engine(url, connect_args={"check_same_thread": False})
+
+
+engine = make_engine(DATABASE_URL)
 
 
 def create_db_and_tables() -> None:
+    db_file = engine.url.database  # e.g. "./data/app.db"; None for in-memory
+    if db_file:
+        Path(db_file).parent.mkdir(parents=True, exist_ok=True)
     SQLModel.metadata.create_all(engine)
 
 
