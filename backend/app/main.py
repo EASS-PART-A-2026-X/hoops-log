@@ -1,35 +1,29 @@
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, status
+from sqlmodel import select
 
-from app.models import ShotCreate, ShotPublic, ShotUpdate
-
-
-@dataclass
-class ShotStore:
-    """A dict standing in for a database. Restart the server: data is gone."""
-
-    rows: dict[int, ShotPublic] = field(default_factory=dict)
-    last_id: int = 0
+from app import db
+from app.db import SessionDep
+from app.models import Shot, ShotCreate, ShotPublic, ShotUpdate
 
 
-store = ShotStore()
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    db.create_db_and_tables()
+    yield
 
 
-def get_store() -> ShotStore:
-    return store  # tests swap in a fresh store via app.dependency_overrides
+app = FastAPI(title="Hoops Log API", lifespan=lifespan)
 
 
-StoreDep = Annotated[ShotStore, Depends(get_store)]
-
-app = FastAPI(title="Hoops Log API")
-
-
-def get_or_404(store: ShotStore, shot_id: int) -> ShotPublic:
-    if shot_id not in store.rows:
+def get_or_404(session: SessionDep, shot_id: int) -> Shot:
+    shot = session.get(Shot, shot_id)
+    if shot is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Shot not found")
-    return store.rows[shot_id]
+    return shot
 
 
 @app.get("/health")
@@ -39,36 +33,42 @@ def health() -> dict[str, str]:
 
 @app.get("/shots")
 def list_shots(
-    store: StoreDep,
+    session: SessionDep,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[ShotPublic]:
-    return list(store.rows.values())[offset : offset + limit]
+    shots = session.exec(
+        select(Shot).order_by(Shot.id).offset(offset).limit(limit)
+    ).all()
+    return [ShotPublic.model_validate(shot) for shot in shots]
 
 
 @app.post("/shots", status_code=status.HTTP_201_CREATED)
-def create_shot(body: ShotCreate, store: StoreDep) -> ShotPublic:
-    store.last_id += 1
-    shot = ShotPublic(id=store.last_id, **body.model_dump())
-    store.rows[shot.id] = shot
-    return shot
+def create_shot(body: ShotCreate, session: SessionDep) -> ShotPublic:
+    shot = Shot.model_validate(body)
+    session.add(shot)
+    session.commit()
+    session.refresh(shot)
+    return ShotPublic.model_validate(shot)
 
 
 @app.get("/shots/{shot_id}")
-def get_shot(shot_id: int, store: StoreDep) -> ShotPublic:
-    return get_or_404(store, shot_id)
+def get_shot(shot_id: int, session: SessionDep) -> ShotPublic:
+    return ShotPublic.model_validate(get_or_404(session, shot_id))
 
 
 @app.patch("/shots/{shot_id}")
-def update_shot(shot_id: int, body: ShotUpdate, store: StoreDep) -> ShotPublic:
-    shot = get_or_404(store, shot_id)
+def update_shot(shot_id: int, body: ShotUpdate, session: SessionDep) -> ShotPublic:
+    shot = get_or_404(session, shot_id)
     # Only fields the client sent; null means "leave unchanged".
-    changes = body.model_dump(exclude_unset=True, exclude_none=True)
-    store.rows[shot_id] = shot.model_copy(update=changes)  # already validated
-    return store.rows[shot_id]
+    shot.sqlmodel_update(body.model_dump(exclude_unset=True, exclude_none=True))
+    session.add(shot)
+    session.commit()
+    session.refresh(shot)
+    return ShotPublic.model_validate(shot)
 
 
 @app.delete("/shots/{shot_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_shot(shot_id: int, store: StoreDep) -> None:
-    get_or_404(store, shot_id)
-    del store.rows[shot_id]
+def delete_shot(shot_id: int, session: SessionDep) -> None:
+    session.delete(get_or_404(session, shot_id))
+    session.commit()
