@@ -37,7 +37,8 @@ class ShotBase(SQLModel):
 class Shot(ShotBase, table=True):
     """The database table. Never returned directly: routes answer with ShotPublic."""
 
-    # AUTOINCREMENT: plain SQLite reuses the highest id after a delete, and ids must not be reused.
+    # AUTOINCREMENT: plain SQLite reuses the highest id after a delete, and ids must
+    # not be reused.
     __table_args__ = {"sqlite_autoincrement": True}
 
     id: int | None = Field(default=None, primary_key=True)

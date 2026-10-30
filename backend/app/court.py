@@ -14,7 +14,8 @@ HOOP_X = 25.0
 HOOP_Y = 5.25
 ARC_RADIUS = 23.75  # 3PT distance from the hoop, above the corners
 CORNER_DISTANCE = 22.0  # 3PT distance from the hoop, in the corners
-# The straight corner line runs up from the baseline until it meets the arc (about 14 ft).
+# The straight corner line runs up from the baseline until it meets the arc
+# (about 14 ft).
 CORNER_LENGTH = HOOP_Y + sqrt(ARC_RADIUS**2 - CORNER_DISTANCE**2)
 RESTRICTED_RADIUS = 4.0
 LANE_HALF_WIDTH = 8.0  # the lane is 16 ft wide
