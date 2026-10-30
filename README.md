@@ -35,6 +35,9 @@ browser -> frontend (:8501) -> backend (:8000) -> ai-service (:8001)
 Only the backend touches the database (SQLite) and calls the AI service.
 
 ## How to run
+Shots are stored in SQLite, so they survive a restart. Every command runs from `backend/`.
+
+### Locally
 Requires [uv](https://docs.astral.sh/uv/) (0.12 or newer); uv installs Python 3.14 from `backend/.python-version`.
 
 ```bash
@@ -42,16 +45,34 @@ cd backend
 uv run fastapi dev
 ```
 
-In a second terminal:
+On first start the app creates `data/app.db` (git-ignored) and adds three demo shots if the table is empty. In a second terminal:
 
 ```bash
 curl http://localhost:8000/health   # prints {"status":"ok"}
+curl http://localhost:8000/shots    # the three demo shots
 ```
 
 Interactive API docs: http://localhost:8000/docs
 
-The shots API keeps data in memory for now, so a restart empties it (a database arrives in Lecture 3):
+### With Docker
+Requires Docker. Stop `fastapi dev` first (Ctrl+C): if it still holds port 8000, `curl` reaches it instead of the container.
 
+```bash
+docker build -t hoops-log-backend .
+docker run -d --name backend -p 127.0.0.1:8000:8000 -v backend-data:/app/data hoops-log-backend
+curl -sS --retry 10 --retry-all-errors --retry-delay 1 localhost:8000/health   # {"status":"ok"}
+```
+
+The named volume `backend-data` holds the database, so shots survive `docker rm -f backend` followed by the same `docker run` again. Without `-v backend-data:/app/data`, a new container starts with an empty database (only the demo shots). `docker volume rm backend-data` deletes the data.
+
+### Settings
+| Variable | Default | Meaning |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///./data/app.db` | Where the SQLite database file lives. See `backend/.env.example`. |
+
+The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run fastapi dev`, or `docker run -e DATABASE_URL=...`.
+
+### Endpoints
 | Request | What it does | Success |
 |---|---|---|
 | `GET /shots?offset=0&limit=50` | List a page (limit at most 100) | 200 |
@@ -69,12 +90,12 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 130 passed
+uv run pytest                 # 133 passed
 uv run ruff check .
 uv run ruff format --check .
 ```
 
-`tests/test_shots.py` starts with a testing-strategy comment listing every input partition; each test fixes one of them. `tests/test_court.py` checks the zone and 2PT/3PT rules.
+`tests/test_shots.py` starts with a testing-strategy comment listing every input partition; each test fixes one of them. `tests/test_court.py` checks the zone and 2PT/3PT rules. `tests/test_seed.py` checks the demo data is added once, and `tests/test_restart.py` checks a shot is still there after the server restarts on the same database file. The other tests use a fresh in-memory database each.
 
 ## API requests and results
 Six requests, with the status code and the stage of FastAPI's pipeline that answers (1 route match, 2 JSON parse, 3 input validation, 4 my handler, 5 response).
@@ -89,7 +110,7 @@ Six requests, with the status code and the stage of FastAPI's pipeline that answ
 | 6 | `DELETE /shots/1` twice | 204, then 404 | 5, then 4 | The first call deletes; the second finds nothing |
 
 ## AI use
-Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (130 passed); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
+Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for Lecture 3 it converted the models to SQLModel, wrote the database session, seed and restart test, the Dockerfile and this README section, and broke the code on purpose (`commit()` to `flush()`, no seed guard) to see that the tests fail; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (133 passed); ran `docker build -t hoops-log-backend .`, started the container with `-v backend-data:/app/data`, created a shot with `curl`, ran `docker rm -f backend`, started it again with the same volume and saw the shot still listed (and gone without `-v`); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
 
 ## Open-source shortlist
 | Repository | Stars (date checked) | License | CONTRIBUTING | Why it fits me |
