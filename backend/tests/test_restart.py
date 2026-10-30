@@ -7,7 +7,7 @@ from app.seed import SEED
 
 
 def test_data_survives_restart(tmp_path, monkeypatch: pytest.MonkeyPatch):
-    url = f"sqlite:///{tmp_path / 'app.db'}"
+    url = f"sqlite:///{tmp_path / 'data' / 'app.db'}"
     monkeypatch.setattr(db, "engine", db.make_engine(url))  # "process" 1
     with TestClient(app) as client:  # `with` runs lifespan startup + shutdown
         assert len(client.get("/shots").json()) == len(SEED)  # seeded

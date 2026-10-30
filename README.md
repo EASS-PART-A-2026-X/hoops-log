@@ -65,12 +65,12 @@ curl -sS --retry 10 --retry-all-errors --retry-delay 1 localhost:8000/health   #
 
 The named volume `backend-data` holds the database, so shots survive `docker rm -f backend` followed by the same `docker run` again. Without `-v backend-data:/app/data`, a new container starts with an empty database (only the demo shots). `docker volume rm backend-data` deletes the data.
 
-### Setting
+### Settings
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./data/app.db` | Where the SQLite database file lives. See `backend/.env.example`. |
 
-The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run fastapi dev`, or `docker run -e DATABASE_URL=... `.
+The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run fastapi dev`, or `docker run -e DATABASE_URL=...`.
 
 ### Endpoints
 | Request | What it does | Success |
@@ -110,7 +110,7 @@ Six requests, with the status code and the stage of FastAPI's pipeline that answ
 | 6 | `DELETE /shots/1` twice | 204, then 404 | 5, then 4 | The first call deletes; the second finds nothing |
 
 ## AI use
-Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for Lecture 3 it converted the models to SQLModel, wrote the database session, seed and restart test, the Dockerfile and this README section, and broke the code on purpose (`commit()` to `flush()`, no seed guard) to see that the tests fail; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (130 passed); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
+Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for Lecture 3 it converted the models to SQLModel, wrote the database session, seed and restart test, the Dockerfile and this README section, and broke the code on purpose (`commit()` to `flush()`, no seed guard) to see that the tests fail; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (133 passed); ran `docker build -t hoops-log-backend .`, started the container with `-v backend-data:/app/data`, created a shot with `curl`, ran `docker rm -f backend`, started it again with the same volume and saw the shot still listed (and gone without `-v`); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
 
 ## Open-source shortlist
 | Repository | Stars (date checked) | License | CONTRIBUTING | Why it fits me |
