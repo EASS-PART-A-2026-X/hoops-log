@@ -66,7 +66,8 @@ def test_three_point_line_edges(x, y, expected):
 
 
 # One point exactly on, and one just across, each threshold of the 2PT and wing zones.
-# Edges: the restricted circle includes its edge, the lane does not, the elbows include theirs.
+# Edges: the restricted circle includes its edge, the lane does not, the elbows
+# include theirs.
 BOUNDARIES = {
     "restricted circle: on the edge": ((25, 9.25), Zone.RESTRICTED_AREA),
     "restricted circle: just outside": ((25, 9.35), Zone.PAINT),

@@ -26,4 +26,4 @@ addopts = "-q"
 filterwarnings = ["error"]
 
 [tool.ruff.lint]
-extend-select = ["I", "FAST"]
+extend-select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PT", "RUF", "FAST"]

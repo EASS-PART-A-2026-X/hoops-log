@@ -7,8 +7,8 @@
 #   x:         -0.1 | 0 | 50 | 50.1 | missing | not a number
 #   y:         -0.1 | 0 | 47 | 47.1
 #   made:      true | false | missing | not a bool ("maybe")
-#   game_date: omitted (defaults to today) | in the past | tomorrow (one day of slack for
-#              time zones) | two days ahead | far future | not a date
+#   game_date: omitted (defaults to today) | in the past | tomorrow (one day of
+#              slack for time zones) | two days ahead | far future | not a date
 #   note:      omitted (defaults to "") | 200 chars | 201 chars | Hebrew
 #   fields:    only known ones | an unknown one ("chef") | computed ones sent by the
 #              client ("zone", "shot_type")

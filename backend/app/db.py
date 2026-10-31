@@ -11,7 +11,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/app.db")
 
 
 def make_engine(url: str) -> Engine:
-    # FastAPI runs sync routes in a thread pool, and SQLite refuses cross-thread use by default.
+    # FastAPI runs sync routes in a thread pool, and SQLite refuses cross-thread use
+    # by default.
     return create_engine(url, connect_args={"check_same_thread": False})
 
 

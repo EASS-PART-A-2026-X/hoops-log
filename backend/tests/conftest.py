@@ -12,7 +12,8 @@ from app.main import app
 
 @pytest.fixture
 def engine() -> Iterator[Engine]:
-    # One in-memory database per test; StaticPool keeps every connection on the same one.
+    # One in-memory database per test; StaticPool keeps every connection on the
+    # same one.
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
