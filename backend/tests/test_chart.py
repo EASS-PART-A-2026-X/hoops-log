@@ -50,6 +50,28 @@ def test_player_filter(client: TestClient):
     assert titles == ["Bob: made from paint"]
 
 
+@pytest.mark.parametrize("query", ["bob", "BOB", "Bob", "  bOb  "])
+def test_player_filter_ignores_case_and_surrounding_spaces(client, query):
+    post(client, player="Ann")
+    post(client, player="Bob")
+    url = f"/chart.svg?player={query}"
+    titles = [t.text for t in parse(client, url).iter(f"{SVG}title")]
+    assert titles == ["Bob: made from paint"]
+
+
+def test_player_filter_ignores_case_of_non_ascii_letters(client):
+    post(client, player="Élodie")
+    titles = [
+        t.text for t in parse(client, "/chart.svg?player=éLODIE").iter(f"{SVG}title")
+    ]
+    assert titles == ["Élodie: made from paint"]
+
+
+def test_player_filter_still_separates_different_names(client):
+    post(client, player="Ann")
+    assert list(parse(client, "/chart.svg?player=An").iter(f"{SVG}title")) == []
+
+
 def test_player_name_is_escaped(client: TestClient):
     post(client, player="<script>&")
     response = client.get("/chart.svg")

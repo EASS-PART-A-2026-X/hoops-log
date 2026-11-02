@@ -80,7 +80,7 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 | `GET /shots/{id}` | Read one | 200, or 404 |
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, or 404 |
 | `DELETE /shots/{id}` | Delete one | 204, or 404 |
-| `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional | 200 |
+| `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional and ignores upper/lower case, so `yuly` and `Yuly` are the same player | 200 |
 
 ```bash
 curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/shots
@@ -91,7 +91,7 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 281 passed
+uv run pytest                 # 288 passed
 uv run ruff check .
 uv run ruff format --check .
 ```

@@ -20,8 +20,11 @@ def chart(
     session: SessionDep,
     player: Annotated[str | None, Query(min_length=1, max_length=50)] = None,
 ) -> Response:
-    query = select(Shot).order_by(Shot.id)
+    shots = session.exec(select(Shot).order_by(Shot.id)).all()
     if player is not None:
-        query = query.where(Shot.player == player)
-    svg = render_chart(session.exec(query).all())
+        # "yuly" and "Yuly" are the same player. casefold also handles non-ASCII
+        # letters, which SQLite's lower() does not.
+        wanted = player.strip().casefold()
+        shots = [shot for shot in shots if shot.player.casefold() == wanted]
+    svg = render_chart(shots)
     return Response(content=svg, media_type="image/svg+xml")
