@@ -75,7 +75,7 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 ### Endpoints
 | Request | What it does | Success |
 |---|---|---|
-| `GET /shots?offset=0&limit=50` | List a page (limit at most 100, offset at most 2147483647) | 200, or 422 if a limit is out of range |
+| `GET /shots?offset=0&limit=50` | List a page (limit at most 100, offset at most 2147483647) | 200, or 422 if `limit` or `offset` is invalid or out of range |
 | `POST /shots` | Create a shot | 201 |
 | `GET /shots/{id}` | Read one (ids start at 1) | 200, 404, or 422 if the id is below 1 or above 2147483647 |
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, 404, or 422 (bad body, or an id below 1 or above 2147483647) |
