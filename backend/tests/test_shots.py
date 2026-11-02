@@ -335,3 +335,13 @@ def test_text_that_cannot_be_stored_or_drawn_is_422(client, text):
 def test_tab_and_newline_are_allowed_in_a_note(client):
     r = client.post("/shots", json={**SHOT, "note": "line one\nline\ttwo"})
     assert r.status_code == status.HTTP_201_CREATED
+
+
+def test_surrogate_inside_a_rejected_object_is_422(client):
+    # The 422 echoes the rejected input back; a surrogate in an object KEY used to
+    # make that echo impossible to send (500).
+    body = '{"player": {"\\ud800": 1}, "x": 1, "y": 1, "made": true}'
+    r = client.post(
+        "/shots", content=body, headers={"content-type": "application/json"}
+    )
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

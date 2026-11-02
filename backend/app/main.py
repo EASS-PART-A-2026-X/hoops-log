@@ -42,7 +42,7 @@ def _json_safe(value: Any) -> Any:
     a 500 instead of the 422 it deserved.
     """
     if isinstance(value, dict):
-        return {key: _json_safe(item) for key, item in value.items()}
+        return {_json_safe(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, list | tuple):
         return [_json_safe(item) for item in value]
     if isinstance(value, float) and not isfinite(value):

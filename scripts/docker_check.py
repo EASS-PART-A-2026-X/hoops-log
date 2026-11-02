@@ -81,31 +81,56 @@ def cleanup() -> None:
     docker("volume", "rm", "-f", VOLUME, check=False)
 
 
-def chaos() -> tuple[int, list[str]]:
-    """Return (acknowledged count, acknowledged players missing after the kill)."""
+MIN_WRITES = 10  # a kill test that killed nothing in flight proves nothing
+
+
+def chaos() -> tuple[int, list[str], str]:
+    """Return (acknowledged count, acknowledged players missing after the kill, problem).
+
+    `problem` is empty when the test ran properly: at least MIN_WRITES writes were
+    acknowledged before the kill, and none failed for any reason other than the kill.
+    """
     acknowledged: list[str] = []
-    stop = threading.Event()
+    failures: list[str] = []
+    killed = threading.Event()
 
     def writer() -> None:
         n = 0
-        while not stop.is_set():
+        while not killed.is_set():
             name = f"chaos{n}"
             try:
-                if request("POST", "/shots", shot(name))[0] == 201:
-                    acknowledged.append(name)
-            except OSError:
-                return  # the container died: stop writing
+                status = request("POST", "/shots", shot(name))[0]
+            except OSError as err:
+                if not killed.is_set():
+                    failures.append(f"connection error before the kill: {err}")
+                return  # after the kill the container is gone: stop writing
+            if status == 201:
+                acknowledged.append(name)
+            else:
+                failures.append(f"POST returned {status}")
+                return
             n += 1
 
     thread = threading.Thread(target=writer)
     thread.start()
-    time.sleep(random.uniform(0.3, 1.0))
+    deadline = time.monotonic() + 30
+    while (
+        len(acknowledged) < MIN_WRITES and not failures and time.monotonic() < deadline
+    ):
+        time.sleep(0.05)
+    time.sleep(random.uniform(0.0, 0.5))  # kill at a random moment, mid-stream
+    count_at_kill = len(acknowledged)
+    killed.set()  # before the kill: connection errors from now on are expected
     docker("kill", NAME)  # SIGKILL: no graceful shutdown
-    stop.set()
     thread.join()
+    problem = ""
+    if failures:
+        problem = failures[0]
+    elif count_at_kill < MIN_WRITES:
+        problem = f"only {count_at_kill} writes acknowledged before the kill"
     start(volume=True)
     present = set(players())
-    return len(acknowledged), [p for p in acknowledged if p not in present]
+    return len(acknowledged), [p for p in acknowledged if p not in present], problem
 
 
 def main() -> int:
@@ -128,11 +153,12 @@ def main() -> int:
         results.append(("without the volume the shot is gone", ok, ""))
 
         start(volume=True)
-        count, lost = chaos()
+        count, lost, problem = chaos()
         detail = f"{count} acknowledged writes, {len(lost)} lost"
-        results.append(
-            ("SIGKILL mid-write loses no acknowledged shot", not lost, detail)
-        )
+        if problem:
+            detail += f" (test invalid: {problem})"
+        ok = not lost and not problem
+        results.append(("SIGKILL mid-write loses no acknowledged shot", ok, detail))
     finally:
         cleanup()
 
