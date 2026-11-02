@@ -8,10 +8,12 @@ from app.models import Shot, ShotCreate, ShotPublic, ShotUpdate
 
 router = APIRouter(prefix="/shots", tags=["shots"])
 
-# SQLite integers are 64-bit: a bigger number in a query raises OverflowError (a 500).
-# Out of range is a validation error (422), like any other bad number.
-SQLITE_MIN, SQLITE_MAX = -(2**63), 2**63 - 1
-ShotId = Annotated[int, Path(ge=SQLITE_MIN, le=SQLITE_MAX)]
+# Ids start at 1 and count up, so 0 and negatives are never valid. The upper limit is
+# far beyond any real table (2.1 billion shots) and far below SQLite's 64-bit range:
+# a number bigger than that makes SQLite raise OverflowError (a 500), so anything out
+# of range is a validation error (422) like any other bad number.
+MAX_ID = 2**31 - 1
+ShotId = Annotated[int, Path(ge=1, le=MAX_ID)]
 
 NOT_FOUND = {status.HTTP_404_NOT_FOUND: {"description": "Shot not found"}}
 
@@ -33,7 +35,7 @@ def get_or_404(session: Session, shot_id: ShotId) -> Shot:
 @router.get("", response_model=list[ShotPublic], summary="List shots, oldest id first")
 def list_shots(
     session: SessionDep,
-    offset: Annotated[int, Query(ge=0, le=SQLITE_MAX)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_ID)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[Shot]:
     query = select(Shot).order_by(Shot.id).offset(offset).limit(limit)

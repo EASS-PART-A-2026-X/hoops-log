@@ -250,10 +250,11 @@ def test_default_game_date_today(c):
 )
 @pytest.mark.parametrize("method", ["get", "patch", "delete"])
 def test_bad_ids(c, sid, method):
-    # README: 404 for missing, 422 for invalid type; never 500
+    # README: ids are 1..2147483647, anything else (0, negatives, too big, not an
+    # integer) is exactly 422; never 404 and never 500
     kw = {"json": {"x": 1}} if method == "patch" else {}
     r = getattr(c, method)(f"/shots/{sid}", **kw)
-    assert r.status_code in (404, 422), (method, sid, r.status_code)
+    assert r.status_code == 422, (method, sid, r.status_code)
 
 
 def test_ids_not_reused_after_delete(c):
@@ -278,7 +279,7 @@ def test_delete_twice(c):
         ("limit=100", 200),
         ("limit=1", 200),
         ("offset=-1", 422),
-        ("offset=99999999999999999999", None),
+        ("offset=99999999999999999999", 422),
         ("limit=abc", 422),
         ("limit=-5", 422),
         ("offset=1.5", 422),
@@ -286,10 +287,7 @@ def test_delete_twice(c):
 )
 def test_paging(c, q, code):
     r = c.get(f"/shots?{q}")
-    if code is None:
-        assert r.status_code in (200, 422), r.status_code
-    else:
-        assert r.status_code == code
+    assert r.status_code == code
 
 
 def test_paging_slices(c):
