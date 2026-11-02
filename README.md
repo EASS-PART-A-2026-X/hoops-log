@@ -80,6 +80,7 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 | `GET /shots/{id}` | Read one | 200, or 404 |
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, or 404 |
 | `DELETE /shots/{id}` | Delete one | 204, or 404 |
+| `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional | 200 |
 
 ```bash
 curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/shots
@@ -90,12 +91,44 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 133 passed
+uv run pytest                 # 281 passed
 uv run ruff check .
 uv run ruff format --check .
 ```
 
 `tests/test_shots.py` starts with a testing-strategy comment listing every input partition; each test fixes one of them. `tests/test_court.py` checks the zone and 2PT/3PT rules. `tests/test_seed.py` checks the demo data is added once, and `tests/test_restart.py` checks a shot is still there after the server restarts on the same database file. The other tests use a fresh in-memory database each.
+
+## How I know the tests are good
+Passing tests only show that the cases I thought of work. Three tools, all in this repo, check the rest. Everything below runs from a fresh clone with only `uv` (and Docker for the last step).
+
+**1. Mutation score: do the tests notice broken code?** `scripts/mutation_score.py` changes one thing at a time in `app/` (`<` to `<=`, `and` to `or`, `50` to `51`, ...) and runs the tests. A change no test notices is a "survivor". My first run scored **68.6%**: the 27 survivors were mostly in the new chart code (the tests checked structure, not coordinates) and in pagination limits. After adding tests for them it scores **100%** (101 of 101). A few mutants cannot change behaviour at all (for example `dx < 0` vs `dx <= 0` where `dx == 0` never reaches that branch); each is marked `# equivalent-mutant: <why>` in the code instead of being hidden.
+
+```bash
+cd backend
+uv run python ../scripts/mutation_score.py              # whole app, about 40 s
+uv run python ../scripts/mutation_score.py app/court.py # one file
+```
+
+**2. A breaker agent: can someone who did not write the code break it?** `.claude/agents/breaker.md` defines a second AI agent that starts with no memory of how the code was built and may only use this README and `/openapi.json` as the specification. It writes tests that must fail against the current code. Round 1 (full log in `docs/adversarial-log.md`) found **five real bugs that my 141 tests missed**, four of them in the EX1 code that was already merged:
+
+| Request | Before | Now |
+|---|---|---|
+| `POST /shots` with `x` = `NaN`, `Infinity`, `1e999` | 500 | 422 |
+| `GET/PATCH/DELETE /shots/99999999999999999999` | 500 | 422 |
+| `GET /shots?offset=99999999999999999999` | 500 | 422 |
+| `player` containing a lone surrogate | 500 | 422 |
+| `player` containing a control character, then `GET /chart.svg` | 201, then a chart that is not valid XML for everyone | 422 |
+
+Plus one cosmetic bug: a missed shot at `x=0, y=0` was drawn partly outside the image. The breaker's 19 failing tests became permanent tests in `backend/tests/adversarial/`, and I added edge-value tests to the normal suite so the mutation score covers the fixes. It also reported what it tried that was fine (escaping, boundaries, unknown fields), and what is a decision rather than a bug: the API still accepts `x: "1.5"` and `made: "yes"` (Pydantic's default coercion); `test_lax_coercion_is_accepted_for_now` records that on purpose.
+
+**3. One command that says whether a change is safe to merge.** `scripts/ci.sh` runs ruff, the formatter check, pytest and the mutation score (must be at least 95%). With `--docker` it also builds the image and checks that a shot survives `docker rm -f` plus a new `docker run` on the same volume, that it is gone without the volume, and a **kill test**: shots are posted in a loop, the container is `SIGKILL`ed at a random moment, and every shot the API acknowledged with 201 must still be there after the restart. `.githooks/pre-push` runs the quick version before every push (turn it on with `git config core.hooksPath .githooks`), and `.github/workflows/ci.yml` runs the full one on pull requests.
+
+```bash
+scripts/ci.sh            # about a minute
+scripts/ci.sh --docker   # plus the Docker and kill tests, needs Docker
+```
+
+The checks found problems in their own tooling too: the first kill test reported 22 lost writes, which was my checker reading only the first 100 of 118 shots (the API returns at most 100 per page), not a lost write; and CI rejected my own lint error on the way in.
 
 ## API requests and results
 Six requests, with the status code and the stage of FastAPI's pipeline that answers (1 route match, 2 JSON parse, 3 input validation, 4 my handler, 5 response).
@@ -110,7 +143,7 @@ Six requests, with the status code and the stage of FastAPI's pipeline that answ
 | 6 | `DELETE /shots/1` twice | 204, then 404 | 5, then 4 | The first call deletes; the second finds nothing |
 
 ## AI use
-Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for Lecture 3 it converted the models to SQLModel, wrote the database session, seed and restart test, the Dockerfile and this README section, and broke the code on purpose (`commit()` to `flush()`, no seed guard) to see that the tests fail; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself; for the router restructure it moved the routes into `app/routers/`, documented them in `/docs`, turned on more Ruff rules and rewrapped the 6 comment lines they flagged, and I removed the empty `backend/README.md` · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (133 passed) and `uv run ruff check .` (clean); ran `docker build -t hoops-log-backend .`, started the container with `-v backend-data:/app/data`, created a shot with `curl`, ran `docker rm -f backend`, started it again with the same volume and saw the shot still listed (and gone without `-v`); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
+Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for Lecture 3 it converted the models to SQLModel, wrote the database session, seed and restart test, the Dockerfile and this README section, and broke the code on purpose (`commit()` to `flush()`, no seed guard) to see that the tests fail; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself; for the router restructure it moved the routes into `app/routers/`, documented them in `/docs`, turned on more Ruff rules and rewrapped the 6 comment lines they flagged, and I removed the empty `backend/README.md`; for the verification work it wrote `/chart.svg`, the mutation runner, the Docker kill test, the CI script and the breaker agent definition, ran one breaker round in a separate agent that had not seen the code, and fixed what it found; I reproduced the reported bugs myself before accepting them · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (133 passed) and `uv run ruff check .` (clean); ran `docker build -t hoops-log-backend .`, started the container with `-v backend-data:/app/data`, created a shot with `curl`, ran `docker rm -f backend`, started it again with the same volume and saw the shot still listed (and gone without `-v`); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
 
 ## Open-source shortlist
 | Repository | Stars (date checked) | License | CONTRIBUTING | Why it fits me |

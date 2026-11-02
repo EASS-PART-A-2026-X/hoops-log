@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Blocks `git push` when the quick checks fail. Turn it on once per clone with:
+#   git config core.hooksPath .githooks
+# Skip it for one push (and say so in the PR) with: git push --no-verify
+exec "$(git rev-parse --show-toplevel)/scripts/ci.sh" --fast
