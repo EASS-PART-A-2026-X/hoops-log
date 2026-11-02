@@ -1,3 +1,5 @@
+import json
+
 # Testing strategy: split each input into partitions and test at least one value
 # from each, especially both sides of every limit. A test counts only if it fails
 # when the rule it protects is broken (break the rule on purpose to check).
@@ -34,7 +36,6 @@
 #   left and right zones mirror each other
 #   shot_type is 3PT exactly when the zone ends in "_3"
 #   the response carries the computed zone and shot_type, and they follow x, y
-
 from datetime import date, timedelta
 
 import pytest
@@ -186,6 +187,19 @@ def test_list_is_paginated(client):
     assert client.get("/shots", params={"offset": 3}).json() == []
 
 
+def test_list_offset_0_is_accepted(client):
+    client.post("/shots", json=SHOT)
+    r = client.get("/shots", params={"offset": 0})
+    assert r.status_code == status.HTTP_200_OK
+    assert len(r.json()) == 1
+
+
+def test_list_default_page_is_50_shots(client):
+    for _ in range(51):
+        client.post("/shots", json=SHOT)
+    assert len(client.get("/shots").json()) == 50
+
+
 def test_list_limit_100_is_accepted(client):
     client.post("/shots", json=SHOT)
     r = client.get("/shots", params={"limit": 100})
@@ -280,3 +294,44 @@ def test_ids_are_not_reused_after_a_delete(client):
     second = client.post("/shots", json=SHOT).json()["id"]
     assert second != first
     assert client.get(f"/shots/{first}").status_code == 404  # no stale record either
+
+
+@pytest.mark.parametrize(
+    ("shot_id", "expected"),
+    [
+        (2**63 - 1, status.HTTP_404_NOT_FOUND),  # largest id SQLite can hold
+        (2**63, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        (-(2**63), status.HTTP_404_NOT_FOUND),
+        (-(2**63) - 1, status.HTTP_422_UNPROCESSABLE_CONTENT),
+    ],
+)
+def test_ids_at_the_edge_of_what_sqlite_holds(client, shot_id, expected):
+    # Before the bound existed these were a 500 (OverflowError inside SQLite).
+    assert client.get(f"/shots/{shot_id}").status_code == expected
+
+
+def test_offset_at_the_edge_of_what_sqlite_holds(client):
+    ok = client.get("/shots", params={"offset": 2**63 - 1})
+    assert (ok.status_code, ok.json()) == (status.HTTP_200_OK, [])
+    too_big = client.get("/shots", params={"offset": 2**63})
+    assert too_big.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+@pytest.mark.parametrize(
+    "text", [chr(0xD800), chr(0xDFFF), chr(0xFFFE), chr(0xFFFF), "a\x00b"]
+)
+def test_text_that_cannot_be_stored_or_drawn_is_422(client, text):
+    # Each of these used to be a 500 or a chart that was no longer valid XML.
+    for field in ("player", "note"):
+        # json.dumps escapes a lone surrogate as \\ud800, which is how a client would
+        # send it; httpx's json= would refuse to encode it at all.
+        body = json.dumps({**SHOT, field: text})
+        r = client.post(
+            "/shots", content=body, headers={"content-type": "application/json"}
+        )
+        assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, (field, text)
+
+
+def test_tab_and_newline_are_allowed_in_a_note(client):
+    r = client.post("/shots", json={**SHOT, "note": "line one\nline\ttwo"})
+    assert r.status_code == status.HTTP_201_CREATED

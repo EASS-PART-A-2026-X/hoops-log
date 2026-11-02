@@ -46,7 +46,7 @@ class Zone(StrEnum):
 
 def is_three(x: float, y: float) -> bool:
     """Strictly beyond the line: standing on the line is a 2-pointer."""
-    if y <= CORNER_LENGTH:
+    if y <= CORNER_LENGTH:  # equivalent-mutant: at y == CORNER_LENGTH both rules agree
         return abs(x - HOOP_X) > CORNER_DISTANCE
     return hypot(x - HOOP_X, y - HOOP_Y) > ARC_RADIUS
 
@@ -57,7 +57,7 @@ def shot_type_of(x: float, y: float) -> ShotType:
 
 def zone_of(x: float, y: float) -> Zone:
     dx = x - HOOP_X
-    left = dx < 0
+    left = dx < 0  # equivalent-mutant: dx == 0 is never a corner, wing or elbow
     if is_three(x, y):
         if y <= CORNER_LENGTH:
             return Zone.LEFT_CORNER_3 if left else Zone.RIGHT_CORNER_3

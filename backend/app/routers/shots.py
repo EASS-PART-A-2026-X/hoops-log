@@ -1,12 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, status
 from sqlmodel import Session, select
 
 from app.db import SessionDep
 from app.models import Shot, ShotCreate, ShotPublic, ShotUpdate
 
 router = APIRouter(prefix="/shots", tags=["shots"])
+
+# SQLite integers are 64-bit: a bigger number in a query raises OverflowError (a 500).
+# Out of range is a validation error (422), like any other bad number.
+SQLITE_MIN, SQLITE_MAX = -(2**63), 2**63 - 1
+ShotId = Annotated[int, Path(ge=SQLITE_MIN, le=SQLITE_MAX)]
 
 NOT_FOUND = {status.HTTP_404_NOT_FOUND: {"description": "Shot not found"}}
 
@@ -18,7 +23,7 @@ def save(session: Session, shot: Shot) -> Shot:
     return shot
 
 
-def get_or_404(session: Session, shot_id: int) -> Shot:
+def get_or_404(session: Session, shot_id: ShotId) -> Shot:
     shot = session.get(Shot, shot_id)
     if shot is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Shot not found")
@@ -28,7 +33,7 @@ def get_or_404(session: Session, shot_id: int) -> Shot:
 @router.get("", response_model=list[ShotPublic], summary="List shots, oldest id first")
 def list_shots(
     session: SessionDep,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=SQLITE_MAX)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[Shot]:
     query = select(Shot).order_by(Shot.id).offset(offset).limit(limit)
@@ -51,7 +56,7 @@ def create_shot(body: ShotCreate, session: SessionDep) -> Shot:
     responses=NOT_FOUND,
     summary="Read one shot",
 )
-def get_shot(shot_id: int, session: SessionDep) -> Shot:
+def get_shot(shot_id: ShotId, session: SessionDep) -> Shot:
     return get_or_404(session, shot_id)
 
 
@@ -61,9 +66,10 @@ def get_shot(shot_id: int, session: SessionDep) -> Shot:
     responses=NOT_FOUND,
     summary="Change only the fields sent",
 )
-def update_shot(shot_id: int, body: ShotUpdate, session: SessionDep) -> Shot:
+def update_shot(shot_id: ShotId, body: ShotUpdate, session: SessionDep) -> Shot:
     shot = get_or_404(session, shot_id)
     # Only fields the client sent; null means "leave unchanged".
+    # equivalent-mutant: exclude_none already drops every unset field (all default None)
     shot.sqlmodel_update(body.model_dump(exclude_unset=True, exclude_none=True))
     return save(session, shot)
 
@@ -74,6 +80,6 @@ def update_shot(shot_id: int, body: ShotUpdate, session: SessionDep) -> Shot:
     responses=NOT_FOUND,
     summary="Delete a shot",
 )
-def delete_shot(shot_id: int, session: SessionDep) -> None:
+def delete_shot(shot_id: ShotId, session: SessionDep) -> None:
     session.delete(get_or_404(session, shot_id))
     session.commit()
