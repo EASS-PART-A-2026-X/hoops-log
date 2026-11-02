@@ -308,8 +308,13 @@ def test_ids_are_not_reused_after_a_delete(client):
         (-(2**63) - 1, status.HTTP_422_UNPROCESSABLE_CONTENT),
     ],
 )
-def test_id_range(client, shot_id, expected):
-    assert client.get(f"/shots/{shot_id}").status_code == expected
+@pytest.mark.parametrize("method", ["get", "patch", "delete"])
+def test_id_range(client, method, shot_id, expected):
+    # The same limit applies to every route that takes an id. PATCH sends a valid
+    # body, so a 422 can only come from the id.
+    kwargs = {"json": {"x": 1}} if method == "patch" else {}
+    response = getattr(client, method)(f"/shots/{shot_id}", **kwargs)
+    assert response.status_code == expected
 
 
 def test_offset_range(client):
