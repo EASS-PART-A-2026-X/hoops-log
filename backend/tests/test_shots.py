@@ -299,21 +299,23 @@ def test_ids_are_not_reused_after_a_delete(client):
 @pytest.mark.parametrize(
     ("shot_id", "expected"),
     [
-        (2**63 - 1, status.HTTP_404_NOT_FOUND),  # largest id SQLite can hold
-        (2**63, status.HTTP_422_UNPROCESSABLE_CONTENT),
-        (-(2**63), status.HTTP_404_NOT_FOUND),
+        (1, status.HTTP_404_NOT_FOUND),  # the first possible id
+        (0, status.HTTP_422_UNPROCESSABLE_CONTENT),  # ids start at 1
+        (-1, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        (2**31 - 1, status.HTTP_404_NOT_FOUND),  # the largest accepted id
+        (2**31, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        (2**63, status.HTTP_422_UNPROCESSABLE_CONTENT),  # used to be a 500 (SQLite)
         (-(2**63) - 1, status.HTTP_422_UNPROCESSABLE_CONTENT),
     ],
 )
-def test_ids_at_the_edge_of_what_sqlite_holds(client, shot_id, expected):
-    # Before the bound existed these were a 500 (OverflowError inside SQLite).
+def test_id_range(client, shot_id, expected):
     assert client.get(f"/shots/{shot_id}").status_code == expected
 
 
-def test_offset_at_the_edge_of_what_sqlite_holds(client):
-    ok = client.get("/shots", params={"offset": 2**63 - 1})
+def test_offset_range(client):
+    ok = client.get("/shots", params={"offset": 2**31 - 1})
     assert (ok.status_code, ok.json()) == (status.HTTP_200_OK, [])
-    too_big = client.get("/shots", params={"offset": 2**63})
+    too_big = client.get("/shots", params={"offset": 2**31})
     assert too_big.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 

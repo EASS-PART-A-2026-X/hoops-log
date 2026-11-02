@@ -77,7 +77,7 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 |---|---|---|
 | `GET /shots?offset=0&limit=50` | List a page (limit at most 100) | 200 |
 | `POST /shots` | Create a shot | 201 |
-| `GET /shots/{id}` | Read one | 200, or 404 |
+| `GET /shots/{id}` | Read one (ids start at 1) | 200, 404, or 422 if the id is below 1 or above 2147483647 |
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, or 404 |
 | `DELETE /shots/{id}` | Delete one | 204, or 404 |
 | `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional. It ignores letter case and spaces around the name, so `yuly` and `Yuly` are the same player; it uses Unicode case folding, so `Straße` and `STRASSE` also match | 200 |
@@ -91,7 +91,7 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 290 passed
+uv run pytest                 # 293 passed
 uv run ruff check .
 uv run ruff format --check .
 ```
@@ -143,7 +143,7 @@ Six requests, with the status code and the stage of FastAPI's pipeline that answ
 | 6 | `DELETE /shots/1` twice | 204, then 404 | 5, then 4 | The first call deletes; the second finds nothing |
 
 ## AI use
-Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for Lecture 3 it converted the models to SQLModel, wrote the database session, seed and restart test, the Dockerfile and this README section, and broke the code on purpose (`commit()` to `flush()`, no seed guard) to see that the tests fail; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself; for the router restructure it moved the routes into `app/routers/`, documented them in `/docs`, turned on more Ruff rules and rewrapped the 6 comment lines they flagged, and I removed the empty `backend/README.md`; for the verification work it wrote `/chart.svg`, the mutation runner, the Docker kill test, the CI script and the breaker agent definition, ran one breaker round in a separate agent that had not seen the code, and fixed what it found; I reproduced the reported bugs myself before accepting them · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (133 passed at the end of Lecture 3, 290 passed now) and `uv run ruff check .` (clean); ran `docker build -t hoops-log-backend .`, started the container with `-v backend-data:/app/data`, created a shot with `curl`, ran `docker rm -f backend`, started it again with the same volume and saw the shot still listed (and gone without `-v`); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
+Tools: Claude Code (Opus 5.5 and Sonnet 5.5) · Help received: it reviewed the repo against the Lecture 1 checklist and wrote the "How to run" section; for Lecture 2 it wrote the Shot models, the court geometry, the CRUD routes and the tests, and ran a check that breaks each rule on purpose to see that a named test fails; for Lecture 3 it converted the models to SQLModel, wrote the database session, seed and restart test, the Dockerfile and this README section, and broke the code on purpose (`commit()` to `flush()`, no seed guard) to see that the tests fail; for my babel PR (#18424) it helped trace the cause and write the code and fixture, and I reviewed the change and its output myself; for the router restructure it moved the routes into `app/routers/`, documented them in `/docs`, turned on more Ruff rules and rewrapped the 6 comment lines they flagged, and I removed the empty `backend/README.md`; for the verification work it wrote `/chart.svg`, the mutation runner, the Docker kill test, the CI script and the breaker agent definition, ran one breaker round in a separate agent that had not seen the code, and fixed what it found; I reproduced the reported bugs myself before accepting them · Checks I ran: started the server with `uv run fastapi dev` from `backend/`, sent the requests above with `curl` and compared each status code with the contract; ran `uv run pytest` (133 passed at the end of Lecture 3, 293 passed now) and `uv run ruff check .` (clean); ran `docker build -t hoops-log-backend .`, started the container with `-v backend-data:/app/data`, created a shot with `curl`, ran `docker rm -f backend`, started it again with the same volume and saw the shot still listed (and gone without `-v`); confirmed `curl http://localhost:8000/health` prints `{"status":"ok"}`
 
 ## Open-source shortlist
 | Repository | Stars (date checked) | License | CONTRIBUTING | Why it fits me |
