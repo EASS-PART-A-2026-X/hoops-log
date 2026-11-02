@@ -67,9 +67,34 @@ def test_player_filter_ignores_case_of_non_ascii_letters(client):
     assert titles == ["Élodie: made from paint"]
 
 
-def test_player_filter_still_separates_different_names(client):
+def test_player_filter_separates_different_names(client: TestClient):
     post(client, player="Ann")
+    # "An" is a different player: it matches nothing, and the chart is still drawn.
     assert list(parse(client, "/chart.svg?player=An").iter(f"{SVG}title")) == []
+    # "Ann" does match, so the empty result above is about the name, not the chart.
+    titles = [
+        t.text for t in parse(client, "/chart.svg?player=ann").iter(f"{SVG}title")
+    ]
+    assert titles == ["Ann: made from paint"]
+
+
+def test_names_that_differ_only_by_case_are_the_same_player(client: TestClient):
+    post(client, player="Bob", x=25, y=10)
+    post(client, player="bob", x=25, y=12)
+    post(client, player="Ann")
+    titles = [
+        t.text for t in parse(client, "/chart.svg?player=BOB").iter(f"{SVG}title")
+    ]
+    assert titles == ["Bob: made from paint", "bob: made from paint"]
+
+
+def test_case_folding_is_unicode_not_just_upper_lower(client: TestClient):
+    # Documented behaviour: "Straße" and "STRASSE" fold to the same name.
+    post(client, player="Straße")
+    titles = [
+        t.text for t in parse(client, "/chart.svg?player=STRASSE").iter(f"{SVG}title")
+    ]
+    assert titles == ["Straße: made from paint"]
 
 
 def test_player_name_is_escaped(client: TestClient):

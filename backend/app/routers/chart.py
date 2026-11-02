@@ -20,10 +20,15 @@ def chart(
     session: SessionDep,
     player: Annotated[str | None, Query(min_length=1, max_length=50)] = None,
 ) -> Response:
+    # Trade-off, on purpose: this loads every shot and filters in Python, not in SQL.
+    # SQLite's lower() only handles ASCII, so `WHERE lower(player) = ...` would miss
+    # names like "Élodie". The chart reads every shot when unfiltered anyway, so this
+    # costs nothing extra at this app's size. Do not "optimise" it back to SQL
+    # without keeping the non-ASCII test.
     shots = session.exec(select(Shot).order_by(Shot.id)).all()
     if player is not None:
-        # "yuly" and "Yuly" are the same player. casefold also handles non-ASCII
-        # letters, which SQLite's lower() does not.
+        # "yuly" and "Yuly" are the same player. casefold is Unicode case folding,
+        # so it is a little broader than upper/lower case: "Straße" matches "STRASSE".
         wanted = player.strip().casefold()
         shots = [shot for shot in shots if shot.player.casefold() == wanted]
     svg = render_chart(shots)
