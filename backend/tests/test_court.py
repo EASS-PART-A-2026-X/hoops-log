@@ -94,6 +94,14 @@ BOUNDARIES = {
     "top of the arc: just wider (left)": ((16.9, 30), Zone.LEFT_WING_3),
     "top of the arc: 8 ft from centre (right)": ((33, 30), Zone.TOP_3),
     "top of the arc: just wider (right)": ((33.1, 30), Zone.RIGHT_WING_3),
+    "corner three: exactly where the line meets the arc (left)": (
+        (1.5, CORNER_LENGTH),
+        Zone.LEFT_CORNER_3,
+    ),
+    "corner three: exactly where the line meets the arc (right)": (
+        (48.5, CORNER_LENGTH),
+        Zone.RIGHT_CORNER_3,
+    ),
     "corner three: just below where the line meets the arc (left)": (
         (1.5, 14.19),
         Zone.LEFT_CORNER_3,

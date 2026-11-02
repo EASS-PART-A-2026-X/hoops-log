@@ -1,3 +1,4 @@
+import unicodedata
 from datetime import date, timedelta
 from typing import Annotated
 
@@ -15,12 +16,30 @@ def _not_too_far_ahead(value: date) -> date:
     return value
 
 
+def _printable_text(value: str) -> str:
+    """Reject text that cannot be stored or drawn.
+
+    Lone surrogates make SQLite fail (500). Control characters and the non-characters
+    U+FFFE/U+FFFF are illegal in XML, so one such name would make /chart.svg invalid
+    for everyone. Tab, newline and carriage return are fine.
+    """
+    for char in value:
+        category = unicodedata.category(char)
+        if category == "Cs" or char in "\ufffe\uffff":
+            raise ValueError("text contains a character that cannot be stored")
+        if category == "Cc" and char not in "\t\n\r":
+            raise ValueError("text contains a control character")
+    return value
+
+
 # Each limit is defined once and used by both ShotBase and ShotUpdate.
-Player = Annotated[str, Field(min_length=1, max_length=50)]
+Player = Annotated[
+    str, Field(min_length=1, max_length=50), AfterValidator(_printable_text)
+]
 CourtX = Annotated[float, Field(ge=0, le=50)]
 CourtY = Annotated[float, Field(ge=0, le=47)]
 GameDate = Annotated[date, AfterValidator(_not_too_far_ahead)]
-Note = Annotated[str, Field(max_length=200)]
+Note = Annotated[str, Field(max_length=200), AfterValidator(_printable_text)]
 
 
 class ShotBase(SQLModel):
