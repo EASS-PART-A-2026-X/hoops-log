@@ -40,7 +40,7 @@ export const BACKEND_URL = (
 // call, including reading the reply.
 export const TIMEOUT_MS = 10_000
 export const PAGE_SIZE = 100 // the backend's maximum page
-const MAX_PAGES = 50 // stop a runaway loop: 5000 shots is far beyond a real log
+export const MAX_PAGES = 50 // 5000 shots; past this the list is marked truncated
 
 /** Turn FastAPI's 422 `detail` list into words, never raw JSON. */
 export function describeValidation(detail: unknown): string {
@@ -71,7 +71,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     })
     if (response.status === 204) return undefined as T
     const body: unknown = await response.json().catch(() => undefined)
-    if (response.ok) return body as T
+    if (response.ok) {
+      // A 2xx that is not JSON (a proxy's page, say) must not be passed on as data.
+      if (body === undefined) {
+        throw new ApiError('server', 'The server sent a reply this app could not read. Try again.')
+      }
+      return body as T
+    }
     if (response.status === 422) {
       throw new ApiError('invalid', describeValidation((body as { detail?: unknown })?.detail))
     }
@@ -93,15 +99,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
+export interface ShotList {
+  shots: Shot[]
+  /** True when there are more shots than this app loads (MAX_PAGES pages). */
+  truncated: boolean
+}
+
 /** All shots, oldest id first. The backend pages at 100, so follow the pages. */
-export async function listShots(): Promise<Shot[]> {
-  const all: Shot[] = []
+export async function listShots(): Promise<ShotList> {
+  // Keyed by id: if another client writes while we page, an offset can repeat a row.
+  const byId = new Map<number, Shot>()
   for (let page = 0; page < MAX_PAGES; page++) {
     const batch = await request<Shot[]>(`/shots?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`)
-    all.push(...batch)
-    if (batch.length < PAGE_SIZE) break
+    for (const shot of batch) byId.set(shot.id, shot)
+    if (batch.length < PAGE_SIZE) return { shots: [...byId.values()], truncated: false }
   }
-  return all
+  return { shots: [...byId.values()], truncated: true }
 }
 
 export function createShot(input: ShotInput): Promise<Shot> {

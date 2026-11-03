@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, createShot, deleteShot, listShots, updateShot } from './api'
-import type { Shot, ShotInput } from './api'
+import { useState } from 'react'
+import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
+import type { ShotInput } from './api'
 import ShotForm from './ShotForm'
 import ShotList from './ShotList'
+import { useShots } from './useShots'
 
 interface Notice {
   kind: 'ok' | 'error'
@@ -10,59 +11,8 @@ interface Notice {
 }
 
 export default function App() {
-  const [shots, setShots] = useState<Shot[] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const { shots, truncated, loading, loadError, refresh } = useShots()
   const [notice, setNotice] = useState<Notice | null>(null)
-  const latest = useRef(0)
-
-  // Fetch and store the list. Every setState here happens after an await, so it is safe
-  // to call from an effect. A ticket makes an older, slower reply unable to overwrite a
-  // newer one.
-  const load = useCallback(async () => {
-    const ticket = ++latest.current
-    try {
-      const fresh = await listShots()
-      if (ticket !== latest.current) return
-      setShots(fresh)
-      setLoadError(null)
-    } catch (caught) {
-      if (ticket !== latest.current) return
-      setLoadError(caught instanceof ApiError ? caught.message : 'Could not load the shots.')
-    } finally {
-      if (ticket === latest.current) setLoading(false)
-    }
-  }, [])
-
-  // Re-fetch after a write or a retry. `loading` starts true, so the first load (from
-  // the effect below) has no spinner to turn on.
-  const refresh = useCallback(() => {
-    setLoading(true)
-    return load()
-  }, [load])
-
-  useEffect(() => {
-    // First load. Bumping the ticket on cleanup makes a StrictMode double mount, or an
-    // unmount, ignore the older reply.
-    const counter = latest // a counter, not a DOM node: the warning about stale refs does not apply
-    const ticket = ++counter.current
-    listShots()
-      .then((fresh) => {
-        if (ticket !== latest.current) return
-        setShots(fresh)
-        setLoadError(null)
-      })
-      .catch((caught: unknown) => {
-        if (ticket !== latest.current) return
-        setLoadError(caught instanceof ApiError ? caught.message : 'Could not load the shots.')
-      })
-      .finally(() => {
-        if (ticket === latest.current) setLoading(false)
-      })
-    return () => {
-      counter.current++
-    }
-  }, [])
 
   // After a write, show the backend's fresh data, not our guess of it.
   async function add(input: ShotInput) {
@@ -75,7 +25,11 @@ export default function App() {
     try {
       await updateShot(id, input)
     } catch (caught) {
-      if (caught instanceof ApiError && caught.kind === 'not_found') await refresh()
+      if (caught instanceof ApiError && caught.kind === 'not_found') {
+        // The refresh removes this row, and its form with it, so say it here as well.
+        setNotice({ kind: 'error', text: caught.message })
+        await refresh()
+      }
       throw caught // the form shows it and keeps the draft
     }
     setNotice({ kind: 'ok', text: `Updated shot #${id}.` })
@@ -133,6 +87,12 @@ export default function App() {
                 </span>
               )}
             </div>
+
+            {truncated && (
+              <p className="state error">
+                Showing the first {MAX_PAGES * PAGE_SIZE} shots only; there are more.
+              </p>
+            )}
 
             {loadError && (
               <div className="state error" role="alert">
