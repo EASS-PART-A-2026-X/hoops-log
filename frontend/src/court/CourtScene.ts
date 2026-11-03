@@ -1,0 +1,761 @@
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
+import type { HeatGrid } from './stats'
+import { drawCourt, paintHeat } from './textures'
+
+export type MapMode = 'heat' | 'beams' | 'arcs'
+export type ViewName = 'broadcast' | 'top' | 'low' | 'side'
+
+export interface ScenePoint {
+  x: number // court feet
+  y: number
+  made: boolean
+  three: boolean
+}
+export interface SceneLabel {
+  x: number
+  y: number
+  title: string
+  detail: string
+}
+export interface SceneData {
+  points: ScenePoint[]
+  labels: SceneLabel[]
+  heat: HeatGrid | null
+}
+export interface SceneOptions {
+  reducedMotion: boolean
+  /** Index into the current points, or null; x and y are pixels inside the container. */
+  onHover: (index: number | null, x: number, y: number) => void
+  onPick: (index: number) => void
+  onFail: () => void
+}
+
+const MADE_2 = '#ff7a2f'
+const MADE_3 = '#ffb27a'
+const MISSED = '#5b9bff'
+const FLIGHT_MS = 760
+const SETTLE_MS = 520
+const ARC_SEGMENTS = 28
+const RELEASE_HEIGHT = 6
+const PICK_RADIUS_PX = 16
+
+const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
+  broadcast: { pos: [0, 24, 17], target: [0, 0, -19] },
+  top: { pos: [0, 66, -17], target: [0, 0, -23.5] },
+  low: { pos: [0, 4.5, 11], target: [0, 3, -22] },
+  side: { pos: [-46, 17, -14], target: [0, 0, -20] },
+}
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+const easeOutBack = (t: number) => {
+  const c1 = 1.5
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+
+export class CourtScene {
+  private container: HTMLElement
+  private opts: SceneOptions
+  private renderer: THREE.WebGLRenderer
+  private composer: EffectComposer
+  private bloom: UnrealBloomPass
+  private scene = new THREE.Scene()
+  private camera: THREE.PerspectiveCamera
+  private controls: OrbitControls
+  private dummy = new THREE.Object3D()
+  private color = new THREE.Color()
+
+  private heatCanvas = document.createElement('canvas')
+  private heatTexture: THREE.CanvasTexture
+  private heatPlane: THREE.Mesh
+  private labelRenderer = new CSS2DRenderer()
+  private labels: CSS2DObject[] = []
+  private marker = new THREE.Group()
+
+  // Shared geometry and materials, made once.
+  private beamGeo: THREE.CylinderGeometry
+  private orbGeo = new THREE.SphereGeometry(0.5, 16, 10)
+  private ballGeo = new THREE.SphereGeometry(0.34, 8, 6)
+  private xGeo = new THREE.BoxGeometry(1.5, 0.07, 0.26)
+  private beamMat = new THREE.MeshBasicMaterial({
+    color: '#8c8c8c', // dims the additive beams so overlapping ones do not blow out to white
+    vertexColors: true,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  })
+  private solidMat = new THREE.MeshBasicMaterial()
+  private ballMat = new THREE.MeshBasicMaterial()
+  private arcMat = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  })
+
+  private beams: THREE.InstancedMesh | null = null
+  private orbs: THREE.InstancedMesh | null = null
+  private xa: THREE.InstancedMesh | null = null
+  private xb: THREE.InstancedMesh | null = null
+  private balls: THREE.InstancedMesh | null = null
+  private arcs: THREE.LineSegments | null = null
+
+  private pts: ScenePoint[] = []
+  /** 1 for a normal log, smaller as thousands of shots crowd the court. */
+  private density = 1
+  private mode: MapMode = 'beams'
+  private playing = false
+  private playStart = 0
+  private stagger = 0
+  private dirty = true
+  private selected: number | null = null
+  private tween: {
+    t0: number
+    dur: number
+    fromPos: THREE.Vector3
+    toPos: THREE.Vector3
+    fromTarget: THREE.Vector3
+    toTarget: THREE.Vector3
+  } | null = null
+
+  private raf = 0
+  private visible = true
+  private disposed = false
+  private hoverIndex: number | null = null
+  private pendingMove: PointerEvent | null = null
+  private down: { x: number; y: number; t: number } | null = null
+  private resizeObserver: ResizeObserver
+  private intersection: IntersectionObserver
+
+  constructor(container: HTMLElement, opts: SceneOptions) {
+    this.container = container
+    this.opts = opts
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
+    this.renderer = renderer
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.0
+    const canvas = renderer.domElement
+    canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:none;outline:none'
+    canvas.tabIndex = 0
+    container.appendChild(canvas)
+
+    this.scene.background = new THREE.Color('#0b0f14')
+    this.scene.fog = new THREE.FogExp2('#0b0f14', 0.0085)
+    this.camera = new THREE.PerspectiveCamera(38, 1, 0.5, 400)
+    this.camera.position.set(...VIEWS.broadcast.pos)
+
+    this.controls = new OrbitControls(this.camera, canvas)
+    this.controls.enableDamping = true
+    this.controls.dampingFactor = 0.08
+    this.controls.minDistance = 10
+    this.controls.maxDistance = 95
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.035
+    this.controls.target.set(...VIEWS.broadcast.target)
+    this.controls.autoRotateSpeed = 0.9
+    this.controls.listenToKeyEvents(canvas)
+
+    this.composer = new EffectComposer(renderer)
+    this.composer.addPass(new RenderPass(this.scene, this.camera))
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.45, 0.32)
+    this.composer.addPass(this.bloom)
+    this.composer.addPass(new OutputPass())
+
+    this.beamGeo = this.makeBeamGeometry()
+    this.buildStatic()
+
+    this.heatCanvas.width = 100
+    this.heatCanvas.height = 94
+    this.heatTexture = new THREE.CanvasTexture(this.heatCanvas)
+    this.heatTexture.colorSpace = THREE.SRGBColorSpace
+    this.heatTexture.generateMipmaps = false
+    this.heatTexture.minFilter = THREE.LinearFilter
+    this.heatTexture.magFilter = THREE.LinearFilter
+    this.heatPlane = new THREE.Mesh(
+      this.flatPlane(),
+      new THREE.MeshBasicMaterial({ map: this.heatTexture, transparent: true, depthWrite: false, opacity: 0.22 }),
+    )
+    this.heatPlane.position.y = 0.04
+    this.scene.add(this.heatPlane)
+    // Zone labels are real HTML (crisp, selectable, untouched by the glow effect).
+    const labelDom = this.labelRenderer.domElement
+    labelDom.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none'
+    container.appendChild(labelDom)
+    this.buildMarker()
+
+    canvas.addEventListener('pointermove', this.onPointerMove)
+    canvas.addEventListener('pointerdown', this.onPointerDown)
+    canvas.addEventListener('pointerup', this.onPointerUp)
+    canvas.addEventListener('pointerleave', this.onPointerLeave)
+    canvas.addEventListener('webglcontextlost', this.onContextLost)
+
+    this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.resizeObserver.observe(container)
+    this.intersection = new IntersectionObserver((entries) => {
+      this.visible = entries.some((e) => e.isIntersecting)
+    })
+    this.intersection.observe(container)
+    this.resize()
+    this.raf = requestAnimationFrame(this.tick)
+  }
+
+  // ---------- public API ----------
+
+  setData(data: SceneData, intro: boolean): void {
+    this.pts = data.points
+    // Crowded courts get dimmer beams, smaller markers and less glow, or they wash out to white.
+    this.density = Math.min(1, Math.sqrt(250 / Math.max(1, data.points.length)))
+    this.beamMat.color.setScalar(0.2 + 0.35 * this.density)
+    this.bloom.strength = 0.28 + 0.22 * this.density
+    this.rebuildMarkers()
+    this.rebuildArcs()
+    paintHeat(this.heatCanvas, data.heat)
+    this.heatTexture.needsUpdate = true
+    this.rebuildLabels(data.labels)
+    this.applyMode()
+    if (intro && !this.opts.reducedMotion && data.points.length > 0) this.replay(2400, 2, 90)
+    else this.playing = false
+    this.dirty = true
+  }
+
+  setMode(mode: MapMode): void {
+    this.mode = mode
+    this.applyMode()
+    this.dirty = true
+  }
+
+  setView(name: ViewName): void {
+    const v = VIEWS[name]
+    const toPos = new THREE.Vector3(...v.pos)
+    const toTarget = new THREE.Vector3(...v.target)
+    if (this.opts.reducedMotion) {
+      this.camera.position.copy(toPos)
+      this.controls.target.copy(toTarget)
+      this.controls.update()
+      return
+    }
+    this.tween = {
+      t0: performance.now(),
+      dur: 950,
+      fromPos: this.camera.position.clone(),
+      toPos,
+      fromTarget: this.controls.target.clone(),
+      toTarget,
+    }
+  }
+
+  setAutoRotate(on: boolean): void {
+    this.controls.autoRotate = on && !this.opts.reducedMotion
+  }
+
+  /** Fly every ball from the shooter to the rim, in order, then let the markers settle. */
+  replay(totalMs = 7000, minStagger = 14, maxStagger = 420): void {
+    if (this.pts.length === 0) return
+    this.stagger = Math.min(maxStagger, Math.max(minStagger, totalMs / this.pts.length))
+    this.playStart = performance.now()
+    this.playing = true
+    this.dirty = true
+  }
+
+  setSelected(index: number | null): void {
+    this.selected = index !== null && index >= 0 && index < this.pts.length ? index : null
+    if (this.selected !== null) {
+      const p = this.pts[this.selected]
+      const [wx, wz] = toWorld(p.x, p.y)
+      this.marker.position.set(wx, 0, wz)
+    }
+    this.marker.visible = this.selected !== null
+  }
+
+  /** Pixel position of a shot inside the container (for tests and focus helpers). */
+  screenPositionOf(index: number): { x: number; y: number } | null {
+    if (!this.pts[index]) return null
+    const v = this.anchor(index, new THREE.Vector3()).project(this.camera)
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    return { x: ((v.x + 1) / 2) * rect.width, y: ((1 - v.y) / 2) * rect.height }
+  }
+
+  dispose(): void {
+    if (this.disposed) return
+    this.disposed = true
+    cancelAnimationFrame(this.raf)
+    this.resizeObserver.disconnect()
+    this.intersection.disconnect()
+    const canvas = this.renderer.domElement
+    canvas.removeEventListener('pointermove', this.onPointerMove)
+    canvas.removeEventListener('pointerdown', this.onPointerDown)
+    canvas.removeEventListener('pointerup', this.onPointerUp)
+    canvas.removeEventListener('pointerleave', this.onPointerLeave)
+    canvas.removeEventListener('webglcontextlost', this.onContextLost)
+    this.controls.dispose()
+    for (const label of this.labels) label.element.remove()
+    this.labelRenderer.domElement.remove()
+    this.scene.traverse((obj) => {
+      const o = obj as THREE.Mesh
+      if (o.geometry) o.geometry.dispose()
+      const m = o.material as THREE.Material | THREE.Material[] | undefined
+      for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+        const map = (mat as THREE.MeshBasicMaterial).map
+        if (map) map.dispose()
+        mat.dispose()
+      }
+      if ((obj as THREE.InstancedMesh).isInstancedMesh) (obj as THREE.InstancedMesh).dispose()
+    })
+    this.composer.dispose()
+    this.renderer.dispose()
+    this.renderer.forceContextLoss()
+    canvas.remove()
+  }
+
+  // ---------- building the world ----------
+
+  private flatPlane(): THREE.PlaneGeometry {
+    const g = new THREE.PlaneGeometry(COURT_W, COURT_L)
+    g.rotateX(-Math.PI / 2)
+    g.translate(0, 0, -COURT_L / 2)
+    return g
+  }
+
+  private makeBeamGeometry(): THREE.CylinderGeometry {
+    const g = new THREE.CylinderGeometry(0.2, 0.2, 1, 10, 1, true)
+    g.translate(0, 0.5, 0)
+    const pos = g.getAttribute('position')
+    const colors = new Float32Array(pos.count * 3)
+    for (let i = 0; i < pos.count; i++) {
+      const shade = 0.04 + 0.96 * pos.getY(i) // dark at the floor, bright at the top
+      colors.set([shade, shade, shade], i * 3)
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    return g
+  }
+
+  private buildStatic(): void {
+    const maxAniso = this.renderer.capabilities.getMaxAnisotropy()
+    const courtTex = new THREE.CanvasTexture(drawCourt())
+    courtTex.colorSpace = THREE.SRGBColorSpace
+    courtTex.anisotropy = maxAniso
+    const court = new THREE.Mesh(this.flatPlane(), new THREE.MeshBasicMaterial({ map: courtTex }))
+    this.scene.add(court)
+
+    // A slab under the court so it has thickness, and a glowing edge.
+    const slab = new THREE.Mesh(
+      new THREE.BoxGeometry(COURT_W + 1.2, 0.5, COURT_L + 1.2),
+      new THREE.MeshBasicMaterial({ color: '#0a1017' }),
+    )
+    slab.position.set(0, -0.26, -COURT_L / 2)
+    const edge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(slab.geometry),
+      new THREE.LineBasicMaterial({ color: '#ff7a2f', transparent: true, opacity: 0.55 }),
+    )
+    edge.position.copy(slab.position)
+    this.scene.add(slab, edge)
+
+    // Ground and a faint grid that fades into the fog: gives depth when you orbit.
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: '#080c11' }),
+    )
+    ground.position.y = -0.55
+    const grid = new THREE.GridHelper(400, 80, 0x1b2a3b, 0x121c28)
+    grid.position.y = -0.5
+    this.scene.add(ground, grid)
+
+    // The hoop: glass, rim and net.
+    // No pole or arm: a stanchion between the camera and the rim would hide the key.
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(6, 3.5, 0.12),
+      new THREE.MeshBasicMaterial({ color: '#9fc5ff', transparent: true, opacity: 0.1, depthWrite: false }),
+    )
+    glass.position.set(0, 10.9, -BACKBOARD_Y)
+    const glassEdge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(glass.geometry),
+      new THREE.LineBasicMaterial({ color: '#cfe3ff', transparent: true, opacity: 0.6 }),
+    )
+    glassEdge.position.copy(glass.position)
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.75, 0.06, 8, 40).rotateX(Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: '#ff7a2f' }),
+    )
+    rim.position.set(0, RIM_HEIGHT, -HOOP_Y)
+    const net = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.75, 0.42, 1.3, 14, 3, true),
+      new THREE.MeshBasicMaterial({ color: '#dfe9f7', wireframe: true, transparent: true, opacity: 0.35 }),
+    )
+    net.position.set(0, RIM_HEIGHT - 0.68, -HOOP_Y)
+    this.scene.add(glass, glassEdge, rim, net)
+  }
+
+  private buildMarker(): void {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.05, 1.3, 48).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthTest: false }),
+    )
+    ring.position.y = 0.09
+    ring.renderOrder = 5
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 9, 6),
+      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthTest: false }),
+    )
+    post.position.y = 4.5
+    post.renderOrder = 5
+    this.marker.add(ring, post)
+    this.marker.visible = false
+    this.scene.add(this.marker)
+  }
+
+  private clearInstanced(): void {
+    for (const m of [this.beams, this.orbs, this.xa, this.xb, this.balls]) {
+      if (m) {
+        this.scene.remove(m)
+        m.dispose()
+      }
+    }
+    this.beams = this.orbs = this.xa = this.xb = this.balls = null
+  }
+
+  private instanced(geo: THREE.BufferGeometry, mat: THREE.Material, n: number): THREE.InstancedMesh {
+    const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, n))
+    mesh.count = n
+    mesh.frustumCulled = false
+    this.scene.add(mesh)
+    return mesh
+  }
+
+  private rebuildMarkers(): void {
+    this.clearInstanced()
+    const n = this.pts.length
+    this.beams = this.instanced(this.beamGeo, this.beamMat, n)
+    this.orbs = this.instanced(this.orbGeo, this.solidMat, n)
+    this.xa = this.instanced(this.xGeo, this.solidMat, n)
+    this.xb = this.instanced(this.xGeo, this.solidMat, n)
+    this.balls = this.instanced(this.ballGeo, this.ballMat, n)
+    for (let i = 0; i < n; i++) {
+      const p = this.pts[i]
+      this.color.set(p.made ? (p.three ? MADE_3 : MADE_2) : MISSED)
+      this.beams.setColorAt(i, this.color)
+      this.orbs.setColorAt(i, this.color)
+      this.xa.setColorAt(i, this.color)
+      this.xb.setColorAt(i, this.color)
+      this.color.lerp(new THREE.Color('#ffffff'), 0.3) // balls glow a touch whiter than their marker
+      this.balls.setColorAt(i, this.color)
+    }
+    for (const m of [this.beams, this.orbs, this.xa, this.xb, this.balls]) {
+      if (m.instanceColor) m.instanceColor.needsUpdate = true
+    }
+  }
+
+  /** Point on a shot's flight path, u from 0 (release) to 1 (rim). */
+  private arcPoint(i: number, u: number, out: THREE.Vector3): THREE.Vector3 {
+    const p = this.pts[i]
+    const [wx, wz] = toWorld(p.x, p.y)
+    const dist = Math.hypot(wx, wz + HOOP_Y)
+    const peak = 3 + dist * 0.22
+    return out.set(
+      wx * (1 - u),
+      RELEASE_HEIGHT + (RIM_HEIGHT - RELEASE_HEIGHT) * u + peak * 4 * u * (1 - u),
+      wz + (-HOOP_Y - wz) * u,
+    )
+  }
+
+  private rebuildArcs(): void {
+    if (this.arcs) {
+      this.scene.remove(this.arcs)
+      this.arcs.geometry.dispose()
+      this.arcs = null
+    }
+    const n = this.pts.length
+    if (n === 0) return
+    const positions = new Float32Array(n * ARC_SEGMENTS * 2 * 3)
+    const colors = new Float32Array(n * ARC_SEGMENTS * 2 * 3)
+    const a = new THREE.Vector3()
+    const b = new THREE.Vector3()
+    let o = 0
+    for (let i = 0; i < n; i++) {
+      const p = this.pts[i]
+      this.color.set(p.made ? (p.three ? MADE_3 : MADE_2) : MISSED)
+      for (let s = 0; s < ARC_SEGMENTS; s++) {
+        const u0 = s / ARC_SEGMENTS
+        const u1 = (s + 1) / ARC_SEGMENTS
+        this.arcPoint(i, u0, a)
+        this.arcPoint(i, u1, b)
+        // Brighter toward the rim, so each arc reads as travelling somewhere.
+        const f0 = 0.06 + 0.4 * u0
+        const f1 = 0.06 + 0.4 * u1
+        positions.set([a.x, a.y, a.z, b.x, b.y, b.z], o)
+        colors.set(
+          [this.color.r * f0, this.color.g * f0, this.color.b * f0, this.color.r * f1, this.color.g * f1, this.color.b * f1],
+          o,
+        )
+        o += 6
+      }
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    this.arcs = new THREE.LineSegments(geo, this.arcMat)
+    this.arcs.frustumCulled = false
+    this.scene.add(this.arcs)
+  }
+
+  private rebuildLabels(labels: SceneLabel[]): void {
+    for (const label of this.labels) {
+      this.scene.remove(label)
+      label.element.remove()
+    }
+    this.labels = []
+    for (const l of this.spreadLabels(labels)) {
+      const el = document.createElement('div')
+      el.className = 'zone-label'
+      const title = document.createElement('strong')
+      title.textContent = l.title
+      const detail = document.createElement('span')
+      detail.textContent = l.detail
+      el.append(title, detail)
+      const object = new CSS2DObject(el)
+      const [wx, wz] = toWorld(l.x, l.y)
+      object.position.set(wx, 1.6, wz)
+      this.scene.add(object)
+      this.labels.push(object)
+    }
+  }
+
+  /** Nudge labels apart (in court feet) so neighbouring zones do not print over each other. */
+  private spreadLabels(labels: SceneLabel[]): SceneLabel[] {
+    const out = labels.map((l) => ({ ...l }))
+    const halfW = 3.0
+    const halfH = 1.15
+    for (let pass = 0; pass < 40; pass++) {
+      let moved = false
+      for (let a = 0; a < out.length; a++) {
+        for (let b = a + 1; b < out.length; b++) {
+          const dx = out[b].x - out[a].x
+          const dy = out[b].y - out[a].y
+          if (Math.abs(dx) < 2 * halfW && Math.abs(dy) < 2 * halfH) {
+            // Push apart along whichever axis has the smaller overlap, away from each other.
+            if (2 * halfW - Math.abs(dx) < 2 * halfH - Math.abs(dy)) {
+              const push = (2 * halfW - Math.abs(dx)) / 2 + 0.05
+              const sign = dx >= 0 ? 1 : -1
+              out[a].x -= sign * push
+              out[b].x += sign * push
+            } else {
+              const push = (2 * halfH - Math.abs(dy)) / 2 + 0.05
+              const sign = dy >= 0 ? 1 : -1
+              out[a].y -= sign * push
+              out[b].y += sign * push
+            }
+            moved = true
+          }
+        }
+      }
+      if (!moved) break
+    }
+    return out
+  }
+
+  private applyMode(): void {
+    const m = this.mode
+    ;(this.heatPlane.material as THREE.MeshBasicMaterial).opacity = m === 'heat' ? 1 : m === 'beams' ? 0.22 : 0.2
+    for (const label of this.labels) label.visible = m === 'heat'
+    if (this.arcs) this.arcs.visible = m === 'arcs'
+    this.dirty = true
+  }
+
+  // ---------- per-frame work ----------
+
+  private layout(now: number): void {
+    const n = this.pts.length
+    if (!this.beams || !this.orbs || !this.xa || !this.xb || !this.balls) return
+    const d = this.dummy
+    const t = now - this.playStart
+    const tail = n > 0 ? (n - 1) * this.stagger + FLIGHT_MS + SETTLE_MS : 0
+    if (this.playing && t > tail) {
+      this.playing = false
+      this.applyMode()
+    }
+    const beamsOn = this.mode === 'beams'
+    const dot = (beamsOn ? 1 : 0.5) * (0.55 + 0.45 * this.density)
+    const tmp = new THREE.Vector3()
+    for (let i = 0; i < n; i++) {
+      const p = this.pts[i]
+      const [wx, wz] = toWorld(p.x, p.y)
+      const local = this.playing ? t - i * this.stagger : Number.POSITIVE_INFINITY
+      const settle = this.playing ? easeOutBack(clamp01((local - FLIGHT_MS) / SETTLE_MS)) : 1
+      const shown = this.playing ? (local >= FLIGHT_MS ? Math.max(0.001, settle) : 0) : 1
+      const height = p.three ? 6 : 3.4
+
+      // beam
+      d.rotation.set(0, 0, 0)
+      d.position.set(wx, 0, wz)
+      d.scale.set(1, p.made && beamsOn ? height * shown : 0.0001, 1)
+      d.updateMatrix()
+      this.beams.setMatrixAt(i, d.matrix)
+      // orb (made only)
+      d.position.set(wx, beamsOn ? height * shown + 0.45 : 0.5 * shown, wz)
+      const orbScale = p.made ? dot * shown : 0.0001
+      d.scale.setScalar(Math.max(orbScale, 0.0001))
+      d.updateMatrix()
+      this.orbs.setMatrixAt(i, d.matrix)
+      // X marks (missed only), two crossed bars lying on the floor
+      const xs = p.made ? 0.0001 : Math.max(dot * shown, 0.0001)
+      d.position.set(wx, 0.07, wz)
+      d.scale.setScalar(xs)
+      d.rotation.set(0, Math.PI / 4, 0)
+      d.updateMatrix()
+      this.xa.setMatrixAt(i, d.matrix)
+      d.rotation.set(0, -Math.PI / 4, 0)
+      d.updateMatrix()
+      this.xb.setMatrixAt(i, d.matrix)
+      // ball in flight: during a replay, or looping along every arc in flight-path mode
+      let ballScale = 0.0001
+      if (this.playing && local > 0 && local < FLIGHT_MS) {
+        this.arcPoint(i, local / FLIGHT_MS, tmp)
+        ballScale = 1
+      } else if (!this.playing && this.mode === 'arcs') {
+        const u = (now / 2600 + i * 0.173) % 1
+        this.arcPoint(i, u, tmp)
+        ballScale = 0.55
+      }
+      d.rotation.set(0, 0, 0)
+      d.position.copy(tmp)
+      d.scale.setScalar(ballScale)
+      d.updateMatrix()
+      this.balls.setMatrixAt(i, d.matrix)
+    }
+    for (const m of [this.beams, this.orbs, this.xa, this.xb, this.balls]) {
+      m.instanceMatrix.needsUpdate = true
+      // Picking uses these bounds; they must follow the instances.
+      m.boundingSphere = null
+      m.boundingBox = null
+    }
+  }
+
+  private tick = (now: number): void => {
+    if (this.disposed) return
+    this.raf = requestAnimationFrame(this.tick)
+    if (!this.visible) return
+    if (this.tween) {
+      const u = clamp01((now - this.tween.t0) / this.tween.dur)
+      const e = easeInOut(u)
+      this.camera.position.lerpVectors(this.tween.fromPos, this.tween.toPos, e)
+      this.controls.target.lerpVectors(this.tween.fromTarget, this.tween.toTarget, e)
+      if (u >= 1) this.tween = null
+    }
+    this.controls.update()
+    if (this.dirty || this.playing || this.mode === 'arcs') {
+      this.layout(now)
+      this.dirty = false
+    }
+    if (this.marker.visible) {
+      const pulse = 1 + 0.18 * Math.sin(now / 260)
+      this.marker.children[0].scale.set(pulse, 1, pulse)
+    }
+    this.runPendingHover()
+    this.composer.render()
+    this.labelRenderer.render(this.scene, this.camera)
+  }
+
+  private resize(): void {
+    const w = Math.max(1, this.container.clientWidth)
+    const h = Math.max(1, this.container.clientHeight)
+    this.renderer.setSize(w, h, false)
+    this.composer.setSize(w, h)
+    this.labelRenderer.setSize(w, h)
+    this.bloom.resolution.set(w, h)
+    this.camera.aspect = w / h
+    // A narrow container needs a wider field of view or the court is cut off.
+    this.camera.fov = w / h < 1 ? 58 : w / h < 1.4 ? 48 : 38
+    this.camera.updateProjectionMatrix()
+    this.dirty = true
+  }
+
+  // ---------- pointer handling ----------
+
+  /** The shot whose marker is nearest the pointer on screen, within a finger-sized
+   *  radius. Projecting is cheaper and far easier to hit than ray-casting tiny orbs. */
+  private pick(clientX: number, clientY: number): number | null {
+    const n = this.pts.length
+    if (n === 0) return null
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    const v = new THREE.Vector3()
+    let best: number | null = null
+    let bestD = PICK_RADIUS_PX
+    for (let i = 0; i < n; i++) {
+      if (this.playing && performance.now() - this.playStart < i * this.stagger + FLIGHT_MS) continue
+      this.anchor(i, v).project(this.camera)
+      if (v.z > 1) continue // behind the camera
+      const d = Math.hypot(((v.x + 1) / 2) * rect.width - px, ((1 - v.y) / 2) * rect.height - py)
+      if (d < bestD) {
+        bestD = d
+        best = i
+      }
+    }
+    return best
+  }
+
+  /** Where a shot's marker sits in the world (the top of its beam in beam mode). */
+  private anchor(i: number, out: THREE.Vector3): THREE.Vector3 {
+    const p = this.pts[i]
+    const [wx, wz] = toWorld(p.x, p.y)
+    const height = this.mode === 'beams' && p.made ? (p.three ? 6 : 3.4) + 0.45 : 0.5
+    return out.set(wx, height, wz)
+  }
+
+  private runPendingHover(): void {
+    const e = this.pendingMove
+    if (!e) return
+    this.pendingMove = null
+    const index = this.pick(e.clientX, e.clientY)
+    this.renderer.domElement.style.cursor = index === null ? 'grab' : 'pointer'
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    if (index !== this.hoverIndex || index !== null) {
+      this.hoverIndex = index
+      this.opts.onHover(index, e.clientX - rect.left, e.clientY - rect.top)
+    }
+  }
+
+  private onPointerMove = (e: PointerEvent): void => {
+    if (e.buttons !== 0) return // dragging to orbit, not hovering
+    this.pendingMove = e
+  }
+
+  private onPointerLeave = (): void => {
+    this.pendingMove = null
+    if (this.hoverIndex !== null) {
+      this.hoverIndex = null
+      this.opts.onHover(null, 0, 0)
+    }
+  }
+
+  private onPointerDown = (e: PointerEvent): void => {
+    this.down = { x: e.clientX, y: e.clientY, t: performance.now() }
+    if (this.hoverIndex !== null) {
+      this.hoverIndex = null
+      this.opts.onHover(null, 0, 0)
+    }
+  }
+
+  private onPointerUp = (e: PointerEvent): void => {
+    const d = this.down
+    this.down = null
+    if (!d) return
+    const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y)
+    if (moved > 5 || performance.now() - d.t > 500) return // that was a drag
+    const index = this.pick(e.clientX, e.clientY)
+    if (index !== null) this.opts.onPick(index)
+  }
+
+  private onContextLost = (e: Event): void => {
+    e.preventDefault()
+    this.opts.onFail()
+  }
+}

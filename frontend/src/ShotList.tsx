@@ -4,20 +4,28 @@ import ShotForm from './ShotForm'
 
 interface Props {
   shots: Shot[]
+  selectedId: number | null
+  onLocate: (id: number) => void
   onSave: (id: number, input: ShotInput) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }
 
 const zoneLabel = (zone: string) => zone.replaceAll('_', ' ')
 
-function Row({ shot, onSave, onDelete }: { shot: Shot } & Omit<Props, 'shots'>) {
+function Row({
+  shot,
+  selected,
+  onLocate,
+  onSave,
+  onDelete,
+}: { shot: Shot; selected: boolean } & Pick<Props, 'onLocate' | 'onSave' | 'onDelete'>) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   if (editing) {
     return (
-      <li className="shot editing">
+      <li className="shot editing" id={`shot-${shot.id}`}>
         <h3 className="edit-title">Edit shot #{shot.id}</h3>
         <ShotForm
           shot={shot}
@@ -33,7 +41,7 @@ function Row({ shot, onSave, onDelete }: { shot: Shot } & Omit<Props, 'shots'>) 
   }
 
   return (
-    <li className="shot">
+    <li className={selected ? 'shot selected' : 'shot'} id={`shot-${shot.id}`} aria-current={selected || undefined}>
       <span className={shot.made ? 'mark made' : 'mark missed'} aria-hidden="true">
         {shot.made ? '●' : '✕'}
       </span>
@@ -76,6 +84,9 @@ function Row({ shot, onSave, onDelete }: { shot: Shot } & Omit<Props, 'shots'>) 
           </>
         ) : (
           <>
+            <button type="button" className="btn" onClick={() => onLocate(shot.id)}>
+              Show on map<span className="sr-only"> for shot #{shot.id}</span>
+            </button>
             <button type="button" className="btn" onClick={() => setEditing(true)}>
               Edit<span className="sr-only"> shot #{shot.id}</span>
             </button>
@@ -89,14 +100,35 @@ function Row({ shot, onSave, onDelete }: { shot: Shot } & Omit<Props, 'shots'>) 
   )
 }
 
-export default function ShotList({ shots, onSave, onDelete }: Props) {
+const PAGE = 100
+
+export default function ShotList({ shots, selectedId, onLocate, onSave, onDelete }: Props) {
+  const [shown, setShown] = useState(PAGE)
+  // Render a page at a time: 5000 rows of DOM make the whole page slow. A selected shot
+  // is always shown, however far down it is.
+  const selectedAt = selectedId === null ? -1 : shots.findIndex((s) => s.id === selectedId)
+  const count = Math.min(shots.length, Math.max(shown, selectedAt + 1))
   return (
-    <ul className="shots">
-      {shots.map((shot) => (
-        // The key is the record's id, never its position: an edit form must stay
-        // attached to its own shot when the list changes.
-        <Row key={shot.id} shot={shot} onSave={onSave} onDelete={onDelete} />
-      ))}
-    </ul>
+    <>
+      <ul className="shots">
+        {shots.slice(0, count).map((shot) => (
+          // The key is the record's id, never its position: an edit form must stay
+          // attached to its own shot when the list changes.
+          <Row
+            key={shot.id}
+            shot={shot}
+            selected={shot.id === selectedId}
+            onLocate={onLocate}
+            onSave={onSave}
+            onDelete={onDelete}
+          />
+        ))}
+      </ul>
+      {count < shots.length && (
+        <button type="button" className="btn more" onClick={() => setShown(count + PAGE)}>
+          Show {Math.min(PAGE, shots.length - count)} more ({shots.length - count} not shown)
+        </button>
+      )}
+    </>
   )
 }
