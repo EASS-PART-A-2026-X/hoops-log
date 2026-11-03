@@ -30,7 +30,7 @@ One stateless service (FastAPI + Pydantic AI); it never touches the database. Th
    - Code rejects an answer if a number in it does not appear in the stats it was given, if a recommendation does not state how many shots it rests on, or if it recommends anything from a zone with too few attempts (for example under 10).
 
 ## Data flow
-browser -> frontend (:8501) -> backend (:8000) -> ai-service (:8001)
+browser -> frontend (:5173) -> backend (:8000) -> ai-service (:8001)
 
 Only the backend touches the database (SQLite) and calls the AI service.
 

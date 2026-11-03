@@ -4,13 +4,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-def preflight(client: TestClient, origin: str, method: str = "POST"):
+def preflight(
+    client: TestClient,
+    origin: str,
+    method: str = "POST",
+    headers: str = "content-type",
+):
     return client.options(
         "/shots",
         headers={
             "Origin": origin,
             "Access-Control-Request-Method": method,
-            "Access-Control-Request-Headers": "content-type",
+            "Access-Control-Request-Headers": headers,
         },
     )
 
@@ -26,6 +31,17 @@ def test_frontend_origin_is_allowed(client: TestClient, origin: str) -> None:
 def test_crud_methods_are_allowed(client: TestClient, method: str) -> None:
     response = preflight(client, "http://localhost:5173", method)
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCHX", "TRACE"])
+def test_other_methods_are_refused(client: TestClient, method: str) -> None:
+    response = preflight(client, "http://localhost:5173", method)
+    assert response.status_code == 400
+
+
+def test_other_headers_are_refused(client: TestClient) -> None:
+    response = preflight(client, "http://localhost:5173", headers="authorization")
+    assert response.status_code == 400
 
 
 @pytest.mark.parametrize(
