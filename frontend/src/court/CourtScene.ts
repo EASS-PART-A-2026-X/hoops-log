@@ -6,8 +6,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
-import type { HeatGrid } from './stats'
-import { drawCourt, paintHeat } from './textures'
+import type { HeatGrid, HexBins, HexCell } from './stats'
+import { drawCourt, heatColor, paintHeat } from './textures'
 
 export type MapMode = 'heat' | 'beams' | 'arcs'
 export type ViewName = 'broadcast' | 'top' | 'low' | 'side'
@@ -21,19 +21,23 @@ export interface ScenePoint {
 export interface SceneLabel {
   x: number
   y: number
-  title: string
-  detail: string
+  title: string // the zone name
+  value: string // the big number, e.g. "64%"
+  sub: string // e.g. "27/42"
 }
 export interface SceneData {
   points: ScenePoint[]
   labels: SceneLabel[]
   heat: HeatGrid | null
+  hexes: HexBins | null
 }
 export interface SceneOptions {
   reducedMotion: boolean
   /** Index into the current points, or null; x and y are pixels inside the container. */
   onHover: (index: number | null, x: number, y: number) => void
   onPick: (index: number) => void
+  /** The hex under the pointer in heat mode (null when none); x and y as for onHover. */
+  onHoverCell: (cell: HexCell | null, x: number, y: number) => void
   onFail: () => void
 }
 
@@ -49,7 +53,7 @@ const MISS_STUB = 1.3 // height of the short beam over a missed shot
 
 const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
   broadcast: { pos: [0, 24, 17], target: [0, 0, -19] },
-  top: { pos: [0, 66, -17], target: [0, 0, -23.5] },
+  top: { pos: [0, 76, -17], target: [0, 0, -23.5] },
   low: { pos: [0, 4.5, 11], target: [0, 3, -22] },
   side: { pos: [-46, 17, -14], target: [0, 0, -20] },
 }
@@ -102,6 +106,14 @@ export class CourtScene {
     depthWrite: false,
   })
 
+  private hexGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1)
+  private hexMat = new THREE.MeshLambertMaterial()
+  private hexMesh: THREE.InstancedMesh | null = null
+  private hexCells: HexCell[] = []
+  private hexRadius = 2
+  private hexStart = 0
+  private hexGrowing = false
+  private hoverCell: HexCell | null = null
   private beams: THREE.InstancedMesh | null = null
   private orbs: THREE.InstancedMesh | null = null
   private xa: THREE.InstancedMesh | null = null
@@ -171,6 +183,9 @@ export class CourtScene {
     this.composer.addPass(new OutputPass())
 
     this.beamGeo = this.makeBeamGeometry()
+    this.hexGeo.translate(0, 0.5, 0)
+    // Only the hex cells are lit; everything else is unlit and glows on its own.
+    this.scene.add(new THREE.AmbientLight('#ffffff', 0.85), new THREE.DirectionalLight('#ffffff', 1.15).translateX(-12).translateY(34).translateZ(18))
     this.buildStatic()
 
     this.heatCanvas.width = 100
@@ -221,6 +236,7 @@ export class CourtScene {
     paintHeat(this.heatCanvas, data.heat)
     this.heatTexture.needsUpdate = true
     this.rebuildLabels(data.labels)
+    this.rebuildHexes(data.hexes)
     this.applyMode()
     if (intro && !this.opts.reducedMotion && data.points.length > 0) this.replay(2400, 2, 90)
     else this.playing = false
@@ -229,6 +245,14 @@ export class CourtScene {
 
   setMode(mode: MapMode): void {
     this.mode = mode
+    if (this.hoverCell) {
+      this.hoverCell = null
+      this.opts.onHoverCell(null, 0, 0)
+    }
+    if (this.hoverIndex !== null) {
+      this.hoverIndex = null
+      this.opts.onHover(null, 0, 0)
+    }
     this.applyMode()
     this.dirty = true
   }
@@ -515,11 +539,15 @@ export class CourtScene {
     for (const l of this.spreadLabels(labels)) {
       const el = document.createElement('div')
       el.className = 'zone-label'
-      const title = document.createElement('strong')
-      title.textContent = l.title
-      const detail = document.createElement('span')
-      detail.textContent = l.detail
-      el.append(title, detail)
+      const name = document.createElement('span')
+      name.className = 'zl-name'
+      name.textContent = l.title
+      const value = document.createElement('strong')
+      value.textContent = l.value
+      const sub = document.createElement('span')
+      sub.className = 'zl-sub'
+      sub.textContent = l.sub
+      el.append(name, value, sub)
       const object = new CSS2DObject(el)
       const [wx, wz] = toWorld(l.x, l.y)
       object.position.set(wx, 1.6, wz)
@@ -531,8 +559,8 @@ export class CourtScene {
   /** Nudge labels apart (in court feet) so neighbouring zones do not print over each other. */
   private spreadLabels(labels: SceneLabel[]): SceneLabel[] {
     const out = labels.map((l) => ({ ...l }))
-    const halfW = 3.0
-    const halfH = 1.15
+    const halfW = 3.4
+    const halfH = 1.9
     for (let pass = 0; pass < 40; pass++) {
       let moved = false
       for (let a = 0; a < out.length; a++) {
@@ -561,9 +589,90 @@ export class CourtScene {
     return out
   }
 
+  private rebuildHexes(bins: HexBins | null): void {
+    if (this.hexMesh) {
+      this.scene.remove(this.hexMesh)
+      this.hexMesh.dispose()
+      this.hexMesh = null
+    }
+    this.hexCells = bins?.cells ?? []
+    this.hexRadius = bins?.radius ?? 2
+    if (this.hexCells.length === 0) return
+    const mesh = new THREE.InstancedMesh(this.hexGeo, this.hexMat, this.hexCells.length)
+    mesh.frustumCulled = false
+    this.hexCells.forEach((cell, i) => {
+      const [r, g, b] = heatColor(cell.heat)
+      mesh.setColorAt(i, this.color.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace))
+    })
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    this.hexMesh = mesh
+    this.scene.add(mesh)
+    this.hexStart = performance.now()
+    this.hexGrowing = true
+  }
+
+  /** Hexes rise one after another (nearest the first shot first); settled, this is a no-op. */
+  private layoutHexes(now: number): void {
+    const mesh = this.hexMesh
+    if (!mesh) return
+    const t = now - this.hexStart
+    const d = this.dummy
+    let growing = false
+    this.hexCells.forEach((cell, i) => {
+      const delay = this.opts.reducedMotion ? -1000 : Math.min(800, i * 16)
+      const u = clamp01((t - delay) / 520)
+      if (u < 1) growing = true
+      const g = Math.max(easeOutBack(u), 0.0001)
+      const radius = this.hexRadius * (0.5 + 0.46 * Math.sqrt(cell.size))
+      const height = 0.14 + 1.7 * Math.sqrt(cell.size)
+      const [wx, wz] = toWorld(cell.x, cell.y)
+      d.rotation.set(0, 0, 0)
+      d.position.set(wx, 0.03, wz)
+      d.scale.set(radius * Math.min(g, 1), height * g, radius * Math.min(g, 1))
+      d.updateMatrix()
+      mesh.setMatrixAt(i, d.matrix)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    mesh.boundingSphere = null
+    mesh.boundingBox = null
+    this.hexGrowing = growing
+  }
+
+  /** The hex under the pointer: nearest centre on screen, inside the hex's drawn radius. */
+  private pickCell(clientX: number, clientY: number): HexCell | null {
+    if (this.hexCells.length === 0) return null
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    const a = new THREE.Vector3()
+    const edge = new THREE.Vector3()
+    let best: HexCell | null = null
+    let bestD = Number.POSITIVE_INFINITY
+    for (const cell of this.hexCells) {
+      const [wx, wz] = toWorld(cell.x, cell.y)
+      a.set(wx, 0.5, wz).project(this.camera)
+      if (a.z > 1) continue
+      edge.set(wx + this.hexRadius * 0.9, 0.5, wz).project(this.camera)
+      const sx = ((a.x + 1) / 2) * rect.width
+      const sy = ((1 - a.y) / 2) * rect.height
+      const reach = Math.max(14, Math.abs(((edge.x - a.x) / 2) * rect.width))
+      const dist = Math.hypot(sx - px, sy - py)
+      if (dist < reach && dist < bestD) {
+        bestD = dist
+        best = cell
+      }
+    }
+    return best
+  }
+
   private applyMode(): void {
     const m = this.mode
-    ;(this.heatPlane.material as THREE.MeshBasicMaterial).opacity = m === 'heat' ? 1 : m === 'beams' ? 0.22 : 0.2
+    // Heat mode is the hex chart; the soft glow under the court is for the other two.
+    this.heatPlane.visible = m !== 'heat'
+    ;(this.heatPlane.material as THREE.MeshBasicMaterial).opacity = m === 'beams' ? 0.22 : 0.2
+    if (this.hexMesh) this.hexMesh.visible = m === 'heat'
+    this.hexStart = performance.now()
+    this.hexGrowing = m === 'heat'
     for (const label of this.labels) label.visible = m === 'heat'
     if (this.arcs) this.arcs.visible = m === 'arcs'
     this.dirty = true
@@ -582,7 +691,9 @@ export class CourtScene {
       this.applyMode()
     }
     const beamsOn = this.mode === 'beams'
-    const dot = (beamsOn ? 1 : 0.5) * (0.55 + 0.45 * this.density)
+    const heatOn = this.mode === 'heat'
+    // In heat mode the hexes carry the data; the individual dots would only clutter them.
+    const dot = heatOn ? 0 : (beamsOn ? 1 : 0.5) * (0.55 + 0.45 * this.density)
     const tmp = new THREE.Vector3()
     for (let i = 0; i < n; i++) {
       const p = this.pts[i]
@@ -606,7 +717,7 @@ export class CourtScene {
       this.orbs.setMatrixAt(i, d.matrix)
       // X marks (missed only), two crossed bars lying on the floor
       // Misses stay large: a cross that is too small to see is a missing data point.
-      const xs = p.made ? 0.0001 : Math.max((beamsOn ? 1 : 0.85) * (0.7 + 0.3 * this.density) * shown, 0.0001)
+      const xs = p.made || heatOn ? 0.0001 : Math.max((beamsOn ? 1 : 0.85) * (0.7 + 0.3 * this.density) * shown, 0.0001)
       d.position.set(wx, 0.1, wz)
       d.scale.setScalar(xs)
       d.rotation.set(0, Math.PI / 4, 0)
@@ -651,6 +762,7 @@ export class CourtScene {
       if (u >= 1) this.tween = null
     }
     this.controls.update()
+    if (this.hexGrowing && this.mode === 'heat') this.layoutHexes(now)
     if (this.dirty || this.playing || this.mode === 'arcs') {
       this.layout(now)
       this.dirty = false
@@ -716,12 +828,21 @@ export class CourtScene {
     const e = this.pendingMove
     if (!e) return
     this.pendingMove = null
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    if (this.mode === 'heat') {
+      const cell = this.pickCell(e.clientX, e.clientY)
+      this.renderer.domElement.style.cursor = cell ? 'help' : 'grab'
+      if (cell || this.hoverCell) this.opts.onHoverCell(cell, x, y)
+      this.hoverCell = cell
+      return
+    }
     const index = this.pick(e.clientX, e.clientY)
     this.renderer.domElement.style.cursor = index === null ? 'grab' : 'pointer'
-    const rect = this.renderer.domElement.getBoundingClientRect()
     if (index !== this.hoverIndex || index !== null) {
       this.hoverIndex = index
-      this.opts.onHover(index, e.clientX - rect.left, e.clientY - rect.top)
+      this.opts.onHover(index, x, y)
     }
   }
 
@@ -732,6 +853,10 @@ export class CourtScene {
 
   private onPointerLeave = (): void => {
     this.pendingMove = null
+    if (this.hoverCell) {
+      this.hoverCell = null
+      this.opts.onHoverCell(null, 0, 0)
+    }
     if (this.hoverIndex !== null) {
       this.hoverIndex = null
       this.opts.onHover(null, 0, 0)
@@ -752,6 +877,7 @@ export class CourtScene {
     if (!d) return
     const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y)
     if (moved > 5 || performance.now() - d.t > 500) return // that was a drag
+    if (this.mode === 'heat') return // hexes are groups of shots, not shots
     const index = this.pick(e.clientX, e.clientY)
     if (index !== null) this.opts.onPick(index)
   }

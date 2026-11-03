@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BACKEND_URL } from './api'
 import type { Shot } from './api'
 import type { CourtScene, MapMode, ViewName } from './court/CourtScene'
-import { applyFilters, heatGrid, hottestZone, summarize, zoneStats } from './court/stats'
+import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneStats } from './court/stats'
+import type { HexCell } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
 
 interface Props {
@@ -17,6 +18,15 @@ interface Hover {
   y: number
   flip: boolean
 }
+
+interface CellHover {
+  cell: HexCell
+  x: number
+  y: number
+  flip: boolean
+}
+
+const MAX_LABELS = 7 // more than this and the zone names print over each other
 
 function Chips<T extends string>(props: {
   label: string
@@ -76,6 +86,7 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
   const [hover, setHover] = useState<Hover | null>(null)
+  const [cellHover, setCellHover] = useState<CellHover | null>(null)
 
   const hostRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<CourtScene | null>(null)
@@ -91,6 +102,7 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
   const summary = useMemo(() => summarize(filtered), [filtered])
   const zones = useMemo(() => zoneStats(filtered), [filtered])
   const hottest = useMemo(() => hottestZone(zones), [zones])
+  const hexes = useMemo(() => hexBins(filtered), [filtered])
 
   // Latest values for scene callbacks, which outlive any one render.
   const filteredRef = useRef(filtered)
@@ -115,6 +127,8 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
             reducedMotion: reduced,
             onHover: (index, x, y) =>
               setHover(index === null ? null : { index, x, y, flip: x > host.clientWidth * 0.55 }),
+            onHoverCell: (cell, x, y) =>
+              setCellHover(cell === null ? null : { cell, x, y, flip: x > host.clientWidth * 0.55 }),
             onPick: (index) => {
               const shot = filteredRef.current[index]
               if (shot) onSelectRef.current(shot.id)
@@ -144,13 +158,21 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
     scene.setData(
       {
         points: filtered.map((s) => ({ x: s.x, y: s.y, made: s.made, three: s.shot_type === '3PT' })),
-        labels: zones.map((z) => ({ x: z.x, y: z.y, title: z.label, detail: `${z.made}/${z.attempts} · ${z.pct}%` })),
+        // Only the busiest zones get a label: the rest are in the Zones list beside the court.
+        labels: zones.slice(0, MAX_LABELS).map((z) => ({
+          x: z.x,
+          y: z.y,
+          title: z.label,
+          value: `${z.pct}%`,
+          sub: `${z.made}/${z.attempts}`,
+        })),
         heat: filtered.length > 0 ? heatGrid(filtered) : null,
+        hexes: filtered.length > 0 ? hexes : null,
       },
       !introDone.current && filtered.length > 0,
     )
     if (filtered.length > 0) introDone.current = true
-  }, [ready, shots, filtered, zones])
+  }, [ready, shots, filtered, zones, hexes])
 
   useEffect(() => sceneRef.current?.setMode(mode), [ready, mode])
   useEffect(() => sceneRef.current?.setAutoRotate(auto), [ready, auto])
@@ -236,20 +258,58 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
                 </p>
               )}
               <p className="stage-hint" aria-hidden="true">
-                Drag to orbit · scroll to zoom · click a shot
+                {mode === 'heat' ? 'Drag to orbit · scroll to zoom · hover a hex' : 'Drag to orbit · scroll to zoom · click a shot'}
               </p>
               <ul className="legend" aria-hidden="true">
-                <li>
-                  <span className="dot made" /> Made
-                </li>
-                <li>
-                  <span className="cross" /> Missed
-                </li>
-                <li>
-                  <span className="ramp" /> Cold → Hot
-                </li>
-                {mode === 'beams' && <li>Taller beam = three-pointer</li>}
+                {mode === 'heat' ? (
+                  <>
+                    <li>
+                      <span className="ramp" /> Colder · typical · hotter
+                    </li>
+                    <li>Bigger, taller hex = more shots</li>
+                    <li className="legend-note">
+                      vs a typical {Math.round(TYPICAL_FG['2PT'] * 100)}% on twos, {Math.round(TYPICAL_FG['3PT'] * 100)}% on threes
+                    </li>
+                  </>
+                ) : (
+                  <>
+                    <li>
+                      <span className="dot made" /> Made
+                    </li>
+                    <li>
+                      <span className="cross" /> Missed
+                    </li>
+                    {mode === 'beams' && <li>Taller beam = three-pointer</li>}
+                  </>
+                )}
               </ul>
+              {cellHover && mode === 'heat' && (
+                <div
+                  className="tip plain"
+                  aria-hidden="true"
+                  style={{
+                    left: cellHover.x,
+                    top: cellHover.y,
+                    transform: `translate(${cellHover.flip ? 'calc(-100% - 14px)' : '14px'}, -50%)`,
+                  }}
+                >
+                  <strong>
+                    {cellHover.cell.made} of {cellHover.cell.attempts} made
+                  </strong>
+                  <span className={cellHover.cell.heat >= 0.5 ? 'tip-made' : 'tip-missed'}>
+                    {Math.round((cellHover.cell.made / cellHover.cell.attempts) * 100)}% here · typical{' '}
+                    {cellHover.cell.expectedPct}%
+                  </span>
+                  <span className="tip-note">
+                    {cellHover.cell.heat >= 0.58
+                      ? 'Hotter than typical'
+                      : cellHover.cell.heat <= 0.42
+                        ? 'Colder than typical'
+                        : 'About typical'}
+                    {cellHover.cell.attempts < 4 ? ' (only a few shots)' : ''}
+                  </span>
+                </div>
+              )}
               {hovered && hover && (
                 <div
                   className="tip"

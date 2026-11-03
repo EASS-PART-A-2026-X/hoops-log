@@ -93,9 +93,9 @@ export function drawCourt(): HTMLCanvasElement {
 }
 
 const COLD = [59, 130, 246] // blue
-const MID = [58, 66, 92] // dim slate: "average" should look quiet, not alarming
+const MID = [88, 98, 134] // slate: "typical" should look calm, but still visible on a dark court
 const HOT_LOW = [255, 122, 47] // orange
-const HOT_HIGH = [255, 214, 140] // warm white at the very top
+const HOT_HIGH = [255, 190, 84] // deep amber at the very top: still orange, never washed to white
 
 const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t)
 

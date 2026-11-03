@@ -435,22 +435,32 @@ h3 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 3px 10px 4px;
-  font-size: 12px;
-  line-height: 1.15;
-  color: var(--orange-soft);
+  padding: 4px 11px 5px;
+  line-height: 1.05;
   white-space: nowrap;
-  border: 1px solid rgba(255, 154, 92, 0.7);
-  border-radius: 10px;
-  background: rgba(9, 13, 19, 0.88);
+  border: 1px solid rgba(255, 154, 92, 0.55);
+  border-radius: 12px;
+  background: rgba(9, 13, 19, 0.82);
+}
+
+.zone-label .zl-name {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .zone-label strong {
   font-family: var(--display);
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 24px;
+  font-weight: 700;
   color: #fff;
+}
+
+.zone-label .zl-sub {
+  font-size: 11px;
+  color: var(--orange-soft);
 }
 
 /* Selected shot (clicked on the map, or "Show on map") */
@@ -673,6 +683,12 @@ h3 {
   pointer-events: none;
 }
 
+.legend .legend-note {
+  width: 100%;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
 .legend li {
   display: inline-flex;
   align-items: center;
@@ -717,6 +733,10 @@ h3 {
   border-radius: 12px;
   background: rgba(9, 13, 19, 0.94);
   pointer-events: none;
+}
+
+.tip.plain {
+  text-transform: none;
 }
 
 .tip strong {

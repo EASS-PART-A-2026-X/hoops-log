@@ -168,3 +168,86 @@ export function heatGrid(shots: MapShot[], cellsPerFoot = 2, sigma = 3.2): HeatG
   }
   return { cols, rows, hot, confidence }
 }
+
+// ---------- hex bins ----------
+
+/** What a typical shooter makes, by shot type. Hex colour compares a spot to this, so a
+ *  36% three is "typical" and a 36% layup is cold. Rounded figures, used only for colour. */
+export const TYPICAL_FG = { '2PT': 0.47, '3PT': 0.36 } as const
+
+export interface HexCell {
+  /** Centre of the hex, in court feet. */
+  x: number
+  y: number
+  attempts: number
+  made: number
+  /** 0 much colder than typical .. 0.5 typical .. 1 much hotter. */
+  heat: number
+  /** Share of the busiest hex's shots, 0..1. Drives hex size and height. */
+  size: number
+  /** What a typical shooter would make from these same shots, as a whole percent. */
+  expectedPct: number
+}
+
+export interface HexBins {
+  /** Centre-to-corner radius of one cell, in feet. */
+  radius: number
+  cells: HexCell[]
+  maxAttempts: number
+}
+
+/** Few shots: big cells that say something. Many shots: smaller cells with more detail. */
+export function hexRadiusFor(count: number): number {
+  return Math.min(3.0, Math.max(1.7, 3.2 - 0.012 * count))
+}
+
+/** Round fractional axial coordinates to the nearest hex (pointy-top layout). */
+function hexRound(q: number, r: number): [number, number] {
+  const s = -q - r
+  let rq = Math.round(q)
+  let rr = Math.round(r)
+  const rs = Math.round(s)
+  const dq = Math.abs(rq - q)
+  const dr = Math.abs(rr - r)
+  const ds = Math.abs(rs - s)
+  if (dq > dr && dq > ds) rq = -rr - rs
+  else if (dr > ds) rr = -rq - rs
+  return [rq, rr]
+}
+
+/**
+ * Group shots into hexagons (the classic shot-chart hexbin). Each cell's heat compares
+ * its makes with what a typical shooter would make from the same shots, pulled toward
+ * "typical" when the cell has few shots, so one lucky make does not look like a hot spot.
+ */
+export function hexBins(shots: MapShot[], radius = hexRadiusFor(shots.length)): HexBins {
+  const sqrt3 = Math.sqrt(3)
+  const bins = new Map<string, { q: number; r: number; attempts: number; made: number; expected: number }>()
+  for (const s of shots) {
+    const q = ((sqrt3 / 3) * s.x - (1 / 3) * s.y) / radius
+    const r = ((2 / 3) * s.y) / radius
+    const [rq, rr] = hexRound(q, r)
+    const key = `${rq},${rr}`
+    const bin = bins.get(key) ?? { q: rq, r: rr, attempts: 0, made: 0, expected: 0 }
+    bin.attempts += 1
+    bin.made += s.made ? 1 : 0
+    bin.expected += TYPICAL_FG[s.shot_type]
+    bins.set(key, bin)
+  }
+  let maxAttempts = 0
+  for (const b of bins.values()) maxAttempts = Math.max(maxAttempts, b.attempts)
+  const cells = [...bins.values()].map((b) => {
+    const diff = (b.made - b.expected) / b.attempts // -0.5 .. +0.5, in fraction made
+    const trust = b.attempts / (b.attempts + 2) // 1 shot: 33%, 4 shots: 67%, 20 shots: 91%
+    return {
+      x: radius * sqrt3 * (b.q + b.r / 2),
+      y: radius * 1.5 * b.r,
+      attempts: b.attempts,
+      made: b.made,
+      heat: Math.min(1, Math.max(0, 0.5 + (diff / 0.5) * trust)),
+      size: maxAttempts > 0 ? b.attempts / maxAttempts : 0,
+      expectedPct: Math.round((b.expected / b.attempts) * 100),
+    }
+  })
+  return { radius, cells, maxAttempts }
+}
