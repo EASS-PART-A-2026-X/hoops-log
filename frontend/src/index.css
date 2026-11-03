@@ -67,9 +67,9 @@ h3 {
 }
 
 .page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 16px 64px;
+  /* Fluid: the app uses the whole window instead of floating in a centred column. */
+  width: 100%;
+  padding: 28px clamp(16px, 3vw, 56px) 64px;
 }
 
 .intro {
@@ -116,7 +116,7 @@ h3 {
 
 .columns {
   display: grid;
-  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, clamp(340px, 28vw, 480px)) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -591,7 +591,7 @@ h3 {
 
 .map-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 21vw, 360px);
   gap: 20px;
   align-items: start;
 }
@@ -619,7 +619,8 @@ h3 {
 
 .stage-canvas {
   position: relative;
-  height: clamp(360px, 54vw, 620px);
+  /* Tall on big screens, never taller than the window: the court should fill the view. */
+  height: clamp(360px, 72vh, 1100px);
   cursor: grab;
 }
 
@@ -690,8 +691,8 @@ h3 {
   width: 10px;
   height: 10px;
   background:
-    linear-gradient(45deg, transparent 43%, #5b9bff 43% 57%, transparent 57%),
-    linear-gradient(-45deg, transparent 43%, #5b9bff 43% 57%, transparent 57%);
+    linear-gradient(45deg, transparent 38%, #8ec1ff 38% 62%, transparent 62%),
+    linear-gradient(-45deg, transparent 38%, #8ec1ff 38% 62%, transparent 62%);
 }
 
 .legend .ramp {

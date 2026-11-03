@@ -39,12 +39,13 @@ export interface SceneOptions {
 
 const MADE_2 = '#ff7a2f'
 const MADE_3 = '#ffb27a'
-const MISSED = '#5b9bff'
+const MISSED = '#8ec1ff'
 const FLIGHT_MS = 760
 const SETTLE_MS = 520
 const ARC_SEGMENTS = 28
 const RELEASE_HEIGHT = 6
 const PICK_RADIUS_PX = 16
+const MISS_STUB = 1.3 // height of the short beam over a missed shot
 
 const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
   broadcast: { pos: [0, 24, 17], target: [0, 0, -19] },
@@ -84,7 +85,7 @@ export class CourtScene {
   private beamGeo: THREE.CylinderGeometry
   private orbGeo = new THREE.SphereGeometry(0.5, 16, 10)
   private ballGeo = new THREE.SphereGeometry(0.34, 8, 6)
-  private xGeo = new THREE.BoxGeometry(1.5, 0.07, 0.26)
+  private xGeo = new THREE.BoxGeometry(2.3, 0.12, 0.42)
   private beamMat = new THREE.MeshBasicMaterial({
     color: '#8c8c8c', // dims the additive beams so overlapping ones do not blow out to white
     vertexColors: true,
@@ -594,7 +595,7 @@ export class CourtScene {
       // beam
       d.rotation.set(0, 0, 0)
       d.position.set(wx, 0, wz)
-      d.scale.set(1, p.made && beamsOn ? height * shown : 0.0001, 1)
+      d.scale.set(1, beamsOn ? (p.made ? height : MISS_STUB) * shown : 0.0001, 1)
       d.updateMatrix()
       this.beams.setMatrixAt(i, d.matrix)
       // orb (made only)
@@ -604,8 +605,9 @@ export class CourtScene {
       d.updateMatrix()
       this.orbs.setMatrixAt(i, d.matrix)
       // X marks (missed only), two crossed bars lying on the floor
-      const xs = p.made ? 0.0001 : Math.max(dot * shown, 0.0001)
-      d.position.set(wx, 0.07, wz)
+      // Misses stay large: a cross that is too small to see is a missing data point.
+      const xs = p.made ? 0.0001 : Math.max((beamsOn ? 1 : 0.85) * (0.7 + 0.3 * this.density) * shown, 0.0001)
+      d.position.set(wx, 0.1, wz)
       d.scale.setScalar(xs)
       d.rotation.set(0, Math.PI / 4, 0)
       d.updateMatrix()
