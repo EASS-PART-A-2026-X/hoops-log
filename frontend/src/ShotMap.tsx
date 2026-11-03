@@ -10,6 +10,8 @@ interface Props {
   shots: Shot[] | null
   /** Why the shots could not be loaded, if they could not. */
   loadError: string | null
+  /** True while a reload is in flight, so the retry button can say so. */
+  retrying: boolean
   onRetry: () => void
   selectedId: number | null
   onSelect: (id: number) => void
@@ -81,7 +83,7 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelect }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [player, setPlayer] = useState('')
@@ -89,7 +91,8 @@ export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelec
   const [view, setView] = useState<ViewName>('shooter')
   const [auto, setAuto] = useState(false)
   const [ready, setReady] = useState(false)
-  const [failed, setFailed] = useState(false)
+  // Why the 3D view is not running: it never started, or the browser took the context away.
+  const [failed, setFailed] = useState<'start' | 'lost' | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [cellHover, setCellHover] = useState<CellHover | null>(null)
 
@@ -125,10 +128,10 @@ export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelec
     let scene: CourtScene | null = null
     // Without WebGL the flat chart can only filter by player, so the other filters go back to
     // their defaults. A scene that was running is stopped, not left drawing to nobody.
-    const fail = () => {
+    const fail = (reason: 'start' | 'lost') => {
       sceneRef.current?.dispose()
       sceneRef.current = null
-      setFailed(true)
+      setFailed(reason)
       setReady(false)
       setArea('all')
       setResult('all')
@@ -148,16 +151,16 @@ export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelec
               const shot = filteredRef.current[index]
               if (shot) onSelectRef.current(shot.id)
             },
-            onFail: fail,
+            onFail: () => fail('lost'),
           })
           sceneRef.current = scene
           if (import.meta.env.DEV) (window as unknown as { __court?: CourtScene }).__court = scene
           setReady(true)
         } catch {
-          fail() // no WebGL: show the flat chart instead
+          fail('start') // no WebGL: show the flat chart instead
         }
       })
-      .catch(fail)
+      .catch(() => fail('start'))
     return () => {
       stop.abort()
       sceneRef.current = null
@@ -215,7 +218,9 @@ export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelec
   }
   const loading = shots === null
   const label = loading
-    ? 'Shot map, loading'
+    ? loadError
+      ? 'Shot map. The shots could not be loaded.'
+      : 'Shot map, loading'
     : `Shot map. ${summary.attempts} shots, ${summary.made} made${hottest ? `, hottest zone ${hottest.label}` : ''}. The shot list and zone breakdown give the same data as text.`
   const chartUrl = `${BACKEND_URL}/chart.svg${activePlayer ? `?player=${encodeURIComponent(activePlayer)}` : ''}`
 
@@ -227,8 +232,8 @@ export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelec
           <h2 id="map-title">Where your shots live</h2>
         </div>
         <div className="filters">
-          <Chips label="Shot area" value={area} options={AREAS} onChange={setArea} disabled={failed} />
-          <Chips label="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed} />
+          <Chips label="Shot area" value={area} options={AREAS} onChange={setArea} disabled={failed !== null} />
+          <Chips label="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed !== null} />
           <label className="player-filter">
             <span className="sr-only">Player</span>
             <select value={activePlayer} onChange={(e) => setPlayer(e.target.value)}>
@@ -272,10 +277,17 @@ export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelec
           {failed ? (
             <div className="stage-fallback">
               <p>
-                The 3D view needs WebGL, which this browser could not start. Here is the flat chart
-                instead. It can only be filtered by player, and its colours (green made, red missed)
-                come from the backend.
+                {failed === 'lost'
+                  ? 'The browser took the 3D drawing context away (a GPU reset, or the tab sat in the background). '
+                  : 'The 3D view needs WebGL, which this browser could not start. '}
+                Here is the flat chart instead. It can only be filtered by player, and its colours
+                (green made, red missed) come from the backend.
               </p>
+              {failed === 'lost' && (
+                <button type="button" className="btn" onClick={() => window.location.reload()}>
+                  Reload to try 3D again
+                </button>
+              )}
               <img src={chartUrl} alt={`Shot chart: green circles are made shots, red crosses are misses.`} />
             </div>
           ) : (
@@ -284,8 +296,8 @@ export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelec
               {!shots && loadError ? (
                 <div className="stage-msg stage-msg-error" role="alert">
                   <p>Could not load the shots, so there is nothing to draw.</p>
-                  <button type="button" className="btn" onClick={onRetry}>
-                    Try again
+                  <button type="button" className="btn" onClick={onRetry} disabled={retrying}>
+                    {retrying ? 'Trying…' : 'Try again'}
                   </button>
                 </div>
               ) : (

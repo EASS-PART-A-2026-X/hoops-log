@@ -3,12 +3,13 @@
 
     python3 scripts/seed_demo.py                 # add 150 shots to http://localhost:8000
     python3 scripts/seed_demo.py --count 400
-    python3 scripts/seed_demo.py --remove        # delete the "Demo ..." shots
+    python3 scripts/seed_demo.py --remove        # delete the demo shots
     python3 scripts/seed_demo.py --url http://localhost:8002
 
 Only the standard library is used. The shots go through POST /shots, so the backend
-checks and classifies them like any other. Demo players are named "Demo ..." so
---remove can find them and never touches your real shots.
+checks and classifies them like any other. The demo players are exactly "Demo Yuly" and
+"Demo Noam"; --remove and the refusal to add twice look for those two names only, so a
+real player with a similar name is never touched.
 """
 
 import argparse
@@ -20,8 +21,8 @@ import urllib.error
 import urllib.request
 
 HOOP_X, HOOP_Y = 25.0, 5.25
-PREFIX = "Demo "
 PLAYERS = [("Demo Yuly", 0.7), ("Demo Noam", 0.3)]
+DEMO_NAMES = {name for name, _ in PLAYERS}
 
 
 def polar(radius: float, angle: float) -> tuple[float, float]:
@@ -94,7 +95,7 @@ def list_all(base: str) -> list[dict]:
 
 
 def add(base: str, count: int) -> None:
-    existing = [s for s in list_all(base) if s["player"].startswith(PREFIX)]
+    existing = [s for s in list_all(base) if s["player"] in DEMO_NAMES]
     if existing:
         raise SystemExit(
             f"{len(existing)} demo shots are already in {base}. "
@@ -135,7 +136,7 @@ def add(base: str, count: int) -> None:
 
 
 def remove(base: str) -> None:
-    demo = [s for s in list_all(base) if s["player"].startswith(PREFIX)]
+    demo = [s for s in list_all(base) if s["player"] in DEMO_NAMES]
     for shot in demo:
         call(f"{base}/shots/{shot['id']}", "DELETE")
     print(f"Removed {len(demo)} demo shots from {base}")

@@ -100,6 +100,7 @@ export default function App() {
         <ShotMap
           shots={shots}
           loadError={loadError}
+          retrying={loading}
           onRetry={() => void refresh()}
           selectedId={selectedId}
           onSelect={pickFromMap}
