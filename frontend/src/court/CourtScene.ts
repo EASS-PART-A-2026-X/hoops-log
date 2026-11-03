@@ -51,11 +51,12 @@ const RELEASE_HEIGHT = 6
 const PICK_RADIUS_PX = 16
 const MISS_STUB = 1.3 // height of the short beam over a missed shot
 
+// The camera stands on the half-court side and looks toward the basket (+Z).
 const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
-  broadcast: { pos: [0, 24, 17], target: [0, 0, -19] },
-  top: { pos: [0, 76, -17], target: [0, 0, -23.5] },
-  low: { pos: [0, 4.5, 11], target: [0, 3, -22] },
-  side: { pos: [-46, 17, -14], target: [0, 0, -20] },
+  broadcast: { pos: [0, 34, -66], target: [0, 0, -15] },
+  top: { pos: [0, 76, -30], target: [0, 0, -23.5] },
+  low: { pos: [0, 6, -58], target: [0, 3.5, -8] },
+  side: { pos: [-46, 17, -20], target: [0, 0, -18] },
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -785,7 +786,7 @@ export class CourtScene {
     this.bloom.resolution.set(w, h)
     this.camera.aspect = w / h
     // A narrow container needs a wider field of view or the court is cut off.
-    this.camera.fov = w / h < 1 ? 58 : w / h < 1.4 ? 48 : 38
+    this.camera.fov = w / h < 1 ? 60 : w / h < 1.4 ? 50 : 42
     this.camera.updateProjectionMatrix()
     this.dirty = true
   }

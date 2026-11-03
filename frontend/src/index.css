@@ -770,6 +770,9 @@ h3 {
 }
 
 .stage-fallback img {
+  /* The backend draws the basket at the bottom; flip it so the basket is at the top, like
+     the shooter-view 3D court (left stays left). */
+  transform: scaleY(-1);
   display: block;
   width: 100%;
   max-width: 560px;

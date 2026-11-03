@@ -126,7 +126,8 @@ export function paintHeat(canvas: HTMLCanvasElement, grid: HeatGrid | null): voi
     for (let c = 0; c < grid.cols; c++) {
       const i = r * grid.cols + c
       const [R, G, B] = heatColor(grid.hot[i])
-      const o = (row * grid.cols + c) * 4
+      // Mirrored like toWorld(): the plane is seen from half court, so x runs right to left.
+      const o = (row * grid.cols + (grid.cols - 1 - c)) * 4
       image.data[o] = R
       image.data[o + 1] = G
       image.data[o + 2] = B

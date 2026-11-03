@@ -15,8 +15,15 @@ export const FREE_THROW_Y = 19
 export const RESTRICTED_RADIUS = 4
 export const BACKBOARD_Y = 4
 
-/** Court (x, y) in feet to world [X, Z]. The camera sits behind the baseline looking
- *  toward half court, so +x is to the viewer's right and half court is far away. */
+/**
+ * Court (x, y) in feet to world [X, Z].
+ *
+ * The viewer stands at half court looking at the basket, the way a shooter sees it, so
+ * the right corner is on the viewer's right. In that view a camera's right is world -X,
+ * so x is mirrored: larger x (the API's "right" zones) is on the right of the screen
+ * and smaller x (its "left" zones) on the left. Z runs from the baseline (0) out to half
+ * court (-47).
+ */
 export function toWorld(x: number, y: number): [number, number] {
-  return [x - HOOP_X, -y]
+  return [HOOP_X - x, -y]
 }

@@ -68,7 +68,7 @@ const MODES: [MapMode, string][] = [
   ['arcs', 'Flight paths'],
 ]
 const VIEWS: [ViewName, string][] = [
-  ['broadcast', 'Broadcast'],
+  ['broadcast', 'Shooter view'],
   ['top', 'Top down'],
   ['low', 'Low angle'],
   ['side', 'Sideline'],
