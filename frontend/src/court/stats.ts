@@ -73,7 +73,7 @@ export function zoneStats(shots: MapShot[]): ZoneStat[] {
       label: zoneLabel(zone),
       made: z.made,
       attempts: z.attempts,
-      pct: Math.round((z.made / z.attempts) * 100),
+      pct: pct(z.made, z.attempts) ?? 0,
       x: z.sx / z.attempts,
       y: z.sy / z.attempts,
     }))
@@ -193,7 +193,6 @@ export interface HexBins {
   /** Centre-to-corner radius of one cell, in feet. */
   radius: number
   cells: HexCell[]
-  maxAttempts: number
 }
 
 /** Few shots: big cells that say something. Many shots: smaller cells with more detail. */
@@ -249,5 +248,5 @@ export function hexBins(shots: MapShot[], radius = hexRadiusFor(shots.length)): 
       expectedPct: Math.round((b.expected / b.attempts) * 100),
     }
   })
-  return { radius, cells, maxAttempts }
+  return { radius, cells }
 }

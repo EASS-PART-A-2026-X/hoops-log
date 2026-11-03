@@ -5,13 +5,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
-import { flightPoint } from './flight'
+import { flightPoint, planFlight } from './flight'
+import type { FlightPlan } from './flight'
 import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
 import type { HeatGrid, HexBins, HexCell } from './stats'
 import { drawCourt, heatColor, paintHeat } from './textures'
 
 export type MapMode = 'heat' | 'beams' | 'arcs'
-export type ViewName = 'broadcast' | 'top' | 'low' | 'side'
+export type ViewName = 'shooter' | 'top' | 'low' | 'side'
 
 export interface ScenePoint {
   x: number // court feet
@@ -53,7 +54,7 @@ const MISS_STUB = 1.3 // height of the short beam over a missed shot
 
 // The camera stands on the half-court side and looks toward the basket (+Z).
 const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
-  broadcast: { pos: [0, 34, -66], target: [0, 0, -15] },
+  shooter: { pos: [0, 34, -66], target: [0, 0, -15] },
   top: { pos: [0, 76, -30], target: [0, 0, -23.5] },
   low: { pos: [0, 6, -58], target: [0, 3.5, -8] },
   side: { pos: [-46, 17, -20], target: [0, 0, -18] },
@@ -123,6 +124,8 @@ export class CourtScene {
   private arcs: THREE.LineSegments | null = null
 
   private pts: ScenePoint[] = []
+  /** One flight plan per shot, made when the data changes (not on every frame). */
+  private plans: FlightPlan[] = []
   /** 1 for a normal log, smaller as thousands of shots crowd the court. */
   private density = 1
   private mode: MapMode = 'beams'
@@ -162,72 +165,92 @@ export class CourtScene {
     canvas.tabIndex = 0
     container.appendChild(canvas)
 
-    this.scene.background = new THREE.Color('#0b0f14')
-    this.scene.fog = new THREE.FogExp2('#0b0f14', 0.0085)
-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.5, 400)
-    this.camera.position.set(...VIEWS.broadcast.pos)
+    try {
+      this.scene.background = new THREE.Color('#0b0f14')
+      this.scene.fog = new THREE.FogExp2('#0b0f14', 0.0085)
+      this.camera = new THREE.PerspectiveCamera(38, 1, 0.5, 400)
+      this.camera.position.set(...VIEWS.shooter.pos)
 
-    this.controls = new OrbitControls(this.camera, canvas)
-    this.controls.enableDamping = true
-    this.controls.dampingFactor = 0.08
-    this.controls.minDistance = 10
-    this.controls.maxDistance = 95
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.035
-    this.controls.target.set(...VIEWS.broadcast.target)
-    this.controls.autoRotateSpeed = 0.9
-    this.controls.listenToKeyEvents(canvas)
+      this.controls = new OrbitControls(this.camera, canvas)
+      this.controls.enableDamping = true
+      this.controls.dampingFactor = 0.08
+      this.controls.minDistance = 10
+      this.controls.maxDistance = 95
+      this.controls.maxPolarAngle = Math.PI / 2 - 0.035
+      this.controls.target.set(...VIEWS.shooter.target)
+      this.controls.autoRotateSpeed = 0.9
+      this.controls.listenToKeyEvents(canvas)
 
-    this.composer = new EffectComposer(renderer)
-    this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.45, 0.32)
-    this.composer.addPass(this.bloom)
-    this.composer.addPass(new OutputPass())
+      this.composer = new EffectComposer(renderer)
+      this.composer.addPass(new RenderPass(this.scene, this.camera))
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.45, 0.32)
+      this.composer.addPass(this.bloom)
+      this.composer.addPass(new OutputPass())
 
-    this.beamGeo = this.makeBeamGeometry()
-    this.hexGeo.translate(0, 0.5, 0)
-    // Only the hex cells are lit; everything else is unlit and glows on its own.
-    this.scene.add(new THREE.AmbientLight('#ffffff', 0.85), new THREE.DirectionalLight('#ffffff', 1.15).translateX(-12).translateY(34).translateZ(18))
-    this.buildStatic()
+      this.beamGeo = this.makeBeamGeometry()
+      this.hexGeo.translate(0, 0.5, 0)
+      // Only the hex cells are lit; everything else is unlit and glows on its own.
+      this.scene.add(new THREE.AmbientLight('#ffffff', 0.85), new THREE.DirectionalLight('#ffffff', 1.15).translateX(-12).translateY(34).translateZ(18))
+      this.buildStatic()
 
-    this.heatCanvas.width = 100
-    this.heatCanvas.height = 94
-    this.heatTexture = new THREE.CanvasTexture(this.heatCanvas)
-    this.heatTexture.colorSpace = THREE.SRGBColorSpace
-    this.heatTexture.generateMipmaps = false
-    this.heatTexture.minFilter = THREE.LinearFilter
-    this.heatTexture.magFilter = THREE.LinearFilter
-    this.heatPlane = new THREE.Mesh(
-      this.flatPlane(),
-      new THREE.MeshBasicMaterial({ map: this.heatTexture, transparent: true, depthWrite: false, opacity: 0.22 }),
-    )
-    this.heatPlane.position.y = 0.04
-    this.scene.add(this.heatPlane)
-    // Zone labels are real HTML (crisp, selectable, untouched by the glow effect).
-    const labelDom = this.labelRenderer.domElement
-    labelDom.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none'
-    container.appendChild(labelDom)
-    this.buildMarker()
+      this.heatCanvas.width = 100
+      this.heatCanvas.height = 94
+      this.heatTexture = new THREE.CanvasTexture(this.heatCanvas)
+      this.heatTexture.colorSpace = THREE.SRGBColorSpace
+      this.heatTexture.generateMipmaps = false
+      this.heatTexture.minFilter = THREE.LinearFilter
+      this.heatTexture.magFilter = THREE.LinearFilter
+      this.heatPlane = new THREE.Mesh(
+        this.flatPlane(),
+        new THREE.MeshBasicMaterial({ map: this.heatTexture, transparent: true, depthWrite: false, opacity: 0.22 }),
+      )
+      this.heatPlane.position.y = 0.04
+      this.scene.add(this.heatPlane)
+      // Zone labels are real HTML (crisp, selectable, untouched by the glow effect).
+      const labelDom = this.labelRenderer.domElement
+      labelDom.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none'
+      container.appendChild(labelDom)
+      this.buildMarker()
 
-    canvas.addEventListener('pointermove', this.onPointerMove)
-    canvas.addEventListener('pointerdown', this.onPointerDown)
-    canvas.addEventListener('pointerup', this.onPointerUp)
-    canvas.addEventListener('pointerleave', this.onPointerLeave)
-    canvas.addEventListener('webglcontextlost', this.onContextLost)
+      canvas.addEventListener('pointermove', this.onPointerMove)
+      canvas.addEventListener('pointerdown', this.onPointerDown)
+      canvas.addEventListener('pointerup', this.onPointerUp)
+      canvas.addEventListener('pointerleave', this.onPointerLeave)
+      canvas.addEventListener('webglcontextlost', this.onContextLost)
 
-    this.resizeObserver = new ResizeObserver(() => this.resize())
-    this.resizeObserver.observe(container)
-    this.intersection = new IntersectionObserver((entries) => {
-      this.visible = entries.some((e) => e.isIntersecting)
-    })
-    this.intersection.observe(container)
-    this.resize()
-    this.raf = requestAnimationFrame(this.tick)
+      this.resizeObserver = new ResizeObserver(() => this.resize())
+      this.resizeObserver.observe(container)
+      this.intersection = new IntersectionObserver((entries) => {
+        this.visible = entries.some((e) => e.isIntersecting)
+      })
+      this.intersection.observe(container)
+      this.resize()
+      this.raf = requestAnimationFrame(this.tick)
+    } catch (error) {
+      // A constructor that throws leaves no object to dispose(), so release what exists.
+      // Some of these were never created, hence the loose type.
+      const made = this as unknown as {
+        resizeObserver?: ResizeObserver
+        intersection?: IntersectionObserver
+        controls?: OrbitControls
+      }
+      cancelAnimationFrame(this.raf)
+      made.resizeObserver?.disconnect()
+      made.intersection?.disconnect()
+      made.controls?.dispose()
+      this.labelRenderer.domElement.remove()
+      renderer.dispose()
+      renderer.forceContextLoss()
+      canvas.remove()
+      throw error
+    }
   }
 
   // ---------- public API ----------
 
   setData(data: SceneData, intro: boolean): void {
     this.pts = data.points
+    this.plans = data.points.map((p, i) => planFlight(p, i))
     // Crowded courts get dimmer beams, smaller markers and less glow, or they wash out to white.
     this.density = Math.min(1, Math.sqrt(250 / Math.max(1, data.points.length)))
     this.beamMat.color.setScalar(0.2 + 0.35 * this.density)
@@ -480,7 +503,7 @@ export class CourtScene {
 
   /** Point on a shot's whole flight, u from 0 (release) to 1 (through the net, or off the iron to the floor). */
   private arcPoint(i: number, u: number, out: THREE.Vector3): THREE.Vector3 {
-    const [x, y, z] = flightPoint(this.pts[i], i, u)
+    const [x, y, z] = flightPoint(this.pts[i], i, u, this.plans[i])
     return out.set(x, y, z)
   }
 
@@ -680,10 +703,7 @@ export class CourtScene {
     const d = this.dummy
     const t = now - this.playStart
     const tail = n > 0 ? (n - 1) * this.stagger + FLIGHT_MS + SETTLE_MS : 0
-    if (this.playing && t > tail) {
-      this.playing = false
-      this.applyMode()
-    }
+    if (this.playing && t > tail) this.playing = false
     const beamsOn = this.mode === 'beams'
     const heatOn = this.mode === 'heat'
     // In heat mode the hexes carry the data; the individual dots would only clutter them.
@@ -725,7 +745,7 @@ export class CourtScene {
       if (this.playing && local > 0 && local < FLIGHT_MS) {
         this.arcPoint(i, local / FLIGHT_MS, tmp)
         ballScale = 1
-      } else if (!this.playing && this.mode === 'arcs') {
+      } else if (!this.playing && this.mode === 'arcs' && !this.opts.reducedMotion) {
         const u = (now / 2600 + i * 0.173) % 1
         this.arcPoint(i, u, tmp)
         ballScale = 0.55
@@ -757,11 +777,11 @@ export class CourtScene {
     }
     this.controls.update()
     if (this.hexGrowing && this.mode === 'heat') this.layoutHexes(now)
-    if (this.dirty || this.playing || this.mode === 'arcs') {
+    if (this.dirty || this.playing || (this.mode === 'arcs' && !this.opts.reducedMotion)) {
       this.layout(now)
       this.dirty = false
     }
-    if (this.marker.visible) {
+    if (this.marker.visible && !this.opts.reducedMotion) {
       const pulse = 1 + 0.18 * Math.sin(now / 260)
       this.marker.children[0].scale.set(pulse, 1, pulse)
     }

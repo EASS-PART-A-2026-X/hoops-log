@@ -411,7 +411,6 @@ h3 {
 .shot-meta {
   color: var(--muted);
   font-size: 14px;
-  text-transform: capitalize;
 }
 
 .shot-note {
@@ -650,6 +649,39 @@ h3 {
   color: #fff;
   text-shadow: 0 2px 18px #000;
   pointer-events: none;
+}
+
+.stage-msg-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.stage-msg-error p {
+  margin: 0;
+}
+
+.stage-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 4px 6px 4px 14px;
+  font-size: 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--orange);
+  border-radius: 22px;
+  background: rgba(9, 13, 19, 0.94);
+}
+
+.kpi-sub {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .stage-hint {

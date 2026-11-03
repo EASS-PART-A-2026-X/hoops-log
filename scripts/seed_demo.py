@@ -4,7 +4,7 @@
     python3 scripts/seed_demo.py                 # add 150 shots to http://localhost:8000
     python3 scripts/seed_demo.py --count 400
     python3 scripts/seed_demo.py --remove        # delete the "Demo ..." shots
-    python3 scripts/seed_demo.py --url http://localhost:8001
+    python3 scripts/seed_demo.py --url http://localhost:8002
 
 Only the standard library is used. The shots go through POST /shots, so the backend
 checks and classifies them like any other. Demo players are named "Demo ..." so
@@ -94,28 +94,44 @@ def list_all(base: str) -> list[dict]:
 
 
 def add(base: str, count: int) -> None:
+    existing = [s for s in list_all(base) if s["player"].startswith(PREFIX)]
+    if existing:
+        raise SystemExit(
+            f"{len(existing)} demo shots are already in {base}. "
+            "Run with --remove first, so the demo is not added twice."
+        )
     random.seed(7)  # the same demo every time
     today = datetime.date.today()
     weights = [weight for weight, _, _ in REGIONS]
-    for _ in range(count):
-        _, chance, spot = random.choices(REGIONS, weights)[0]
-        x, y = spot()
-        player = random.choices([p for p, _ in PLAYERS], [w for _, w in PLAYERS])[0]
-        call(
-            f"{base}/shots",
-            "POST",
-            {
-                "player": player,
-                "x": min(50.0, max(0.0, round(x, 1))),
-                "y": min(47.0, max(0.0, round(y, 1))),
-                "made": random.random() < chance,
-                "game_date": (
-                    today - datetime.timedelta(days=random.randint(0, 21))
-                ).isoformat(),
-                "note": random.choice(NOTES),
-            },
-        )
-    print(f"Added {count} demo shots to {base}")
+    added = 0
+    try:
+        for _ in range(count):
+            _, chance, spot = random.choices(REGIONS, weights)[0]
+            x, y = spot()
+            names, shares = zip(*PLAYERS, strict=True)
+            player = random.choices(names, shares)[0]
+            call(
+                f"{base}/shots",
+                "POST",
+                {
+                    "player": player,
+                    "x": min(50.0, max(0.0, round(x, 1))),
+                    "y": min(47.0, max(0.0, round(y, 1))),
+                    "made": random.random() < chance,
+                    "game_date": (
+                        today - datetime.timedelta(days=random.randint(0, 21))
+                    ).isoformat(),
+                    "note": random.choice(NOTES),
+                },
+            )
+            added += 1
+    except urllib.error.HTTPError as error:
+        # The server answered, so it is up: it refused a request. Say how far we got.
+        raise SystemExit(
+            f"The backend at {base} answered HTTP {error.code} ({error.reason}) "
+            f"after {added} of {count} shots were added. Run --remove to undo."
+        ) from None
+    print(f"Added {added} demo shots to {base}")
 
 
 def remove(base: str) -> None:
@@ -140,6 +156,10 @@ def main() -> None:
     base = args.url.rstrip("/")
     try:
         remove(base) if args.remove else add(base, args.count)
+    except urllib.error.HTTPError as error:
+        raise SystemExit(
+            f"The backend at {base} answered HTTP {error.code} ({error.reason})."
+        ) from None
     except urllib.error.URLError as error:
         raise SystemExit(
             f"Cannot reach the backend at {base}: {error.reason}. Is it running?"

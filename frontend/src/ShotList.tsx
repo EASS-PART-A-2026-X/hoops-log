@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Shot, ShotInput } from './api'
+import { zoneLabel } from './court/stats'
 import ShotForm from './ShotForm'
 
 interface Props {
@@ -9,8 +10,6 @@ interface Props {
   onSave: (id: number, input: ShotInput) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }
-
-const zoneLabel = (zone: string) => zone.replaceAll('_', ' ')
 
 function Row({
   shot,

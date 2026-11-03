@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BACKEND_URL } from './api'
 import type { Shot } from './api'
 import type { CourtScene, MapMode, ViewName } from './court/CourtScene'
-import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneStats } from './court/stats'
+import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneStats } from './court/stats'
 import type { HexCell } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
 
 interface Props {
   shots: Shot[] | null
+  /** Why the shots could not be loaded, if they could not. */
+  loadError: string | null
+  onRetry: () => void
   selectedId: number | null
   onSelect: (id: number) => void
 }
@@ -33,6 +36,7 @@ function Chips<T extends string>(props: {
   value: T
   options: [T, string][]
   onChange: (value: T) => void
+  disabled?: boolean
 }) {
   return (
     <div className="chips" role="group" aria-label={props.label}>
@@ -42,6 +46,7 @@ function Chips<T extends string>(props: {
           type="button"
           className="chip"
           aria-pressed={props.value === id}
+          disabled={props.disabled}
           onClick={() => props.onChange(id)}
         >
           {text}
@@ -68,7 +73,7 @@ const MODES: [MapMode, string][] = [
   ['arcs', 'Flight paths'],
 ]
 const VIEWS: [ViewName, string][] = [
-  ['broadcast', 'Shooter view'],
+  ['shooter', 'Shooter view'],
   ['top', 'Top down'],
   ['low', 'Low angle'],
   ['side', 'Sideline'],
@@ -76,12 +81,12 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, selectedId, onSelect }: Props) {
+export default function ShotMap({ shots, loadError, onRetry, selectedId, onSelect }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [player, setPlayer] = useState('')
   const [mode, setMode] = useState<MapMode>('beams')
-  const [view, setView] = useState<ViewName>('broadcast')
+  const [view, setView] = useState<ViewName>('shooter')
   const [auto, setAuto] = useState(false)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -118,6 +123,16 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
     if (!host) return
     const stop = new AbortController()
     let scene: CourtScene | null = null
+    // Without WebGL the flat chart can only filter by player, so the other filters go back to
+    // their defaults. A scene that was running is stopped, not left drawing to nobody.
+    const fail = () => {
+      sceneRef.current?.dispose()
+      sceneRef.current = null
+      setFailed(true)
+      setReady(false)
+      setArea('all')
+      setResult('all')
+    }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     import('./court/CourtScene')
       .then(({ CourtScene }) => {
@@ -133,16 +148,16 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
               const shot = filteredRef.current[index]
               if (shot) onSelectRef.current(shot.id)
             },
-            onFail: () => setFailed(true),
+            onFail: fail,
           })
           sceneRef.current = scene
           if (import.meta.env.DEV) (window as unknown as { __court?: CourtScene }).__court = scene
           setReady(true)
         } catch {
-          setFailed(true) // no WebGL: show the flat chart instead
+          fail() // no WebGL: show the flat chart instead
         }
       })
-      .catch(() => setFailed(true))
+      .catch(fail)
     return () => {
       stop.abort()
       sceneRef.current = null
@@ -178,7 +193,7 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
   useEffect(() => sceneRef.current?.setAutoRotate(auto), [ready, auto])
   useEffect(() => {
     // The first view is the scene's own default; only move the camera for a real choice.
-    if (view !== 'broadcast' || introDone.current) sceneRef.current?.setView(view)
+    if (view !== 'shooter' || introDone.current) sceneRef.current?.setView(view)
   }, [ready, view])
   const selectedIndex = useMemo(
     () => (selectedId === null ? -1 : filtered.findIndex((s) => s.id === selectedId)),
@@ -190,6 +205,14 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
   )
 
   const hovered = hover ? filtered[hover.index] : undefined
+  // "Show on map" for a shot the current filters hide: say so, and offer the way out.
+  const hiddenSelected =
+    selectedId !== null && (shots ?? []).some((s) => s.id === selectedId) && !filtered.some((s) => s.id === selectedId)
+  const clearFilters = () => {
+    setArea('all')
+    setResult('all')
+    setPlayer('')
+  }
   const loading = shots === null
   const label = loading
     ? 'Shot map, loading'
@@ -204,8 +227,8 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
           <h2 id="map-title">Where your shots live</h2>
         </div>
         <div className="filters">
-          <Chips label="Shot area" value={area} options={AREAS} onChange={setArea} />
-          <Chips label="Result" value={result} options={RESULTS} onChange={setResult} />
+          <Chips label="Shot area" value={area} options={AREAS} onChange={setArea} disabled={failed} />
+          <Chips label="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed} />
           <label className="player-filter">
             <span className="sr-only">Player</span>
             <select value={activePlayer} onChange={(e) => setPlayer(e.target.value)}>
@@ -236,6 +259,11 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
         <div className="kpi hot">
           <span className="kpi-label">HOTTEST ZONE</span>
           <span className="kpi-value small">{hottest ? hottest.label : '–'}</span>
+          {hottest && (
+            <span className="kpi-sub">
+              {hottest.made}/{hottest.attempts} made · {hottest.pct}%
+            </span>
+          )}
         </div>
       </div>
 
@@ -243,13 +271,34 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
         <div className="stage">
           {failed ? (
             <div className="stage-fallback">
-              <p>The 3D view needs WebGL, which this browser could not start. Here is the flat chart instead.</p>
+              <p>
+                The 3D view needs WebGL, which this browser could not start. Here is the flat chart
+                instead. It can only be filtered by player, and its colours (green made, red missed)
+                come from the backend.
+              </p>
               <img src={chartUrl} alt={`Shot chart: green circles are made shots, red crosses are misses.`} />
             </div>
           ) : (
             <div className="stage-frame">
               <div ref={hostRef} className="stage-canvas" role="img" aria-label={label} />
-              {(loading || !ready) && <p className="stage-msg">Loading the court…</p>}
+              {!shots && loadError ? (
+                <div className="stage-msg stage-msg-error" role="alert">
+                  <p>Could not load the shots, so there is nothing to draw.</p>
+                  <button type="button" className="btn" onClick={onRetry}>
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                (loading || !ready) && <p className="stage-msg">Loading the court…</p>
+              )}
+              {hiddenSelected && (
+                <div className="stage-notice">
+                  Shot #{selectedId} is hidden by the current filters.
+                  <button type="button" className="link" onClick={clearFilters}>
+                    Show all shots
+                  </button>
+                </div>
+              )}
               {ready && !loading && filtered.length === 0 && (
                 <p className="stage-msg">
                   {(shots ?? []).length === 0
@@ -325,7 +374,7 @@ export default function ShotMap({ shots, selectedId, onSelect }: Props) {
                     {hovered.made ? 'Made' : 'Missed'} · {hovered.shot_type}
                   </span>
                   <span>
-                    {hovered.zone.replaceAll('_', ' ')} · {hovered.game_date}
+                    {zoneLabel(hovered.zone)} · {hovered.game_date}
                   </span>
                   {hovered.note && <span className="tip-note">{hovered.note}</span>}
                 </div>

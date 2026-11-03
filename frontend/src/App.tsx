@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
 import type { ShotInput } from './api'
 import ShotForm from './ShotForm'
@@ -15,6 +15,9 @@ export default function App() {
   const { shots, truncated, loading, loadError, refresh } = useShots()
   const [notice, setNotice] = useState<Notice | null>(null)
   const [pickedId, setPickedId] = useState<number | null>(null)
+  // Where to scroll after the next render: the target row or the map only exists once the
+  // selection has been drawn (a row past the first 100, say), so scrolling cannot happen in the click.
+  const [scrollTarget, setScrollTarget] = useState<{ id: string; block: ScrollLogicalPosition } | null>(null)
   // A deleted shot cannot stay selected.
   const selectedId = shots?.some((s) => s.id === pickedId) ? pickedId : null
 
@@ -51,18 +54,22 @@ export default function App() {
     await refresh()
   }
 
-  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const scrollTo = (id: string, block: ScrollLogicalPosition) =>
-    document.getElementById(id)?.scrollIntoView({ block, behavior: reduced() ? 'auto' : 'smooth' })
+  useEffect(() => {
+    if (!scrollTarget) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    document
+      .getElementById(scrollTarget.id)
+      ?.scrollIntoView({ block: scrollTarget.block, behavior: reduced ? 'auto' : 'smooth' })
+  }, [scrollTarget])
 
   // Clicked a shot on the map: highlight its row. Clicked "Show on map": highlight the shot.
   function pickFromMap(id: number) {
     setPickedId(id)
-    scrollTo(`shot-${id}`, 'nearest')
+    setScrollTarget({ id: `shot-${id}`, block: 'nearest' })
   }
   function locate(id: number) {
     setPickedId(id)
-    scrollTo('map-title', 'start')
+    setScrollTarget({ id: 'map-title', block: 'start' })
   }
 
   const made = shots?.filter((s) => s.made).length ?? 0
@@ -90,7 +97,13 @@ export default function App() {
           )}
         </div>
 
-        <ShotMap shots={shots} selectedId={selectedId} onSelect={pickFromMap} />
+        <ShotMap
+          shots={shots}
+          loadError={loadError}
+          onRetry={() => void refresh()}
+          selectedId={selectedId}
+          onSelect={pickFromMap}
+        />
 
         <div className="columns">
           <section className="card" aria-labelledby="add-title">
