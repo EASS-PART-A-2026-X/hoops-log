@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
@@ -28,6 +29,16 @@ app = FastAPI(
     version="0.3.0",
     description="Record basketball shots on a half court and read them back.",
     lifespan=lifespan,
+)
+# The React dev server runs in the user's browser, so the browser checks CORS: the
+# API must name the exact origin (scheme + host + port). "localhost" and "127.0.0.1"
+# are different origins, so both are listed.
+FRONTEND_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 app.include_router(health.router)
 app.include_router(shots.router)
