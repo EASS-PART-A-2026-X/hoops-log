@@ -5,6 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { flightPoint } from './flight'
 import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
 import type { HeatGrid, HexBins, HexCell } from './stats'
 import { drawCourt, heatColor, paintHeat } from './textures'
@@ -44,10 +45,9 @@ export interface SceneOptions {
 const MADE_2 = '#ff7a2f'
 const MADE_3 = '#ffb27a'
 const MISSED = '#8ec1ff'
-const FLIGHT_MS = 760
+const FLIGHT_MS = 900
 const SETTLE_MS = 520
-const ARC_SEGMENTS = 28
-const RELEASE_HEIGHT = 6
+const ARC_SEGMENTS = 36
 const PICK_RADIUS_PX = 16
 const MISS_STUB = 1.3 // height of the short beam over a missed shot
 
@@ -478,17 +478,10 @@ export class CourtScene {
     }
   }
 
-  /** Point on a shot's flight path, u from 0 (release) to 1 (rim). */
+  /** Point on a shot's whole flight, u from 0 (release) to 1 (through the net, or off the iron to the floor). */
   private arcPoint(i: number, u: number, out: THREE.Vector3): THREE.Vector3 {
-    const p = this.pts[i]
-    const [wx, wz] = toWorld(p.x, p.y)
-    const dist = Math.hypot(wx, wz + HOOP_Y)
-    const peak = 3 + dist * 0.22
-    return out.set(
-      wx * (1 - u),
-      RELEASE_HEIGHT + (RIM_HEIGHT - RELEASE_HEIGHT) * u + peak * 4 * u * (1 - u),
-      wz + (-HOOP_Y - wz) * u,
-    )
+    const [x, y, z] = flightPoint(this.pts[i], i, u)
+    return out.set(x, y, z)
   }
 
   private rebuildArcs(): void {
