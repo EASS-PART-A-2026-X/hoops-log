@@ -99,22 +99,31 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
-export interface ShotList {
+export interface ShotListResult {
   shots: Shot[]
   /** True when there are more shots than this app loads (MAX_PAGES pages). */
   truncated: boolean
 }
 
 /** All shots, oldest id first. The backend pages at 100, so follow the pages. */
-export async function listShots(): Promise<ShotList> {
+export async function listShots(): Promise<ShotListResult> {
   // Keyed by id: if another client writes while we page, an offset can repeat a row.
   const byId = new Map<number, Shot>()
+  const fetchPage = async (offset: number, limit: number) => {
+    const batch = await request<Shot[]>(`/shots?offset=${offset}&limit=${limit}`)
+    if (!Array.isArray(batch)) {
+      throw new ApiError('server', 'The server sent a reply this app could not read. Try again.')
+    }
+    return batch
+  }
   for (let page = 0; page < MAX_PAGES; page++) {
-    const batch = await request<Shot[]>(`/shots?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`)
+    const batch = await fetchPage(page * PAGE_SIZE, PAGE_SIZE)
     for (const shot of batch) byId.set(shot.id, shot)
     if (batch.length < PAGE_SIZE) return { shots: [...byId.values()], truncated: false }
   }
-  return { shots: [...byId.values()], truncated: true }
+  // Every page was full. Truncated only if at least one more shot exists beyond them.
+  const extra = await fetchPage(MAX_PAGES * PAGE_SIZE, 1)
+  return { shots: [...byId.values()], truncated: extra.length > 0 }
 }
 
 export function createShot(input: ShotInput): Promise<Shot> {
