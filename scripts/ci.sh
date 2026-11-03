@@ -5,7 +5,8 @@
 #   scripts/ci.sh --docker   ...plus the Docker persistence and kill test
 #   scripts/ci.sh --fast     lint, format and tests only           (a few seconds)
 #
-# The frontend (npm ci, lint, build) runs when frontend/ exists and npm is installed.
+# The frontend runs when frontend/ exists: npm ci, lint and build, or only lint with --fast.
+# A missing npm is a SKIP on a laptop and a FAIL when CI=true (GitHub sets it).
 #
 # Run it from anywhere. Exit status 0 means every step passed.
 set -u
@@ -33,9 +34,21 @@ fi
 
 if [ -f ../frontend/package.json ]; then
   if command -v npm >/dev/null; then
-    step "frontend npm ci"     npm --prefix ../frontend ci
-    step "frontend lint"       npm --prefix ../frontend run lint
-    step "frontend build"      npm --prefix ../frontend run build
+    if [ "$mode" = "--fast" ]; then
+      # Quick mode: lint only, and only when dependencies are already installed.
+      if [ -d ../frontend/node_modules ]; then
+        step "frontend lint"   npm --prefix ../frontend run lint
+      else
+        summary+="SKIP  frontend lint (run npm ci in frontend/ once)"$'\n'
+      fi
+    else
+      step "frontend npm ci"   npm --prefix ../frontend ci
+      step "frontend lint"     npm --prefix ../frontend run lint
+      step "frontend build"    npm --prefix ../frontend run build
+    fi
+  elif [ "${CI:-}" = "true" ]; then
+    # On GitHub a missing npm means the Node setup is broken: that must fail.
+    summary+="FAIL  frontend checks (npm not found in CI)"$'\n'; failed=1
   else
     summary+="SKIP  frontend checks (npm not found)"$'\n'
   fi
