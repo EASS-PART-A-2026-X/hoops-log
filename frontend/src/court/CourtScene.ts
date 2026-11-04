@@ -48,7 +48,7 @@ const MADE_2 = '#ff7a2f'
 const MADE_3 = '#ffb27a'
 const MISSED = '#8ec1ff'
 // The selected shot's marker: a colour no shot uses (orange = made, blue = missed).
-const SELECTED = '#ff4fd8'
+const SELECTED = '#ffffff'
 const FLIGHT_MS = 900
 const SETTLE_MS = 520
 const ARC_SEGMENTS = 36
