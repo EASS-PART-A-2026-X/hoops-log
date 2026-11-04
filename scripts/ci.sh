@@ -5,7 +5,7 @@
 #   scripts/ci.sh --docker   ...plus the Docker persistence and kill test
 #   scripts/ci.sh --fast     lint, format and tests only           (a few seconds)
 #
-# The frontend runs when frontend/ exists: npm ci, lint and build, or only lint with --fast.
+# The frontend runs when frontend/ exists: npm ci, lint, tests and build, or only lint with --fast.
 # A missing npm is a SKIP on a laptop and a FAIL when CI=true (GitHub sets it).
 #
 # Run it from anywhere. Exit status 0 means every step passed.
@@ -44,6 +44,7 @@ if [ -f ../frontend/package.json ]; then
     else
       step "frontend npm ci"   npm --prefix ../frontend ci
       step "frontend lint"     npm --prefix ../frontend run lint
+      step "frontend tests"    npm --prefix ../frontend test
       step "frontend build"    npm --prefix ../frontend run build
     fi
   elif [ "${CI:-}" = "true" ]; then

@@ -90,11 +90,19 @@ h3 {
 }
 
 .notice-slot {
-  min-height: 52px;
-  margin-bottom: 8px;
+  /* A toast under the top bar, on every tab, so it takes no room from the page. */
+  position: fixed;
+  top: calc(var(--topbar-h, 72px) + 6px);
+  left: 50%;
+  z-index: 60;
+  width: min(560px, calc(100% - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .notice {
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -112,19 +120,6 @@ h3 {
 
 .notice.error {
   border-color: var(--red);
-}
-
-.columns {
-  display: grid;
-  grid-template-columns: minmax(0, clamp(340px, 28vw, 480px)) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-@media (max-width: 860px) {
-  .columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .card {
@@ -478,6 +473,10 @@ h3 {
   padding: 24px;
 }
 
+.log-view:not([hidden]) {
+  position: relative;
+}
+
 .map-head {
   display: flex;
   flex-wrap: wrap;
@@ -628,6 +627,10 @@ h3 {
 }
 
 .stage-frame {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -637,8 +640,9 @@ h3 {
 
 .stage-canvas {
   position: relative;
-  /* Window height minus the fixed chrome (~490px: top bar 67, page padding 20, intro 116, notice slot 60, map card padding 50, map heading 79, stat cards 98) so the filters, cards and court fit one screen. */
-  height: clamp(340px, calc(100vh - 490px), 820px);
+  /* Fills whatever the window leaves after the controls above and below it (see .page.fit). */
+  flex: 1;
+  min-height: 0;
   cursor: grab;
 }
 
@@ -1011,8 +1015,9 @@ h3 {
 
 .nba-zone-foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -1413,4 +1418,310 @@ h3 {
     min-width: 0;
     width: 100%;
   }
+}
+
+/* Whose shots: the same choice on the map, vs NBA and Players */
+.shooter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shooter-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Shot list and add form: a drawer from the right, closed by default */
+.drawer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 18px;
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0b0f14;
+  background: var(--orange);
+  border: 0;
+  border-radius: 22px;
+  cursor: pointer;
+}
+
+.drawer-toggle:hover {
+  background: var(--orange-soft);
+}
+
+.drawer-count {
+  padding: 1px 9px;
+  font-size: 16px;
+  border-radius: 12px;
+  background: rgba(11, 15, 20, 0.18);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100vw);
+  border-left: 1px solid var(--line-strong);
+  background: var(--panel);
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+
+.drawer:focus {
+  outline: none; /* focus lands here when its plain text is clicked */
+}
+
+.drawer.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.25s ease;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.drawer-close:hover {
+  border-color: var(--orange-soft);
+}
+
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 16px 28px;
+  overflow-y: auto;
+}
+
+.drawer-body h2 {
+  margin-bottom: 14px;
+  font-size: 26px;
+}
+
+/* While the drawer is open the notice would sit under it: put it above, at the bottom of the screen,
+   in the space left of the drawer on desktop and across the full width on phones. */
+.app:has(.drawer.open) .notice-slot {
+  position: fixed;
+  top: auto;
+  bottom: 16px;
+  left: calc((100% - 460px) / 2);
+  width: min(560px, calc(100% - 460px - 32px));
+}
+
+@media (max-width: 960px) {
+  .app:has(.drawer.open) .notice-slot {
+    left: 50%;
+    width: calc(100% - 32px);
+  }
+}
+
+/* On small screens the drawer covers the page, so dim what is behind it */
+.drawer-scrim {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* The home page fits the window: no big heading, no page scroll. The map card takes all the space
+   under the top bar, the court takes what is left inside it, and the zone list scrolls on its own. */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.topbar {
+  flex: none;
+}
+
+.brand {
+  margin-right: auto;
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* The scroll container for absolutely positioned children too (the screen-reader-only text,
+     the card badges), so none of them stretches the window's own scroll area. */
+  position: relative;
+}
+
+.page.fit {
+  display: flex;
+  flex-direction: column;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  overflow: hidden;
+}
+
+.page.fit .log-view:not([hidden]) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page.fit .map {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+  padding: 16px 18px;
+}
+
+.page.fit .map-head h2 {
+  font-size: 26px;
+}
+
+.page.fit .map-body {
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  align-items: stretch;
+}
+
+.page.fit .stage {
+  min-height: 0;
+}
+
+.page.fit .zones {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.page.fit .stage-fallback {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Phones and very short windows cannot fit everything: go back to a normal scrolling page. */
+@media (max-width: 960px), (max-height: 620px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .page,
+  .page.fit {
+    display: block;
+    overflow: visible;
+  }
+
+  .page.fit .log-view:not([hidden]),
+  .page.fit .map {
+    display: block;
+  }
+
+  .page.fit .map-body {
+    align-items: start;
+  }
+
+  .stage-canvas {
+    flex: none;
+    height: clamp(300px, 60vh, 720px);
+  }
+}
+
+@media (max-width: 640px) {
+  .drawer-toggle {
+    margin-left: auto;
+  }
+}
+
+/* Short desktop windows: tighten the controls so the court keeps as much height as possible */
+@media (max-height: 820px) and (min-width: 961px) {
+  .page.fit {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .page.fit .map {
+    padding: 12px 16px;
+  }
+
+  .page.fit .map-head {
+    margin-bottom: 8px;
+  }
+
+  .page.fit .kpis {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .page.fit .kpi {
+    padding: 4px 12px;
+  }
+
+  .page.fit .kpi-value {
+    font-size: 24px;
+  }
+
+  .page.fit .kpi-value.small {
+    font-size: 20px;
+  }
+
+  .page.fit .kpi-sub {
+    display: none;
+  }
+
+  .page.fit .chip,
+  .page.fit .player-filter select {
+    min-height: 38px;
+    padding-block: 4px;
+  }
+
+  .page.fit .stage {
+    gap: 8px;
+  }
+}
+
+/* Hovering a hex: fade the zone labels so the hex and its tooltip can be read */
+.zone-label {
+  transition: opacity 0.12s ease;
+}
+
+.stage-frame.cell-hover .zone-label {
+  opacity: 0.18;
 }

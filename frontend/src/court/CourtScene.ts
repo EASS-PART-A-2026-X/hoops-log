@@ -47,11 +47,15 @@ export interface SceneOptions {
 const MADE_2 = '#ff7a2f'
 const MADE_3 = '#ffb27a'
 const MISSED = '#8ec1ff'
+// The selected shot's marker: a colour no shot uses (orange = made, blue = missed).
+const SELECTED = '#ffffff'
 const FLIGHT_MS = 900
 const SETTLE_MS = 520
 const ARC_SEGMENTS = 36
 const PICK_RADIUS_PX = 16
 const MISS_STUB = 1.3 // height of the short beam over a missed shot
+const MARKER_PIN_Y = 19 // resting height of the selected-shot pin
+const MARKER_COLUMN_END = MARKER_PIN_Y - 1.5 // the column stops just under the pin
 
 // The camera stands on the half-court side and looks toward the basket (+Z).
 const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
@@ -87,6 +91,10 @@ export class CourtScene {
   private labelRenderer = new CSS2DRenderer()
   private labels: CSS2DObject[] = []
   private marker = new THREE.Group()
+  // The parts of the marker that tick animates; set in buildMarker.
+  private markerRing: THREE.Mesh | null = null
+  private markerOuter: THREE.Mesh | null = null
+  private markerPin: THREE.Mesh | null = null
 
   // Shared geometry and materials, made once.
   private beamGeo: THREE.CylinderGeometry
@@ -184,7 +192,8 @@ export class CourtScene {
 
       this.composer = new EffectComposer(renderer)
       this.composer.addPass(new RenderPass(this.scene, this.camera))
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.45, 0.32)
+      // Strength, radius, threshold. A high threshold means only the brightest spots bloom, so the shots keep their shape.
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.2, 0.3, 0.7)
       this.composer.addPass(this.bloom)
       this.composer.addPass(new OutputPass())
 
@@ -209,7 +218,9 @@ export class CourtScene {
       this.scene.add(this.heatPlane)
       // Zone labels are real HTML (crisp, selectable, untouched by the glow effect).
       const labelDom = this.labelRenderer.domElement
-      labelDom.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none'
+      // isolation: the library gives every label a huge z-index; keep it inside this layer so the
+      // tooltip (a normal z-index) always draws above the labels.
+      labelDom.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1;isolation:isolate'
       container.appendChild(labelDom)
       this.buildMarker()
 
@@ -254,8 +265,8 @@ export class CourtScene {
     this.plans = data.points.map((p, i) => planFlight(p, i))
     // Crowded courts get dimmer beams, smaller markers and less glow, or they wash out to white.
     this.density = Math.min(1, Math.sqrt(250 / Math.max(1, data.points.length)))
-    this.beamMat.color.setScalar(0.2 + 0.35 * this.density)
-    this.bloom.strength = 0.28 + 0.22 * this.density
+    this.beamMat.color.setScalar(0.16 + 0.26 * this.density)
+    this.bloom.strength = 0.08 + 0.12 * this.density
     this.rebuildMarkers()
     this.rebuildArcs()
     paintHeat(this.heatCanvas, data.heat)
@@ -318,11 +329,50 @@ export class CourtScene {
   setSelected(index: number | null): void {
     this.selected = index !== null && index >= 0 && index < this.pts.length ? index : null
     if (this.selected !== null) {
-      const p = this.pts[this.selected]
-      const [wx, wz] = toWorld(p.x, p.y)
-      this.marker.position.set(wx, 0, wz)
+      this.updateMarker()
     }
     this.marker.visible = this.selected !== null
+    // Dim every other shot while one is selected, so the marker is what the eye lands on.
+    const dim = this.selected !== null
+    for (const m of [this.solidMat, this.ballMat, this.arcMat, this.beamMat]) {
+      m.transparent = dim || m === this.arcMat || m === this.beamMat
+      m.opacity = dim ? 0.3 : 1
+      m.needsUpdate = true
+    }
+    this.dirty = true
+  }
+
+  /** Place the marker and the lit copy of the selected shot (the mode decides how tall the shot is). */
+  private updateMarker(): void {
+    const p = this.selected === null ? undefined : this.pts[this.selected]
+    if (!p) return // nothing selected, or the data changed under the selection
+    const [wx, wz] = toWorld(p.x, p.y)
+    this.marker.position.set(wx, 0, wz)
+    const beams = this.mode === 'beams'
+    const top = beams && p.made ? (p.three ? 6 : 3.4) + 0.45 : p.made ? 0.5 : 0.1
+    const ball = this.marker.getObjectByName('heroBall')
+    const xa = this.marker.getObjectByName('heroXa')
+    const xb = this.marker.getObjectByName('heroXb')
+    if (ball) {
+      ball.visible = p.made
+      ball.position.set(0, top, 0)
+      ball.scale.setScalar(1.7)
+    }
+    for (const x of [xa, xb]) {
+      if (!x) continue
+      x.visible = !p.made
+      x.position.set(0, 0.16, 0)
+      x.scale.setScalar(1.55)
+    }
+    // The column starts just above the lit shot and runs up to the pin.
+    const start = top + 1.6
+    const end = MARKER_COLUMN_END
+    const column = this.marker.getObjectByName('column')
+    if (column) {
+      column.visible = end - start > 1
+      column.scale.y = Math.max(end - start, 0.01)
+      column.position.y = start + (end - start) / 2
+    }
   }
 
   /** Pixel position of a shot inside the container (for tests and focus helpers). */
@@ -443,20 +493,56 @@ export class CourtScene {
     this.scene.add(glass, glassEdge, rim, net)
   }
 
+  /**
+   * The marker for the selected shot. It has to be easy to find among hundreds of shots, so it is
+   * big and a colour nothing else on the court uses (SELECTED), and the other shots are dimmed
+   * while it is shown (see setSelected). The ring, outer ring and pin are kept as fields because tick animates them.
+   */
   private buildMarker(): void {
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(1.05, 1.3, 48).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthTest: false }),
-    )
-    ring.position.y = 0.09
-    ring.renderOrder = 5
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 9, 6),
-      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthTest: false }),
-    )
-    post.position.y = 4.5
-    post.renderOrder = 5
-    this.marker.add(ring, post)
+    const accent = SELECTED
+    const mat = (opacity: number, additive = false) =>
+      new THREE.MeshBasicMaterial({
+        color: accent,
+        transparent: true,
+        opacity,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      })
+    const flat = (geo: THREE.BufferGeometry, material: THREE.Material, y: number) => {
+      const m = new THREE.Mesh(geo.rotateX(-Math.PI / 2), material)
+      m.position.y = y
+      m.renderOrder = 5
+      return m
+    }
+    const ring = flat(new THREE.RingGeometry(2.3, 2.9, 56), mat(1), 0.1)
+    const outer = flat(new THREE.RingGeometry(3.6, 3.9, 56), mat(0.7), 0.1)
+    // Unit-height column; updateMarker stretches it so it starts above the shot, not through it.
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1, 12, 1, true), mat(0.5, true))
+    column.name = 'column'
+    column.renderOrder = 5
+    // A pin above the shot pointing down at it; it bobs in tick.
+    const pin = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 4).rotateX(Math.PI), mat(1))
+    pin.name = 'pin'
+    pin.position.y = MARKER_PIN_Y
+    pin.renderOrder = 6
+    // The chosen shot itself, drawn bigger and in a light colour, so it is what stands out and
+    // nothing of the marker covers it. A ball for a made shot, a cross for a miss.
+    const lit = (hex: string) => new THREE.MeshBasicMaterial({ color: hex })
+    const heroBall = new THREE.Mesh(this.orbGeo, lit('#ffe3cc'))
+    heroBall.name = 'heroBall'
+    const heroXa = new THREE.Mesh(this.xGeo, lit('#e6f2ff'))
+    heroXa.name = 'heroXa'
+    heroXa.rotation.y = Math.PI / 4
+    const heroXb = new THREE.Mesh(this.xGeo, lit('#e6f2ff'))
+    heroXb.name = 'heroXb'
+    heroXb.rotation.y = -Math.PI / 4
+    for (const m of [heroBall, heroXa, heroXb]) m.renderOrder = 4
+    this.markerRing = ring
+    this.markerOuter = outer
+    this.markerPin = pin
+    this.marker.add(ring, outer, column, pin, heroBall, heroXa, heroXb)
     this.marker.visible = false
     this.scene.add(this.marker)
   }
@@ -691,6 +777,7 @@ export class CourtScene {
     if (this.hexMesh) this.hexMesh.visible = m === 'heat'
     this.hexStart = performance.now()
     this.hexGrowing = m === 'heat'
+    this.updateMarker()
     for (const label of this.labels) label.visible = m === 'heat'
     if (this.arcs) this.arcs.visible = m === 'arcs'
     this.dirty = true
@@ -783,8 +870,11 @@ export class CourtScene {
       this.dirty = false
     }
     if (this.marker.visible && !this.opts.reducedMotion) {
-      const pulse = 1 + 0.18 * Math.sin(now / 260)
-      this.marker.children[0].scale.set(pulse, 1, pulse)
+      const pulse = 1 + 0.22 * Math.sin(now / 260)
+      this.markerRing?.scale.set(pulse, 1, pulse)
+      const outerPulse = 1 + 0.08 * Math.sin(now / 260 + 1.5)
+      this.markerOuter?.scale.set(outerPulse, 1, outerPulse)
+      if (this.markerPin) this.markerPin.position.y = MARKER_PIN_Y + 0.7 * Math.sin(now / 320)
     }
     this.runPendingHover()
     this.composer.render()
