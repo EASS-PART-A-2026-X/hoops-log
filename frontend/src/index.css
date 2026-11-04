@@ -1560,6 +1560,9 @@ h3 {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* The scroll container for absolutely positioned children too (the screen-reader-only text,
+     the card badges), so none of them stretches the window's own scroll area. */
+  position: relative;
 }
 
 .page.fit {
