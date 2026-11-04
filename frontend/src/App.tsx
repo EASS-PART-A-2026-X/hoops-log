@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
 import type { ShotInput } from './api'
 import NbaCompare from './NbaCompare'
+import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
 import ShotList from './ShotList'
 import ShotMap from './ShotMap'
@@ -15,7 +16,7 @@ interface Notice {
 export default function App() {
   const { shots, truncated, loading, loadError, refresh } = useShots()
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [tab, setTab] = useState<'log' | 'nba'>('log')
+  const [tab, setTab] = useState<'log' | 'nba' | 'players'>('log')
   const [pickedId, setPickedId] = useState<number | null>(null)
   // Where to scroll after the next render: the target row or the map only exists once the
   // selection has been drawn (a row past the first 100, say), so scrolling cannot happen in the click.
@@ -103,11 +104,16 @@ export default function App() {
           <button type="button" aria-current={tab === 'nba' ? 'page' : undefined} onClick={() => setTab('nba')}>
             vs NBA
           </button>
+          <button type="button" aria-current={tab === 'players' ? 'page' : undefined} onClick={() => setTab('players')}>
+            Players
+          </button>
         </nav>
       </header>
 
       <main className="page">
-        {tab === 'nba' ? (
+        {tab === 'players' ? (
+          <PlayersPage />
+        ) : tab === 'nba' ? (
           <NbaCompare shots={shots} />
         ) : (
           <>

@@ -1007,3 +1007,121 @@ h3 {
   top: 12px;
   left: 12px;
 }
+
+/* Players */
+.players {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.player {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+}
+
+.player-photo {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 190px;
+  /* The team colour fades into the card, so every photo sits on the same kind of backdrop. */
+  background: linear-gradient(180deg, var(--team) 0%, var(--panel) 100%);
+}
+
+.player-img {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: bottom;
+}
+
+.player-logo {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+.img-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-weight: 700;
+  color: #fff;
+}
+
+.player-img.img-fallback {
+  align-self: center;
+  width: 110px;
+  height: 110px;
+  font-size: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.player-logo.img-fallback {
+  font-size: 14px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.player-body {
+  padding: 14px 16px 16px;
+}
+
+.player-body h3 {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.player-meta {
+  margin: 2px 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.player-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.player-stats div {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.player-stats dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.player-stats dd {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.player-style {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
