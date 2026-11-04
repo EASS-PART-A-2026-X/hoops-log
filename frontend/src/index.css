@@ -1001,3 +1001,9 @@ h3 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.stage-clear {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}

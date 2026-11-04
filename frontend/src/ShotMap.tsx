@@ -14,7 +14,8 @@ interface Props {
   retrying: boolean
   onRetry: () => void
   selectedId: number | null
-  onSelect: (id: number) => void
+  /** A shot was clicked on the map; null means a click on empty space or the clear button. */
+  onSelect: (id: number | null) => void
 }
 
 interface Hover {
@@ -148,8 +149,8 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
             onHoverCell: (cell, x, y) =>
               setCellHover(cell === null ? null : { cell, x, y, flip: x > host.clientWidth * 0.55 }),
             onPick: (index) => {
-              const shot = filteredRef.current[index]
-              if (shot) onSelectRef.current(shot.id)
+              const shot = index === null ? undefined : filteredRef.current[index]
+              onSelectRef.current(shot ? shot.id : null)
             },
             onFail: () => fail('lost'),
           })
@@ -302,6 +303,11 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                 </div>
               ) : (
                 (loading || !ready) && <p className="stage-msg">Loading the court…</p>
+              )}
+              {selectedId !== null && !hiddenSelected && (
+                <button type="button" className="btn stage-clear" onClick={() => onSelect(null)}>
+                  Clear selection<span className="sr-only"> (shot #{selectedId})</span>
+                </button>
               )}
               {hiddenSelected && (
                 <div className="stage-notice">

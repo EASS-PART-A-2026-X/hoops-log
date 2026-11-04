@@ -56,6 +56,16 @@ export default function App() {
     await refresh()
   }
 
+  // Escape deselects.
+  useEffect(() => {
+    if (selectedId === null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPickedId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedId])
+
   useEffect(() => {
     if (!scrollTarget) return
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -65,7 +75,12 @@ export default function App() {
   }, [scrollTarget])
 
   // Clicked a shot on the map: highlight its row. Clicked "Show on map": highlight the shot.
-  function pickFromMap(id: number) {
+  function pickFromMap(id: number | null) {
+    // Clicking the selected shot again, empty space, or "Clear selection" deselects.
+    if (id === null || id === selectedId) {
+      setPickedId(null)
+      return
+    }
     setPickedId(id)
     setScrollTarget({ id: `shot-${id}`, block: 'nearest' })
   }
