@@ -14,7 +14,7 @@ export default function NbaCompare({ shots }: { shots: Shot[] | null }) {
   const zones = useMemo(() => compareZones(shots ?? []), [shots])
 
   return (
-    <section className="nba" aria-labelledby="nba-title">
+    <section aria-labelledby="nba-title">
       <div className="map-head">
         <h2 id="nba-title">You vs the NBA</h2>
       </div>
@@ -41,44 +41,28 @@ export default function NbaCompare({ shots }: { shots: Shot[] | null }) {
             ))}
           </div>
 
-          <div className="card">
-            <h3 className="nba-sub">By zone</h3>
-            <table className="nba-table">
-              <thead>
-                <tr>
-                  <th scope="col">Zone</th>
-                  <th scope="col">Your shots</th>
-                  <th scope="col">You</th>
-                  <th scope="col">NBA</th>
-                  <th scope="col">Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {zones.map((z) => (
-                  <tr key={z.zone} className={z.attempts === 0 ? 'empty' : undefined}>
-                    <th scope="row">{z.label}</th>
-                    <td>
-                      {z.made}/{z.attempts}
-                      {z.attempts > 0 && z.attempts < SMALL_SAMPLE && (
-                        <span className="nba-small"> small sample</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="nba-bars" aria-hidden="true">
-                        <span className="nba-bar mine" style={{ width: `${z.mine ?? 0}%` }} />
-                        <span className="nba-bar nba" style={{ width: `${z.nba}%` }} />
-                      </span>
-                      {z.mine === null ? '–' : `${z.mine}%`}
-                    </td>
-                    <td>{z.nba}%</td>
-                    <td>
-                      <Diff diff={z.diff} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <h3 className="nba-zones-title">By zone</h3>
+          <ul className="nba-zones">
+            {zones.map((z) => (
+              <li key={z.zone} className={z.attempts === 0 ? 'nba-zone empty' : 'nba-zone'}>
+                <div className="nba-zone-head">
+                  <span className="nba-zone-name">{z.label}</span>
+                  <Diff diff={z.diff} />
+                </div>
+                <div className="nba-track" aria-hidden="true">
+                  <span className="nba-fill" style={{ width: `${z.mine ?? 0}%` }} />
+                  <span className="nba-tick" style={{ left: `${z.nba}%` }} />
+                </div>
+                <div className="nba-zone-foot">
+                  <span>
+                    You {z.mine === null ? '–' : `${z.mine}%`} · {z.made}/{z.attempts}
+                    {z.attempts > 0 && z.attempts < SMALL_SAMPLE ? ' (small sample)' : ''}
+                  </span>
+                  <span>NBA {z.nba}%</span>
+                </div>
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </section>

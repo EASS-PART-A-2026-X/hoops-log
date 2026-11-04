@@ -866,105 +866,88 @@ h3 {
   }
 }
 
-/* Page tabs in the top bar */
+/* Page tabs: the same pills as the map filters, on the right of the top bar */
 .topbar {
-  gap: 32px;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
 }
 
 .tabs button {
   min-height: 44px;
-  padding: 8px 16px;
+  padding: 8px 18px;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--text);
   background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
   cursor: pointer;
 }
 
 .tabs button:hover {
-  color: var(--text);
+  border-color: var(--orange-soft);
 }
 
 .tabs button[aria-current='page'] {
   color: var(--orange-soft);
-  border-bottom-color: var(--orange);
+  background: var(--orange-bg);
+  border-color: var(--orange);
 }
 
 /* You vs the NBA */
 .nba-note {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   color: var(--muted);
   font-size: 14px;
 }
 
-.nba-sub {
-  margin-bottom: 8px;
+.nba-zones-title {
+  margin: 8px 0 12px;
   font-size: 22px;
 }
 
-.nba-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 15px;
+.nba-zones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.nba-table th,
-.nba-table td {
-  padding: 10px 8px;
-  text-align: left;
-  border-bottom: 1px solid var(--line);
+.nba-zone {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
 }
 
-.nba-table thead th {
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
+.nba-zone.empty {
+  opacity: 0.5;
 }
 
-.nba-table tbody th {
+.nba-zone-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.nba-zone-name {
   font-weight: 600;
-  color: var(--text);
 }
 
-.nba-table tr.empty {
-  opacity: 0.55;
-}
-
-.nba-small {
+.nba-diff {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--muted);
-  font-size: 12px;
-}
-
-.nba-bars {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 90px;
-  margin-right: 10px;
-  vertical-align: middle;
-}
-
-.nba-bar {
-  display: block;
-  height: 5px;
-  border-radius: 3px;
-}
-
-.nba-bar.mine {
-  background: var(--orange);
-}
-
-.nba-bar.nba {
-  background: var(--line-strong);
+  white-space: nowrap;
 }
 
 .nba-diff.up {
@@ -972,16 +955,49 @@ h3 {
 }
 
 .nba-diff.down {
+  color: #7fb0ff;
+}
+
+.nba-track {
+  position: relative;
+  height: 6px;
+  margin: 12px 0 8px;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.nba-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--orange);
+}
+
+/* A thin white tick where the NBA average sits on the same scale */
+.nba-tick {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: #fff;
+}
+
+.nba-zone-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
   color: var(--muted);
+  font-size: 13px;
+}
+
+.nba-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 @media (max-width: 640px) {
-  .topbar {
-    flex-wrap: wrap;
-    gap: 8px 16px;
-  }
-
-  .nba-bars {
-    display: none;
+  .nba-kpis {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
