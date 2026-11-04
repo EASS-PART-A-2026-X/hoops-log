@@ -3,6 +3,7 @@ import { BACKEND_URL } from './api'
 import type { Shot } from './api'
 import type { CourtScene, MapMode, ViewName } from './court/CourtScene'
 import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneStats } from './court/stats'
+import { lastName } from './court/players'
 import type { HexCell, Typical } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
 
@@ -116,9 +117,9 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const typical = baseline?.typical ?? TYPICAL_FG
   const hexes = useMemo(
     () => hexBins(filtered, undefined, typical),
-    [filtered, typical['2PT'], typical['3PT']],
+    [filtered, typical],
   )
-  const baseWord = baseline ? baseline.name.split(' ').slice(-1)[0] : 'typical'
+  const baseWord = baseline ? lastName(baseline.name) : 'typical'
 
   // Latest values for scene callbacks, which outlive any one render.
   const filteredRef = useRef(filtered)

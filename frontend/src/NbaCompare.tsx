@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Shot } from './api'
 import { LEAGUE, SMALL_SAMPLE, benchmarkOf, compareOverall, compareZones } from './court/nba'
-import { PLAYERS } from './court/players'
+import { PLAYERS, lastName } from './court/players'
 import PlayerPicker from './PlayerPicker'
 
 function Diff({ diff }: { diff: number | null }) {
@@ -22,7 +22,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
   const player = PLAYERS.find((p) => p.id === benchmarkId) ?? null
   const bench = useMemo(() => (player ? benchmarkOf(player) : LEAGUE), [player])
   const overall = useMemo(() => compareOverall(shots ?? [], bench), [shots, bench])
-  const who = player ? player.name.split(' ').slice(-1)[0] : 'NBA average'
+  const who = player ? lastName(player.name) : 'NBA average'
   const zones = useMemo(() => compareZones(shots ?? [], bench), [shots, bench])
 
   return (

@@ -2,7 +2,7 @@
  * A hand-written list of well-known players. The numbers are rounded, recent-seasons figures
  * typed in by hand (not from a data feed), so the page calls them "about". Teams change, so a
  * player's team may be out of date. Photos and logos come from the NBA's public image
- * host and are only ever shown with a drawn fallback (see `PlayerImage`).
+ * host and are only ever shown with a drawn fallback (see `FallbackImage`, used by `PlayersPage` and `PlayerPicker`).
  */
 export interface Team {
   id: number
@@ -60,6 +60,11 @@ export const PLAYERS: Player[] = [
 
 export const headshotUrl = (id: number) => `https://cdn.nba.com/headshots/nba/latest/1040x760/${id}.png`
 export const logoUrl = (teamId: number) => `https://cdn.nba.com/logos/nba/${teamId}/global/L/logo.svg`
+
+/** The last word of a name: "Stephen Curry" becomes "Curry". */
+export function lastName(name: string): string {
+  return name.trim().split(/\s+/).slice(-1)[0]
+}
 
 export function initials(name: string): string {
   return name

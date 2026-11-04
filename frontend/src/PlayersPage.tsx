@@ -3,19 +3,7 @@ import type { Shot } from './api'
 import { MIN_SHOTS_FOR_MATCH, compareOverall, rankPlayers } from './court/nba'
 import { PLAYERS, TEAMS, headshotUrl, initials, logoUrl } from './court/players'
 import type { Player } from './court/players'
-
-/** An image that falls back to a drawn badge if it cannot load, so no broken-image icon ever shows. */
-function Img({ src, alt, fallback, className }: { src: string; alt: string; fallback: string; className: string }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) {
-    return (
-      <span className={`${className} img-fallback`} role="img" aria-label={alt}>
-        {fallback}
-      </span>
-    )
-  }
-  return <img className={className} src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} />
-}
+import FallbackImage from './FallbackImage'
 
 interface Mine {
   fg: number | null
@@ -55,8 +43,9 @@ function Card({
   return (
     <li className={best ? 'player best' : 'player'} style={{ '--team': team.color } as React.CSSProperties}>
       <div className="player-photo">
-        <Img
+        <FallbackImage
           className="player-img"
+          fallbackClassName="img-fallback"
           src={headshotUrl(player.id)}
           alt={`Photo of ${player.name}`}
           fallback={initials(player.name)}
@@ -67,8 +56,9 @@ function Card({
             <span>{best ? 'closest to you' : 'like you'}</span>
           </div>
         )}
-        <Img
+        <FallbackImage
           className="player-logo"
+          fallbackClassName="img-fallback"
           src={logoUrl(team.id)}
           alt={`${team.name} logo`}
           fallback={team.abbr}

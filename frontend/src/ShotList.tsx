@@ -85,7 +85,7 @@ function Row({
           <>
             <button type="button" className="btn" onClick={() => onLocate(selected ? null : shot.id)}>
               {selected ? 'Unselect' : 'Show on map'}
-              <span className="sr-only"> shot #{shot.id}</span>
+              <span className="sr-only">{selected ? '' : ' for'} shot #{shot.id}</span>
             </button>
             <button type="button" className="btn" onClick={() => setEditing(true)}>
               Edit<span className="sr-only"> shot #{shot.id}</span>

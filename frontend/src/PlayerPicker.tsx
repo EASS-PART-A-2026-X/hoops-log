@@ -1,17 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import FallbackImage from './FallbackImage'
 import { PLAYERS, TEAMS, headshotUrl, initials } from './court/players'
 
-/** A small round headshot that falls back to initials, so nothing ever shows a broken image. */
+/** A small round headshot that falls back to initials. */
 function Thumb({ id, name }: { id: number; name: string }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) {
-    return (
-      <span className="pp-thumb pp-thumb-fallback" aria-hidden="true">
-        {initials(name)}
-      </span>
-    )
-  }
-  return <img className="pp-thumb" src={headshotUrl(id)} alt="" loading="lazy" onError={() => setFailed(true)} />
+  return (
+    <FallbackImage
+      className="pp-thumb"
+      fallbackClassName="pp-thumb-fallback"
+      src={headshotUrl(id)}
+      alt=""
+      fallback={initials(name)}
+    />
+  )
 }
 
 interface Props {
@@ -80,12 +81,14 @@ export default function PlayerPicker({ value, onChange }: Props) {
       <button
         type="button"
         className="pp-button"
+        role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
         onClick={() => (open ? setOpen(false) : show())}
       >
-        {current ? <Thumb id={current.id} name={current.name} /> : <span className="pp-thumb pp-nba" aria-hidden="true">NBA</span>}
+        {current ? <Thumb key={current.id} id={current.id} name={current.name} /> : <span className="pp-thumb pp-nba" aria-hidden="true">NBA</span>}
         <span className="pp-label">
           <span className="pp-name">{current ? current.name : 'NBA average'}</span>
           <span className="pp-sub">{current ? TEAMS[current.team].name : 'Compare with'}</span>
@@ -95,7 +98,7 @@ export default function PlayerPicker({ value, onChange }: Props) {
         </span>
       </button>
       {open && (
-        <ul className="pp-list" role="listbox" id={listId} aria-label="Compare with" aria-activedescendant={`${listId}-${active}`}>
+        <ul className="pp-list" role="listbox" id={listId} aria-label="Compare with">
           {options.map((p, i) => (
             <li
               key={p?.id ?? 'nba'}
@@ -106,7 +109,7 @@ export default function PlayerPicker({ value, onChange }: Props) {
               onMouseEnter={() => setActive(i)}
               onClick={() => choose(i)}
             >
-              {p ? <Thumb id={p.id} name={p.name} /> : <span className="pp-thumb pp-nba" aria-hidden="true">NBA</span>}
+              {p ? <Thumb key={p.id} id={p.id} name={p.name} /> : <span className="pp-thumb pp-nba" aria-hidden="true">NBA</span>}
               <span className="pp-label">
                 <span className="pp-name">{p ? p.name : 'NBA average'}</span>
                 <span className="pp-sub">{p ? `${TEAMS[p.team].name} · ${p.position}` : 'League-wide figures'}</span>
