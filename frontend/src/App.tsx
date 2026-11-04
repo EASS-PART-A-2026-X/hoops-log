@@ -61,15 +61,15 @@ export default function App() {
     await refresh()
   }
 
-  // Escape deselects.
+  // Escape deselects, but only on the log tab: the other tabs do not show the selection.
   useEffect(() => {
-    if (selectedId === null) return
+    if (selectedId === null || tab !== 'log') return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setPickedId(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId])
+  }, [selectedId, tab])
 
   useEffect(() => {
     if (!scrollTarget) return
@@ -121,7 +121,7 @@ export default function App() {
       </header>
 
       <main className="page">
-        {tab === 'players' ? (
+        {tab === 'players' && (
           <PlayersPage
             shots={shots}
             benchmarkId={benchmarkId}
@@ -130,86 +130,88 @@ export default function App() {
               setTab('nba')
             }}
           />
-        ) : tab === 'nba' ? (
+        )}
+        {tab === 'nba' && (
           <NbaCompare shots={shots} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId} onBrowse={() => setTab('players')} />
-        ) : (
-          <>
-        <section className="intro">
-          <p className="eyebrow">YOUR SHOT LOG</p>
-          <h1>Every shot, on the record.</h1>
-        </section>
-
-        <div role="status" aria-live="polite" className="notice-slot">
-          {notice && (
-            <p className={`notice ${notice.kind}`}>
-              {notice.text}
-              <button type="button" className="link" onClick={() => setNotice(null)}>
-                Dismiss
-              </button>
-            </p>
-          )}
-        </div>
-
-        <ShotMap
-          shots={shots}
-          loadError={loadError}
-          retrying={loading}
-          onRetry={() => void refresh()}
-          selectedId={selectedId}
-          onSelect={pickFromMap}
-          baseline={baseline}
-        />
-
-        <div className="columns">
-          <section className="card" aria-labelledby="add-title">
-            <h2 id="add-title">Add a shot</h2>
-            <ShotForm submitLabel="Add shot" onSubmit={add} />
+        )}
+        {/* Always mounted, only hidden, so the form, row edits and map filters survive a tab switch.
+            The map's scene stops drawing while hidden and re-measures when shown again. */}
+        <div hidden={tab !== 'log'}>
+          <section className="intro">
+            <p className="eyebrow">YOUR SHOT LOG</p>
+            <h1>Every shot, on the record.</h1>
           </section>
 
-          <section className="card" aria-labelledby="list-title" aria-busy={loading}>
-            <div className="list-head">
-              <h2 id="list-title">Shots</h2>
-              {shots && shots.length > 0 && (
-                <span className="count">
-                  {made} made of {shots.length}
-                </span>
-              )}
-            </div>
-
-            {truncated && (
-              <p className="state error">
-                Showing the first {MAX_PAGES * PAGE_SIZE} shots only; there are more.
+          <div role="status" aria-live="polite" className="notice-slot">
+            {notice && (
+              <p className={`notice ${notice.kind}`}>
+                {notice.text}
+                <button type="button" className="link" onClick={() => setNotice(null)}>
+                  Dismiss
+                </button>
               </p>
             )}
+          </div>
 
-            {loadError && (
-              <div className="state error" role="alert">
-                <p>{loadError}</p>
-                <button type="button" className="btn" onClick={() => void refresh()} disabled={loading}>
-                  {loading ? 'Trying…' : 'Try again'}
-                </button>
+          <ShotMap
+            shots={shots}
+            loadError={loadError}
+            retrying={loading}
+            onRetry={() => void refresh()}
+            selectedId={selectedId}
+            onSelect={pickFromMap}
+            baseline={baseline}
+          />
+
+          <div className="columns">
+            <section className="card" aria-labelledby="add-title">
+              <h2 id="add-title">Add a shot</h2>
+              <ShotForm submitLabel="Add shot" onSubmit={add} />
+            </section>
+
+            <section className="card" aria-labelledby="list-title" aria-busy={loading}>
+              <div className="list-head">
+                <h2 id="list-title">Shots</h2>
+                {shots && shots.length > 0 && (
+                  <span className="count">
+                    {made} made of {shots.length}
+                  </span>
+                )}
               </div>
-            )}
 
-            {!shots && loading && <p className="state">Loading shots…</p>}
+              {truncated && (
+                <p className="state error">
+                  Showing the first {MAX_PAGES * PAGE_SIZE} shots only; there are more.
+                </p>
+              )}
 
-            {shots && shots.length === 0 && !loadError && (
-              <p className="state">No shots yet. Add your first one on the left.</p>
-            )}
+              {loadError && (
+                <div className="state error" role="alert">
+                  <p>{loadError}</p>
+                  <button type="button" className="btn" onClick={() => void refresh()} disabled={loading}>
+                    {loading ? 'Trying…' : 'Try again'}
+                  </button>
+                </div>
+              )}
 
-            {shots && shots.length > 0 && (
-              <ShotList
-                shots={shots}
-                selectedId={selectedId}
-                onLocate={locate}
-                onSave={save}
-                onDelete={remove}
-              />
-            )}
-          </section>
+              {!shots && loading && <p className="state">Loading shots…</p>}
+
+              {shots && shots.length === 0 && !loadError && (
+                <p className="state">No shots yet. Add your first one on the left.</p>
+              )}
+
+              {shots && shots.length > 0 && (
+                <ShotList
+                  shots={shots}
+                  selectedId={selectedId}
+                  onLocate={locate}
+                  onSave={save}
+                  onDelete={remove}
+                />
+              )}
+            </section>
+          </div>
         </div>
-          </>
-        )}
       </main>
     </>
   )
