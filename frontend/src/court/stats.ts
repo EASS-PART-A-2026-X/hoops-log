@@ -172,8 +172,9 @@ export function heatGrid(shots: MapShot[], cellsPerFoot = 2, sigma = 3.2): HeatG
 // ---------- hex bins ----------
 
 /** What a typical shooter makes, by shot type. Hex colour compares a spot to this, so a
- *  36% three is "typical" and a 36% layup is cold. Rounded figures, used only for colour. */
-export const TYPICAL_FG: Typical = { '2PT': 0.47, '3PT': 0.36 }
+ *  36% three is "typical" and a 36% layup is cold. Rounded figures, used only for colour.
+ *  The single source of the league two- and three-point rates (nba.ts derives its own from it). */
+export const TYPICAL_FG: Typical = { '2PT': 0.54, '3PT': 0.365 }
 
 /** Expected make rate (0..1) per shot type: the baseline the hex colours compare against. */
 export type Typical = Record<'2PT' | '3PT', number>

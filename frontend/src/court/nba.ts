@@ -1,6 +1,6 @@
 import { PLAYERS } from './players'
 import type { Player } from './players'
-import { pct, zoneLabel } from './stats'
+import { TYPICAL_FG, pct, zoneLabel } from './stats'
 import type { Typical } from './stats'
 import type { MapShot } from './stats'
 
@@ -8,7 +8,11 @@ import type { MapShot } from './stats'
  * Rounded league-wide field-goal percentages from recent NBA seasons. They are approximate
  * (a season moves them by a point or two), so the page calls them "about".
  */
-export const NBA_OVERALL = { fg: 47, two: 54, three: 36.5 } as const
+export const NBA_OVERALL = {
+  fg: 47,
+  two: Math.round(TYPICAL_FG['2PT'] * 1000) / 10,
+  three: Math.round(TYPICAL_FG['3PT'] * 1000) / 10,
+}
 
 export const NBA_ZONE_PCT: Record<string, number> = {
   restricted_area: 65,
