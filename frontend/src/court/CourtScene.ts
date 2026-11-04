@@ -324,6 +324,14 @@ export class CourtScene {
       this.marker.position.set(wx, 0, wz)
     }
     this.marker.visible = this.selected !== null
+    // Dim every other shot while one is selected, so the marker is what the eye lands on.
+    const dim = this.selected !== null
+    for (const m of [this.solidMat, this.ballMat, this.arcMat, this.beamMat]) {
+      m.transparent = dim || m === this.arcMat || m === this.beamMat
+      m.opacity = dim ? 0.3 : 1
+      m.needsUpdate = true
+    }
+    this.dirty = true
   }
 
   /** Pixel position of a shot inside the container (for tests and focus helpers). */
@@ -444,20 +452,41 @@ export class CourtScene {
     this.scene.add(glass, glassEdge, rim, net)
   }
 
+  /**
+   * The marker for the selected shot. It has to be easy to find among hundreds of shots, so it is
+   * big and a colour nothing else on the court uses (yellow), and the other shots are dimmed
+   * while it is shown (see setSelected). The first child is the pulsing ring (tick animates it).
+   */
   private buildMarker(): void {
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(1.05, 1.3, 48).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthTest: false }),
-    )
-    ring.position.y = 0.09
-    ring.renderOrder = 5
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 9, 6),
-      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthTest: false }),
-    )
-    post.position.y = 4.5
-    post.renderOrder = 5
-    this.marker.add(ring, post)
+    const accent = '#ffe14d'
+    const mat = (opacity: number, additive = false) =>
+      new THREE.MeshBasicMaterial({
+        color: accent,
+        transparent: true,
+        opacity,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      })
+    const flat = (geo: THREE.BufferGeometry, material: THREE.Material, y: number) => {
+      const m = new THREE.Mesh(geo.rotateX(-Math.PI / 2), material)
+      m.position.y = y
+      m.renderOrder = 5
+      return m
+    }
+    const ring = flat(new THREE.RingGeometry(1.7, 2.35, 56), mat(1), 0.1)
+    const outer = flat(new THREE.RingGeometry(3.1, 3.4, 56), mat(0.7), 0.1)
+    const disc = flat(new THREE.CircleGeometry(1.7, 40), mat(0.22), 0.08)
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 17, 12, 1, true), mat(0.5, true))
+    column.position.y = 8.5
+    column.renderOrder = 5
+    // A pin above the shot pointing down at it; it bobs in tick.
+    const pin = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 4).rotateX(Math.PI), mat(1))
+    pin.name = 'pin'
+    pin.position.y = 19
+    pin.renderOrder = 6
+    this.marker.add(ring, outer, disc, column, pin)
     this.marker.visible = false
     this.scene.add(this.marker)
   }
@@ -784,8 +813,11 @@ export class CourtScene {
       this.dirty = false
     }
     if (this.marker.visible && !this.opts.reducedMotion) {
-      const pulse = 1 + 0.18 * Math.sin(now / 260)
+      const pulse = 1 + 0.22 * Math.sin(now / 260)
       this.marker.children[0].scale.set(pulse, 1, pulse)
+      this.marker.children[1].scale.set(1 + 0.08 * Math.sin(now / 260 + 1.5), 1, 1 + 0.08 * Math.sin(now / 260 + 1.5))
+      const pin = this.marker.getObjectByName('pin')
+      if (pin) pin.position.y = 19 + 0.7 * Math.sin(now / 320)
     }
     this.runPendingHover()
     this.composer.render()
