@@ -37,9 +37,23 @@ export interface ZoneCompare {
   diff: number | null
 }
 
-export function compareZones(shots: MapShot[]): ZoneCompare[] {
-  return Object.entries(NBA_ZONE_PCT)
-    .map(([zone, nba]) => {
+/**
+ * The benchmark's percentage for one zone. For the league these are the typed-in zone figures.
+ * For a player there is no zone data, so the league zone figure is scaled by how much better or
+ * worse than the league that player is on threes (for the three-point zones) or on twos (for
+ * the rest). It is an estimate, and the page says so.
+ */
+export function benchZonePct(zone: string, bench: Benchmark): number {
+  const base = NBA_ZONE_PCT[zone] ?? 0
+  if (bench === LEAGUE) return base
+  const factor = zone.endsWith('_3') ? bench.three / LEAGUE.three : bench.two / LEAGUE.two
+  return Math.min(90, Math.round(base * factor * 10) / 10)
+}
+
+export function compareZones(shots: MapShot[], bench: Benchmark = LEAGUE): ZoneCompare[] {
+  return Object.keys(NBA_ZONE_PCT)
+    .map((zone) => {
+      const nba = benchZonePct(zone, bench)
       const inZone = shots.filter((s) => s.zone === zone)
       const made = inZone.filter((s) => s.made).length
       const mine = pct(made, inZone.length)
@@ -80,6 +94,7 @@ export const NBA_THREE_SHARE = 40
 export interface Benchmark {
   label: string
   fg: number
+  two: number
   three: number
   threeShare: number
 }
@@ -87,12 +102,13 @@ export interface Benchmark {
 export const LEAGUE: Benchmark = {
   label: 'NBA average',
   fg: NBA_OVERALL.fg,
+  two: NBA_OVERALL.two,
   three: NBA_OVERALL.three,
   threeShare: NBA_THREE_SHARE,
 }
 
 export function benchmarkOf(p: Player): Benchmark {
-  return { label: p.name, fg: p.fg, three: p.three, threeShare: p.threeShare }
+  return { label: p.name, fg: p.fg, two: Math.round(typicalOf(p)['2PT'] * 1000) / 10, three: p.three, threeShare: p.threeShare }
 }
 
 /** Fewer shots than this and "who you shoot like" would be a guess. */

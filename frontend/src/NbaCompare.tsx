@@ -19,10 +19,10 @@ interface Props {
 
 export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }: Props) {
   const player = PLAYERS.find((p) => p.id === benchmarkId) ?? null
-  const bench = player ? benchmarkOf(player) : LEAGUE
+  const bench = useMemo(() => (player ? benchmarkOf(player) : LEAGUE), [player])
   const overall = useMemo(() => compareOverall(shots ?? [], bench), [shots, bench])
   const who = player ? player.name.split(' ').slice(-1)[0] : 'NBA average'
-  const zones = useMemo(() => compareZones(shots ?? []), [shots])
+  const zones = useMemo(() => compareZones(shots ?? [], bench), [shots, bench])
 
   return (
     <section aria-labelledby="nba-title">
@@ -47,7 +47,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
       </div>
       <p className="nba-note">
         {player ? `${player.name}'s` : 'NBA'} numbers are rounded figures from recent seasons, so read them as
-        about. {player && 'The zone tiles below are still league averages. '}Zones with fewer than{' '}
+        about. {player && 'The zone tiles below are estimates: the league zone numbers scaled by how he shoots overall. '}Zones with fewer than{' '}
         {SMALL_SAMPLE} shots are a small sample.
       </p>
 
@@ -90,7 +90,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
             })}
           </div>
 
-          <h3 className="nba-zones-title">By zone (vs league average)</h3>
+          <h3 className="nba-zones-title">{player ? `By zone (estimated for ${who})` : 'By zone (vs league average)'}</h3>
           <ul className="nba-zones">
             {zones.map((z) => (
               <li key={z.zone} className={z.attempts === 0 ? 'nba-zone empty' : 'nba-zone'}>
