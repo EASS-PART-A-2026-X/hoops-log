@@ -84,8 +84,9 @@ export default function App() {
     setPickedId(id)
     setScrollTarget({ id: `shot-${id}`, block: 'nearest' })
   }
-  function locate(id: number) {
+  function locate(id: number | null) {
     setPickedId(id)
+    if (id === null) return
     setScrollTarget({ id: 'map-title', block: 'start' })
   }
 

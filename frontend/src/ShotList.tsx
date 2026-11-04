@@ -6,7 +6,7 @@ import ShotForm from './ShotForm'
 interface Props {
   shots: Shot[]
   selectedId: number | null
-  onLocate: (id: number) => void
+  onLocate: (id: number | null) => void
   onSave: (id: number, input: ShotInput) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }
@@ -83,8 +83,9 @@ function Row({
           </>
         ) : (
           <>
-            <button type="button" className="btn" onClick={() => onLocate(shot.id)}>
-              Show on map<span className="sr-only"> for shot #{shot.id}</span>
+            <button type="button" className="btn" onClick={() => onLocate(selected ? null : shot.id)}>
+              {selected ? 'Unselect' : 'Show on map'}
+              <span className="sr-only"> shot #{shot.id}</span>
             </button>
             <button type="button" className="btn" onClick={() => setEditing(true)}>
               Edit<span className="sr-only"> shot #{shot.id}</span>
