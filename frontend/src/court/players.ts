@@ -28,7 +28,7 @@ export const TEAMS: Record<string, Team> = {
   HOU: { id: 1610612745, name: 'Rockets', abbr: 'HOU', color: '#ce1141' },
   DEN: { id: 1610612743, name: 'Nuggets', abbr: 'DEN', color: '#0e2240' },
   BOS: { id: 1610612738, name: 'Celtics', abbr: 'BOS', color: '#007a33' },
-  MIL: { id: 1610612749, name: 'Bucks', abbr: 'MIL', color: '#00471b' },
+  MIA: { id: 1610612748, name: 'Heat', abbr: 'MIA', color: '#98002e' },
   OKC: { id: 1610612760, name: 'Thunder', abbr: 'OKC', color: '#007ac1' },
   SAS: { id: 1610612759, name: 'Spurs', abbr: 'SAS', color: '#5f6b73' },
   PHI: { id: 1610612755, name: '76ers', abbr: 'PHI', color: '#006bb6' },
@@ -40,11 +40,11 @@ export const TEAMS: Record<string, Team> = {
 
 export const PLAYERS: Player[] = [
   { id: 201939, name: 'Stephen Curry', team: 'GSW', position: 'Guard', fg: 47, three: 41, ppg: 25, style: 'The greatest shooter ever: threes off the dribble from anywhere.' },
-  { id: 2544, name: 'LeBron James', team: 'LAL', position: 'Forward', fg: 51, three: 35, ppg: 25, style: 'Drives and finishes at the rim, with a steady jumper.' },
+  { id: 2544, name: 'LeBron James', team: 'PHI', position: 'Forward', fg: 51, three: 35, ppg: 25, style: 'Drives and finishes at the rim, with a steady jumper.' },
   { id: 201142, name: 'Kevin Durant', team: 'HOU', position: 'Forward', fg: 52, three: 39, ppg: 27, style: 'A 7-footer who scores from every spot, mid-range included.' },
   { id: 203999, name: 'Nikola Jokić', team: 'DEN', position: 'Center', fg: 57, three: 36, ppg: 27, style: 'Hooks, floaters and passes, with very high percentages inside.' },
   { id: 1628369, name: 'Jayson Tatum', team: 'BOS', position: 'Forward', fg: 46, three: 37, ppg: 26, style: 'Big wing who mixes threes with step-back mid-range shots.' },
-  { id: 203507, name: 'Giannis Antetokounmpo', team: 'MIL', position: 'Forward', fg: 55, three: 28, ppg: 30, style: 'Almost all points at the rim and from the free-throw line.' },
+  { id: 203507, name: 'Giannis Antetokounmpo', team: 'MIA', position: 'Forward', fg: 55, three: 28, ppg: 30, style: 'Almost all points at the rim and from the free-throw line.' },
   { id: 1629029, name: 'Luka Dončić', team: 'LAL', position: 'Guard', fg: 46, three: 35, ppg: 28, style: 'Slow, step-back threes and pull-up jumpers.' },
   { id: 1628983, name: 'Shai Gilgeous-Alexander', team: 'OKC', position: 'Guard', fg: 54, three: 36, ppg: 31, style: 'The mid-range master: gets to his spot and rarely misses.' },
   { id: 1641705, name: 'Victor Wembanyama', team: 'SAS', position: 'Center', fg: 47, three: 33, ppg: 24, style: 'Seven foot five and shoots threes: a rim protector who spaces the floor.' },
