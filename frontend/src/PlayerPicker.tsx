@@ -106,7 +106,8 @@ export default function PlayerPicker({ value, onChange }: Props) {
         </span>
       </button>
       {open && (
-        <ul className="pp-list" role="listbox" id={listId} aria-label="Compare with"
+        <ul className="pp-list" role="listbox" id={listId} aria-label="Compare with" tabIndex={-1}
+          // tabIndex -1: a scrolling list is otherwise a Tab stop, and Tab from the button would land on it, still inside the picker.
           // Keep focus on the button while clicking or dragging the list, so the blur above does not close it first.
           onMouseDown={(e) => e.preventDefault()}>
           {options.map((p, i) => (
