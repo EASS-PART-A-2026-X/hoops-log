@@ -184,7 +184,8 @@ export class CourtScene {
 
       this.composer = new EffectComposer(renderer)
       this.composer.addPass(new RenderPass(this.scene, this.camera))
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.45, 0.32)
+      // Strength, radius, threshold. A high threshold means only the brightest spots bloom, so the shots keep their shape.
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.2, 0.3, 0.7)
       this.composer.addPass(this.bloom)
       this.composer.addPass(new OutputPass())
 
@@ -254,8 +255,8 @@ export class CourtScene {
     this.plans = data.points.map((p, i) => planFlight(p, i))
     // Crowded courts get dimmer beams, smaller markers and less glow, or they wash out to white.
     this.density = Math.min(1, Math.sqrt(250 / Math.max(1, data.points.length)))
-    this.beamMat.color.setScalar(0.2 + 0.35 * this.density)
-    this.bloom.strength = 0.28 + 0.22 * this.density
+    this.beamMat.color.setScalar(0.16 + 0.26 * this.density)
+    this.bloom.strength = 0.08 + 0.12 * this.density
     this.rebuildMarkers()
     this.rebuildArcs()
     paintHeat(this.heatCanvas, data.heat)
