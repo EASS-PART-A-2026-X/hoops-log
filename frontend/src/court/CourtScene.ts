@@ -47,6 +47,8 @@ export interface SceneOptions {
 const MADE_2 = '#ff7a2f'
 const MADE_3 = '#ffb27a'
 const MISSED = '#8ec1ff'
+// The selected shot's marker: a colour no shot uses (orange = made, blue = missed).
+const SELECTED = '#ff4fd8'
 const FLIGHT_MS = 900
 const SETTLE_MS = 520
 const ARC_SEGMENTS = 36
@@ -454,11 +456,11 @@ export class CourtScene {
 
   /**
    * The marker for the selected shot. It has to be easy to find among hundreds of shots, so it is
-   * big and a colour nothing else on the court uses (yellow), and the other shots are dimmed
+   * big and a colour nothing else on the court uses (SELECTED), and the other shots are dimmed
    * while it is shown (see setSelected). The first child is the pulsing ring (tick animates it).
    */
   private buildMarker(): void {
-    const accent = '#ffe14d'
+    const accent = SELECTED
     const mat = (opacity: number, additive = false) =>
       new THREE.MeshBasicMaterial({
         color: accent,
