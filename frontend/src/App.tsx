@@ -25,6 +25,9 @@ export default function App() {
   // most shots); '' = every player's shots together; otherwise a player's name.
   const [shooterChoice, setShooterChoice] = useState<string | null>(null)
   const [benchmarkId, setBenchmarkId] = useState<number | null>(null)
+  // The side drawer with the shot list and the add form: closed by default, so the page is just the map.
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
   const [pickedId, setPickedId] = useState<number | null>(null)
   // Where to scroll after the next render: the target row or the map only exists once the
   // selection has been drawn (a row past the first 100, say), so scrolling cannot happen in the click.
@@ -37,6 +40,7 @@ export default function App() {
     const saved = await createShot(input)
     setNotice({ kind: 'ok', text: `Saved shot #${saved.id} for ${saved.player}.` })
     await refresh()
+    setDrawerView('list') // show the new row
   }
 
   async function save(id: number, input: ShotInput) {
@@ -65,15 +69,18 @@ export default function App() {
     await refresh()
   }
 
-  // Escape deselects, but only on the log tab: the other tabs do not show the selection.
+  // Escape closes the drawer if it is open, otherwise deselects. Only on the log tab: the other
+  // tabs show neither.
   useEffect(() => {
-    if (selectedId === null || tab !== 'log') return
+    if (tab !== 'log' || (!drawerOpen && selectedId === null)) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPickedId(null)
+      if (e.key !== 'Escape') return
+      if (drawerOpen) setDrawerOpen(false)
+      else setPickedId(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, tab])
+  }, [selectedId, tab, drawerOpen])
 
   useEffect(() => {
     if (!scrollTarget) return
@@ -91,11 +98,13 @@ export default function App() {
       return
     }
     setPickedId(id)
-    setScrollTarget({ id: `shot-${id}`, block: 'nearest' })
+    // The row only exists on screen while the drawer is open.
+    if (drawerOpen) setScrollTarget({ id: `shot-${id}`, block: 'nearest' })
   }
   function locate(id: number | null) {
     setPickedId(id)
     if (id === null) return
+    setDrawerOpen(false) // the drawer would cover the map
     setScrollTarget({ id: 'map-title', block: 'start' })
   }
 
@@ -184,54 +193,90 @@ export default function App() {
             baseline={baseline}
           />
 
-          <div className="columns">
-            <section className="card" aria-labelledby="add-title">
-              <h2 id="add-title">Add a shot</h2>
-              <ShotForm submitLabel="Add shot" onSubmit={add} />
-            </section>
+          <button
+            type="button"
+            className="drawer-toggle"
+            aria-expanded={drawerOpen}
+            aria-controls="shots-drawer"
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            {drawerOpen ? 'Close' : 'Shots'}
+            {!drawerOpen && shots && <span className="drawer-count">{shots.length}</span>}
+          </button>
 
-            <section className="card" aria-labelledby="list-title" aria-busy={loading}>
-              <div className="list-head">
-                <h2 id="list-title">Shots</h2>
-                {shots && shots.length > 0 && (
-                  <span className="count">
-                    {made} made of {shots.length}
-                  </span>
-                )}
+          {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
+          {/* Always mounted (only hidden when closed), so a half-typed shot survives closing the drawer. */}
+          <aside
+            id="shots-drawer"
+            className={drawerOpen ? 'drawer open' : 'drawer'}
+            aria-label="Shots"
+            aria-busy={loading}
+            inert={!drawerOpen}
+          >
+            <div className="drawer-head">
+              <div className="chips" role="group" aria-label="Drawer view">
+                <button type="button" className="chip" aria-pressed={drawerView === 'list'} onClick={() => setDrawerView('list')}>
+                  Shots{shots ? ` (${shots.length})` : ''}
+                </button>
+                <button type="button" className="chip" aria-pressed={drawerView === 'add'} onClick={() => setDrawerView('add')}>
+                  Add a shot
+                </button>
               </div>
+              <button type="button" className="drawer-close" onClick={() => setDrawerOpen(false)}>
+                <span aria-hidden="true">✕</span>
+                <span className="sr-only">Close the shot list</span>
+              </button>
+            </div>
 
-              {truncated && (
-                <p className="state error">
-                  Showing the first {MAX_PAGES * PAGE_SIZE} shots only; there are more.
-                </p>
-              )}
+            <div className="drawer-body">
+              <section hidden={drawerView !== 'add'} aria-labelledby="add-title">
+                <h2 id="add-title">Add a shot</h2>
+                <ShotForm submitLabel="Add shot" onSubmit={add} />
+              </section>
 
-              {loadError && (
-                <div className="state error" role="alert">
-                  <p>{loadError}</p>
-                  <button type="button" className="btn" onClick={() => void refresh()} disabled={loading}>
-                    {loading ? 'Trying…' : 'Try again'}
-                  </button>
+              <section hidden={drawerView !== 'list'} aria-labelledby="list-title">
+                <div className="list-head">
+                  <h2 id="list-title">Shots</h2>
+                  {shots && shots.length > 0 && (
+                    <span className="count">
+                      {made} made of {shots.length}
+                    </span>
+                  )}
                 </div>
-              )}
 
-              {!shots && loading && <p className="state">Loading shots…</p>}
+                {truncated && (
+                  <p className="state error">
+                    Showing the first {MAX_PAGES * PAGE_SIZE} shots only; there are more.
+                  </p>
+                )}
 
-              {shots && shots.length === 0 && !loadError && (
-                <p className="state">No shots yet. Add your first one on the left.</p>
-              )}
+                {loadError && (
+                  <div className="state error" role="alert">
+                    <p>{loadError}</p>
+                    <button type="button" className="btn" onClick={() => void refresh()} disabled={loading}>
+                      {loading ? 'Trying…' : 'Try again'}
+                    </button>
+                  </div>
+                )}
 
-              {shots && shots.length > 0 && (
-                <ShotList
-                  shots={shots}
-                  selectedId={selectedId}
-                  onLocate={locate}
-                  onSave={save}
-                  onDelete={remove}
-                />
-              )}
-            </section>
-          </div>
+                {!shots && loading && <p className="state">Loading shots…</p>}
+
+                {shots && shots.length === 0 && !loadError && (
+                  <p className="state">No shots yet. Open "Add a shot" to log your first one.</p>
+                )}
+
+                {shots && shots.length > 0 && (
+                  <ShotList
+                    shots={shots}
+                    selectedId={selectedId}
+                    onLocate={locate}
+                    onSave={save}
+                    onDelete={remove}
+                  />
+                )}
+              </section>
+            </div>
+          </aside>
         </div>
       </main>
     </>

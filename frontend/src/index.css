@@ -114,19 +114,6 @@ h3 {
   border-color: var(--red);
 }
 
-.columns {
-  display: grid;
-  grid-template-columns: minmax(0, clamp(340px, 28vw, 480px)) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-@media (max-width: 860px) {
-  .columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .card {
   padding: 24px;
   border-radius: 20px;
@@ -1428,4 +1415,115 @@ h3 {
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* Shot list and add form: a drawer from the right, closed by default */
+.drawer-toggle {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 22px;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0b0f14;
+  background: var(--orange);
+  border: 0;
+  border-radius: 26px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.drawer-toggle:hover {
+  background: var(--orange-soft);
+}
+
+.drawer-count {
+  padding: 1px 9px;
+  font-size: 16px;
+  border-radius: 12px;
+  background: rgba(11, 15, 20, 0.18);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100vw);
+  border-left: 1px solid var(--line-strong);
+  background: var(--panel);
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+
+.drawer.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.25s ease;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.drawer-close:hover {
+  border-color: var(--orange-soft);
+}
+
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 16px 28px;
+  overflow-y: auto;
+}
+
+.drawer-body h2 {
+  margin-bottom: 14px;
+  font-size: 26px;
+}
+
+/* On small screens the drawer covers the page, so dim what is behind it */
+.drawer-scrim {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.55);
+  }
 }
