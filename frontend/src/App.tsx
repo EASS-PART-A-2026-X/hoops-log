@@ -4,6 +4,7 @@ import type { ShotInput } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
+import ShooterSelect from './ShooterSelect'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
 import ShotList from './ShotList'
@@ -20,6 +21,9 @@ export default function App() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [tab, setTab] = useState<'log' | 'nba' | 'players'>('log')
   // The player the vs NBA tab compares you with; null means the league average.
+  // Whose shots everything shows. null = not chosen yet, so use the default (the player with the
+  // most shots); '' = every player's shots together; otherwise a player's name.
+  const [shooterChoice, setShooterChoice] = useState<string | null>(null)
   const [benchmarkId, setBenchmarkId] = useState<number | null>(null)
   const [pickedId, setPickedId] = useState<number | null>(null)
   // Where to scroll after the next render: the target row or the map only exists once the
@@ -95,6 +99,18 @@ export default function App() {
     setScrollTarget({ id: 'map-title', block: 'start' })
   }
 
+  const shooters = useMemo(() => [...new Set((shots ?? []).map((s) => s.player))].sort(), [shots])
+  const defaultShooter = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
+    // Most shots wins; ties go to the first name alphabetically (shooters is sorted).
+    return shooters.reduce((best, p) => ((counts.get(p) ?? 0) > (counts.get(best) ?? 0) ? p : best), shooters[0] ?? '')
+  }, [shots, shooters])
+  // A chosen player who was deleted falls back to the default.
+  const shooter = shooterChoice === '' ? '' : shooterChoice !== null && shooters.includes(shooterChoice) ? shooterChoice : defaultShooter
+  const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
+  const shooterPicker = <ShooterSelect players={shooters} value={shooter} onChange={setShooterChoice} />
+
   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
   const baseline = useMemo(
     () => (benchPlayer ? { name: benchPlayer.name, typical: typicalOf(benchPlayer) } : null),
@@ -123,7 +139,9 @@ export default function App() {
       <main className="page">
         {tab === 'players' && (
           <PlayersPage
-            shots={shots}
+            shots={shooterShots}
+            shooter={shooter}
+            shooterPicker={shooterPicker}
             benchmarkId={benchmarkId}
             onCompare={(id) => {
               setBenchmarkId(id)
@@ -132,7 +150,7 @@ export default function App() {
           />
         )}
         {tab === 'nba' && (
-          <NbaCompare shots={shots} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId} onBrowse={() => setTab('players')} />
+          <NbaCompare shots={shooterShots} shooter={shooter} shooterPicker={shooterPicker} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId} onBrowse={() => setTab('players')} />
         )}
         {/* Always mounted, only hidden, so the form, row edits and map filters survive a tab switch.
             The map's scene stops drawing while hidden and re-measures when shown again. */}
@@ -155,6 +173,9 @@ export default function App() {
 
           <ShotMap
             shots={shots}
+            players={shooters}
+            player={shooter}
+            onPlayerChange={setShooterChoice}
             loadError={loadError}
             retrying={loading}
             onRetry={() => void refresh()}

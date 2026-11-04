@@ -99,11 +99,14 @@ function Card({
 
 interface Props {
   shots: Shot[] | null
+  /** Whose shots these are ('' = every player's). */
+  shooter: string
+  shooterPicker: React.ReactNode
   benchmarkId: number | null
   onCompare: (id: number) => void
 }
 
-export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
+export default function PlayersPage({ shots, shooter, shooterPicker, benchmarkId, onCompare }: Props) {
   const [team, setTeam] = useState('')
   const teamKeys = [...new Set(PLAYERS.map((p) => p.team))]
   const ranking = useMemo(() => rankPlayers(shots ?? []), [shots])
@@ -111,6 +114,7 @@ export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
   const list = ranking ? ranking.map((m) => m.player) : PLAYERS
   const shown = team ? list.filter((p) => p.team === team) : list
   const top = ranking?.[0]
+  const whose = shooter ? `${shooter}'s` : "the whole log's"
   const mine = useMemo<Mine | null>(() => {
     if (!shots || shots.length === 0) return null
     const [fg, three] = compareOverall(shots)
@@ -121,15 +125,18 @@ export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
     <section aria-labelledby="players-title">
       <div className="map-head">
         <h2 id="players-title">NBA players</h2>
-        <div className="chips" role="group" aria-label="Team">
-          <button type="button" className="chip" aria-pressed={team === ''} onClick={() => setTeam('')}>
-            All teams
-          </button>
-          {teamKeys.map((k) => (
-            <button key={k} type="button" className="chip" aria-pressed={team === k} onClick={() => setTeam(k)}>
-              {TEAMS[k].name}
+        <div className="filters">
+          {shooterPicker}
+          <div className="chips" role="group" aria-label="Team">
+            <button type="button" className="chip" aria-pressed={team === ''} onClick={() => setTeam('')}>
+              All teams
             </button>
-          ))}
+            {teamKeys.map((k) => (
+              <button key={k} type="button" className="chip" aria-pressed={team === k} onClick={() => setTeam(k)}>
+                {TEAMS[k].name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <p className="nba-note">
@@ -139,9 +146,9 @@ export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
       <p className="nba-note match-note">
         {top ? (
           <>
-            The big number on each photo is how alike your shooting is, from 0 to 100%. Under each stat,
-            "You" is your own number from the log: ▲ means you are better, ▼ means they are. You shoot most like{' '}
-            <strong>{top.player.name}</strong> ({top.score}%). Press "Compare my shots" to colour the heat map
+            The big number on each photo is how alike {whose} shooting is, from 0 to 100%. Under each stat,
+            "You" is {whose} number from the log: ▲ means better than the player, ▼ means the player is better.{' '}
+            {shooter || 'The whole log'} shoots most like <strong>{top.player.name}</strong> ({top.score}%). Press "Compare my shots" to colour the heat map
             and the vs NBA tab against that player.
           </>
         ) : (

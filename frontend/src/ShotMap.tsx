@@ -4,6 +4,7 @@ import type { Shot } from './api'
 import type { CourtScene, MapMode, ViewName } from './court/CourtScene'
 import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneStats } from './court/stats'
 import { lastName } from './court/players'
+import ShooterSelect from './ShooterSelect'
 import type { HexCell, Typical } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
 
@@ -19,6 +20,10 @@ interface Props {
   onSelect: (id: number | null) => void
   /** A player the heat map compares each spot with, instead of a typical shooter. */
   baseline: { name: string; typical: Typical } | null
+  /** Everyone in the log, and whose shots to show ('' = everyone). The choice lives in App. */
+  players: string[]
+  player: string
+  onPlayerChange: (player: string) => void
 }
 
 interface Hover {
@@ -87,10 +92,9 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, players, player, onPlayerChange }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
-  const [player, setPlayer] = useState('')
   const [mode, setMode] = useState<MapMode>('beams')
   const [view, setView] = useState<ViewName>('shooter')
   const [auto, setAuto] = useState(false)
@@ -104,9 +108,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const sceneRef = useRef<CourtScene | null>(null)
   const introDone = useRef(false)
 
-  const players = useMemo(() => [...new Set((shots ?? []).map((s) => s.player))].sort(), [shots])
-  // A player who was deleted must not leave the filter stuck on nobody.
-  const activePlayer = players.includes(player) ? player : ''
+  const activePlayer = player
   const filtered = useMemo(
     () => applyFilters(shots ?? [], { area, result, player: activePlayer }),
     [shots, area, result, activePlayer],
@@ -223,7 +225,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const clearFilters = () => {
     setArea('all')
     setResult('all')
-    setPlayer('')
+    onPlayerChange('')
   }
   const loading = shots === null
   const label = loading
@@ -243,17 +245,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
         <div className="filters">
           <Chips label="Shot area" value={area} options={AREAS} onChange={setArea} disabled={failed !== null} />
           <Chips label="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed !== null} />
-          <label className="player-filter">
-            <span className="sr-only">Player</span>
-            <select value={activePlayer} onChange={(e) => setPlayer(e.target.value)}>
-              <option value="">Every player</option>
-              {players.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ShooterSelect players={players} value={player} onChange={onPlayerChange} />
         </div>
       </div>
 

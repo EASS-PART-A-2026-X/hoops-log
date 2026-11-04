@@ -1011,8 +1011,9 @@ h3 {
 
 .nba-zone-foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -1413,4 +1414,18 @@ h3 {
     min-width: 0;
     width: 100%;
   }
+}
+
+/* Whose shots: the same choice on the map, vs NBA and Players */
+.shooter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shooter-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
 }
