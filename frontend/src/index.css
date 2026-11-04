@@ -69,7 +69,7 @@ h3 {
 .page {
   /* Fluid: the app uses the whole window instead of floating in a centred column. */
   width: 100%;
-  padding: 28px clamp(16px, 3vw, 56px) 64px;
+  padding: 20px clamp(16px, 3vw, 56px) 48px;
 }
 
 .intro {
@@ -484,12 +484,12 @@ h3 {
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .map-head h2 {
   margin: 0;
-  font-size: 34px;
+  font-size: 28px;
 }
 
 .filters,
@@ -549,8 +549,8 @@ h3 {
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 @media (max-width: 640px) {
@@ -562,10 +562,10 @@ h3 {
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 12px 16px;
+  gap: 0;
+  padding: 8px 14px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--bg);
 }
 
@@ -587,13 +587,13 @@ h3 {
 .kpi-value {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 38px;
+  font-size: 30px;
   line-height: 1.1;
   color: #fff;
 }
 
 .kpi-value.small {
-  font-size: 30px;
+  font-size: 24px;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
@@ -628,8 +628,8 @@ h3 {
 
 .stage-canvas {
   position: relative;
-  /* Tall on big screens, never taller than the window: the court should fill the view. */
-  height: clamp(360px, 72vh, 1100px);
+  /* The filters and cards sit above the court, so keep it well under the window height: the whole map section should fit on one screen. */
+  height: clamp(340px, 62vh, 820px);
   cursor: grab;
 }
 
