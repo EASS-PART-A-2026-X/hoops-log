@@ -129,9 +129,21 @@ export default function App() {
   const made = shots?.filter((s) => s.made).length ?? 0
 
   return (
-    <>
+    <div className="app">
       <header className="topbar">
         <span className="brand">HOOPS LOG</span>
+        {tab === 'log' && (
+          <button
+            type="button"
+            className="drawer-toggle"
+            aria-expanded={drawerOpen}
+            aria-controls="shots-drawer"
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            Shots
+            {shots && <span className="drawer-count">{shots.length}</span>}
+          </button>
+        )}
         <nav className="tabs" aria-label="Pages">
           <button type="button" aria-current={tab === 'log' ? 'page' : undefined} onClick={() => setTab('log')}>
             My log
@@ -145,7 +157,7 @@ export default function App() {
         </nav>
       </header>
 
-      <main className="page">
+      <main className={tab === 'log' ? 'page fit' : 'page'}>
         {tab === 'players' && (
           <PlayersPage
             shots={shooterShots}
@@ -163,12 +175,7 @@ export default function App() {
         )}
         {/* Always mounted, only hidden, so the form, row edits and map filters survive a tab switch.
             The map's scene stops drawing while hidden and re-measures when shown again. */}
-        <div hidden={tab !== 'log'}>
-          <section className="intro">
-            <p className="eyebrow">YOUR SHOT LOG</p>
-            <h1>Every shot, on the record.</h1>
-          </section>
-
+        <div className="log-view" hidden={tab !== 'log'}>
           <div role="status" aria-live="polite" className="notice-slot">
             {notice && (
               <p className={`notice ${notice.kind}`}>
@@ -192,17 +199,6 @@ export default function App() {
             onSelect={pickFromMap}
             baseline={baseline}
           />
-
-          <button
-            type="button"
-            className="drawer-toggle"
-            aria-expanded={drawerOpen}
-            aria-controls="shots-drawer"
-            onClick={() => setDrawerOpen((open) => !open)}
-          >
-            {drawerOpen ? 'Close' : 'Shots'}
-            {!drawerOpen && shots && <span className="drawer-count">{shots.length}</span>}
-          </button>
 
           {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
           {/* Always mounted (only hidden when closed), so a half-typed shot survives closing the drawer. */}
@@ -279,6 +275,6 @@ export default function App() {
           </aside>
         </div>
       </main>
-    </>
+    </div>
   )
 }

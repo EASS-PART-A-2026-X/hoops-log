@@ -90,11 +90,19 @@ h3 {
 }
 
 .notice-slot {
-  min-height: 52px;
-  margin-bottom: 8px;
+  /* A toast over the top of the map, so it takes no room from the court. */
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 25;
+  width: min(560px, calc(100% - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .notice {
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -465,6 +473,10 @@ h3 {
   padding: 24px;
 }
 
+.log-view:not([hidden]) {
+  position: relative;
+}
+
 .map-head {
   display: flex;
   flex-wrap: wrap;
@@ -615,6 +627,10 @@ h3 {
 }
 
 .stage-frame {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -624,8 +640,9 @@ h3 {
 
 .stage-canvas {
   position: relative;
-  /* 62% of the window: big enough to read the court, small enough that the filters above and the cards below stay in view. */
-  height: clamp(340px, 62vh, 820px);
+  /* Fills whatever the window leaves after the controls above and below it (see .page.fit). */
+  flex: 1;
+  min-height: 0;
   cursor: grab;
 }
 
@@ -1419,24 +1436,19 @@ h3 {
 
 /* Shot list and add form: a drawer from the right, closed by default */
 .drawer-toggle {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 30;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 48px;
-  padding: 8px 22px;
+  min-height: 44px;
+  padding: 6px 18px;
   font-family: var(--display);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #0b0f14;
   background: var(--orange);
   border: 0;
-  border-radius: 26px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border-radius: 22px;
   cursor: pointer;
 }
 
@@ -1525,5 +1537,158 @@ h3 {
     inset: 0;
     z-index: 35;
     background: rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* The home page fits the window: no big heading, no page scroll. The map card takes all the space
+   under the top bar, the court takes what is left inside it, and the zone list scrolls on its own. */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.topbar {
+  flex: none;
+}
+
+.brand {
+  margin-right: auto;
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.page.fit {
+  display: flex;
+  flex-direction: column;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  overflow: hidden;
+}
+
+.page.fit .log-view:not([hidden]) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page.fit .map {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+  padding: 16px 18px;
+}
+
+.page.fit .map-head h2 {
+  font-size: 26px;
+}
+
+.page.fit .map-body {
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  align-items: stretch;
+}
+
+.page.fit .stage {
+  min-height: 0;
+}
+
+.page.fit .zones {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.page.fit .stage-fallback {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Phones and very short windows cannot fit everything: go back to a normal scrolling page. */
+@media (max-width: 960px), (max-height: 620px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .page,
+  .page.fit {
+    display: block;
+    overflow: visible;
+  }
+
+  .page.fit .log-view:not([hidden]),
+  .page.fit .map {
+    display: block;
+  }
+
+  .page.fit .map-body {
+    align-items: start;
+  }
+
+  .stage-canvas {
+    flex: none;
+    height: clamp(300px, 60vh, 720px);
+  }
+}
+
+@media (max-width: 640px) {
+  .drawer-toggle {
+    margin-left: auto;
+  }
+}
+
+/* Short desktop windows: tighten the controls so the court keeps as much height as possible */
+@media (max-height: 820px) and (min-width: 961px) {
+  .page.fit {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .page.fit .map {
+    padding: 12px 16px;
+  }
+
+  .page.fit .map-head {
+    margin-bottom: 8px;
+  }
+
+  .page.fit .kpis {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .page.fit .kpi {
+    padding: 4px 12px;
+  }
+
+  .page.fit .kpi-value {
+    font-size: 24px;
+  }
+
+  .page.fit .kpi-value.small {
+    font-size: 20px;
+  }
+
+  .page.fit .kpi-sub {
+    display: none;
+  }
+
+  .page.fit .chip,
+  .page.fit .player-filter select {
+    min-height: 38px;
+    padding-block: 4px;
+  }
+
+  .page.fit .stage {
+    gap: 8px;
   }
 }

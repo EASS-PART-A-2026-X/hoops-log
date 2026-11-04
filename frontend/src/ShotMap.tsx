@@ -239,7 +239,6 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
     <section className="map card" aria-labelledby="map-title">
       <div className="map-head">
         <div>
-          <p className="eyebrow">SHOT MAP</p>
           <h2 id="map-title">Where your shots live</h2>
         </div>
         <div className="filters">
