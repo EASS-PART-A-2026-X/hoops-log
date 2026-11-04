@@ -1125,3 +1125,29 @@ h3 {
   color: var(--muted);
   font-size: 14px;
 }
+
+.match-note strong {
+  color: var(--orange-soft);
+}
+
+.player.best {
+  border-color: var(--orange);
+}
+
+.player-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.match {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.match.best {
+  color: var(--orange-soft);
+}

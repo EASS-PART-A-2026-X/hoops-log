@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { Shot } from './api'
+import { MIN_SHOTS_FOR_MATCH, rankPlayers } from './court/nba'
 import { PLAYERS, TEAMS, headshotUrl, initials, logoUrl } from './court/players'
 import type { Player } from './court/players'
 
@@ -15,10 +17,10 @@ function Img({ src, alt, fallback, className }: { src: string; alt: string; fall
   return <img className={className} src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} />
 }
 
-function Card({ player }: { player: Player }) {
+function Card({ player, score, best, benchmark, onCompare }: { player: Player; score: number | null; best: boolean; benchmark: boolean; onCompare: (id: number) => void }) {
   const team = TEAMS[player.team]
   return (
-    <li className="player" style={{ '--team': team.color } as React.CSSProperties}>
+    <li className={best ? 'player best' : 'player'} style={{ '--team': team.color } as React.CSSProperties}>
       <div className="player-photo">
         <Img
           className="player-img"
@@ -53,15 +55,34 @@ function Card({ player }: { player: Player }) {
           </div>
         </dl>
         <p className="player-style">{player.style}</p>
+        <div className="player-foot">
+          {score !== null && (
+            <span className={best ? 'match best' : 'match'}>{best ? 'Closest to you · ' : ''}{score}% match</span>
+          )}
+          <button type="button" className="btn" onClick={() => onCompare(player.id)} aria-pressed={benchmark}>
+            {benchmark ? 'Comparing' : 'Compare with me'}
+            <span className="sr-only"> {player.name}</span>
+          </button>
+        </div>
       </div>
     </li>
   )
 }
 
-export default function PlayersPage() {
+interface Props {
+  shots: Shot[] | null
+  benchmarkId: number | null
+  onCompare: (id: number) => void
+}
+
+export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
   const [team, setTeam] = useState('')
   const teamKeys = [...new Set(PLAYERS.map((p) => p.team))]
-  const shown = team ? PLAYERS.filter((p) => p.team === team) : PLAYERS
+  const ranking = useMemo(() => rankPlayers(shots ?? []), [shots])
+  const scoreOf = (id: number) => ranking?.find((m) => m.player.id === id)?.score ?? null
+  const list = ranking ? ranking.map((m) => m.player) : PLAYERS
+  const shown = team ? list.filter((p) => p.team === team) : list
+  const top = ranking?.[0]
 
   return (
     <section aria-labelledby="players-title">
@@ -82,9 +103,19 @@ export default function PlayersPage() {
         Numbers are rounded figures from recent seasons, typed in by hand, so read them as about. Teams
         change, so a player may have moved. Photos and logos belong to the NBA and its teams.
       </p>
+      <p className="nba-note match-note">
+        {top ? (
+          <>
+            Sorted by how close each player's shooting is to your log: field goal %, three-point % and how
+            often you shoot threes. You shoot most like <strong>{top.player.name}</strong> ({top.score}%).
+          </>
+        ) : (
+          <>Log at least {MIN_SHOTS_FOR_MATCH} shots and the players are sorted by how close they are to you.</>
+        )}
+      </p>
       <ul className="players">
         {shown.map((p) => (
-          <Card key={p.id} player={p} />
+          <Card key={p.id} player={p} score={scoreOf(p.id)} best={top?.player.id === p.id} benchmark={benchmarkId === p.id} onCompare={onCompare} />
         ))}
       </ul>
     </section>

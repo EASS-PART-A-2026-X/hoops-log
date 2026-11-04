@@ -17,6 +17,8 @@ export default function App() {
   const { shots, truncated, loading, loadError, refresh } = useShots()
   const [notice, setNotice] = useState<Notice | null>(null)
   const [tab, setTab] = useState<'log' | 'nba' | 'players'>('log')
+  // The player the vs NBA tab compares you with; null means the league average.
+  const [benchmarkId, setBenchmarkId] = useState<number | null>(null)
   const [pickedId, setPickedId] = useState<number | null>(null)
   // Where to scroll after the next render: the target row or the map only exists once the
   // selection has been drawn (a row past the first 100, say), so scrolling cannot happen in the click.
@@ -112,9 +114,16 @@ export default function App() {
 
       <main className="page">
         {tab === 'players' ? (
-          <PlayersPage />
+          <PlayersPage
+            shots={shots}
+            benchmarkId={benchmarkId}
+            onCompare={(id) => {
+              setBenchmarkId(id)
+              setTab('nba')
+            }}
+          />
         ) : tab === 'nba' ? (
-          <NbaCompare shots={shots} />
+          <NbaCompare shots={shots} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId} onBrowse={() => setTab('players')} />
         ) : (
           <>
         <section className="intro">

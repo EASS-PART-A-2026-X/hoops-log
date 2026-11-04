@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Shot } from './api'
-import { SMALL_SAMPLE, compareOverall, compareZones } from './court/nba'
+import { LEAGUE, SMALL_SAMPLE, benchmarkOf, compareOverall, compareZones } from './court/nba'
+import { PLAYERS, TEAMS } from './court/players'
 
 function Diff({ diff }: { diff: number | null }) {
   if (diff === null) return <span className="nba-diff">–</span>
@@ -9,18 +10,44 @@ function Diff({ diff }: { diff: number | null }) {
   return <span className={cls}>{`${sign}${diff} pts`}</span>
 }
 
-export default function NbaCompare({ shots }: { shots: Shot[] | null }) {
-  const overall = useMemo(() => compareOverall(shots ?? []), [shots])
+interface Props {
+  shots: Shot[] | null
+  benchmarkId: number | null
+  onBenchmark: (id: number | null) => void
+  onBrowse: () => void
+}
+
+export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }: Props) {
+  const player = PLAYERS.find((p) => p.id === benchmarkId) ?? null
+  const bench = player ? benchmarkOf(player) : LEAGUE
+  const overall = useMemo(() => compareOverall(shots ?? [], bench), [shots, bench])
   const zones = useMemo(() => compareZones(shots ?? []), [shots])
 
   return (
     <section aria-labelledby="nba-title">
       <div className="map-head">
-        <h2 id="nba-title">You vs the NBA</h2>
+        <h2 id="nba-title">You vs {player ? player.name : 'the NBA'}</h2>
+        <div className="filters">
+          <label className="player-filter">
+            <span className="sr-only">Compare with</span>
+            <select value={benchmarkId ?? ''} onChange={(e) => onBenchmark(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">NBA average</option>
+              {PLAYERS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({TEAMS[p.team].abbr})
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="chip" onClick={onBrowse}>
+            Browse players
+          </button>
+        </div>
       </div>
       <p className="nba-note">
-        NBA numbers are rounded league averages from recent seasons, so read them as about. Zones with
-        fewer than {SMALL_SAMPLE} shots are a small sample.
+        {player ? `${player.name}'s` : 'NBA'} numbers are rounded figures from recent seasons, so read them as
+        about. {player && 'The zone tiles below are still league averages. '}Zones with fewer than{' '}
+        {SMALL_SAMPLE} shots are a small sample.
       </p>
 
       {!shots ? (
@@ -35,13 +62,13 @@ export default function NbaCompare({ shots }: { shots: Shot[] | null }) {
                 <span className="kpi-label">{o.label.toUpperCase()}</span>
                 <span className="kpi-value">{o.mine === null ? '–' : `${o.mine}%`}</span>
                 <span className="kpi-sub">
-                  NBA about {o.nba}% · {o.attempts} {o.attempts === 1 ? 'shot' : 'shots'}
+                  {player ? player.name.split(' ').slice(-1)[0] : 'NBA'} about {o.nba}% · {o.attempts} {o.attempts === 1 ? 'shot' : 'shots'}
                 </span>
               </div>
             ))}
           </div>
 
-          <h3 className="nba-zones-title">By zone</h3>
+          <h3 className="nba-zones-title">By zone (vs league average)</h3>
           <ul className="nba-zones">
             {zones.map((z) => (
               <li key={z.zone} className={z.attempts === 0 ? 'nba-zone empty' : 'nba-zone'}>

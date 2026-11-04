@@ -19,6 +19,8 @@ export interface Player {
   fg: number
   three: number
   ppg: number
+  /** Rounded share of the player's shots that are threes. */
+  threeShare: number
   style: string
 }
 
@@ -39,21 +41,21 @@ export const TEAMS: Record<string, Team> = {
 }
 
 export const PLAYERS: Player[] = [
-  { id: 201939, name: 'Stephen Curry', team: 'GSW', position: 'Guard', fg: 47, three: 41, ppg: 25, style: 'The greatest shooter ever: threes off the dribble from anywhere.' },
-  { id: 2544, name: 'LeBron James', team: 'PHI', position: 'Forward', fg: 51, three: 35, ppg: 25, style: 'Drives and finishes at the rim, with a steady jumper.' },
-  { id: 201142, name: 'Kevin Durant', team: 'HOU', position: 'Forward', fg: 52, three: 39, ppg: 27, style: 'A 7-footer who scores from every spot, mid-range included.' },
-  { id: 203999, name: 'Nikola Jokić', team: 'DEN', position: 'Center', fg: 57, three: 36, ppg: 27, style: 'Hooks, floaters and passes, with very high percentages inside.' },
-  { id: 1628369, name: 'Jayson Tatum', team: 'BOS', position: 'Forward', fg: 46, three: 37, ppg: 26, style: 'Big wing who mixes threes with step-back mid-range shots.' },
-  { id: 203507, name: 'Giannis Antetokounmpo', team: 'MIA', position: 'Forward', fg: 55, three: 28, ppg: 30, style: 'Almost all points at the rim and from the free-throw line.' },
-  { id: 1629029, name: 'Luka Dončić', team: 'LAL', position: 'Guard', fg: 46, three: 35, ppg: 28, style: 'Slow, step-back threes and pull-up jumpers.' },
-  { id: 1628983, name: 'Shai Gilgeous-Alexander', team: 'OKC', position: 'Guard', fg: 54, three: 36, ppg: 31, style: 'The mid-range master: gets to his spot and rarely misses.' },
-  { id: 1641705, name: 'Victor Wembanyama', team: 'SAS', position: 'Center', fg: 47, three: 33, ppg: 24, style: 'Seven foot five and shoots threes: a rim protector who spaces the floor.' },
-  { id: 203954, name: 'Joel Embiid', team: 'PHI', position: 'Center', fg: 47, three: 34, ppg: 28, style: 'Elbow jumpers and post moves, and he lives at the free-throw line.' },
-  { id: 1626164, name: 'Devin Booker', team: 'PHX', position: 'Guard', fg: 49, three: 37, ppg: 26, style: 'A classic mid-range scorer who also shoots from deep.' },
-  { id: 1630162, name: 'Anthony Edwards', team: 'MIN', position: 'Guard', fg: 46, three: 36, ppg: 26, style: 'Explosive drives and deep pull-up threes.' },
-  { id: 1628973, name: 'Jalen Brunson', team: 'NYK', position: 'Guard', fg: 48, three: 40, ppg: 26, style: 'Footwork and pull-up jumpers: a lot of points from 10 to 18 feet.' },
-  { id: 202695, name: 'Kawhi Leonard', team: 'LAC', position: 'Forward', fg: 50, three: 40, ppg: 24, style: 'Efficient from mid-range and the wing, with few wasted shots.' },
-  { id: 201935, name: 'James Harden', team: 'LAC', position: 'Guard', fg: 43, three: 36, ppg: 22, style: 'Step-back threes and free throws: the original "Moreyball" shot diet.' },
+  { id: 201939, name: 'Stephen Curry', team: 'GSW', position: 'Guard', fg: 47, three: 41, ppg: 25, threeShare: 55, style: 'The greatest shooter ever: threes off the dribble from anywhere.' },
+  { id: 2544, name: 'LeBron James', team: 'PHI', position: 'Forward', fg: 51, three: 35, ppg: 25, threeShare: 35, style: 'Drives and finishes at the rim, with a steady jumper.' },
+  { id: 201142, name: 'Kevin Durant', team: 'HOU', position: 'Forward', fg: 52, three: 39, ppg: 27, threeShare: 30, style: 'A 7-footer who scores from every spot, mid-range included.' },
+  { id: 203999, name: 'Nikola Jokić', team: 'DEN', position: 'Center', fg: 57, three: 36, ppg: 27, threeShare: 20, style: 'Hooks, floaters and passes, with very high percentages inside.' },
+  { id: 1628369, name: 'Jayson Tatum', team: 'BOS', position: 'Forward', fg: 46, three: 37, ppg: 26, threeShare: 45, style: 'Big wing who mixes threes with step-back mid-range shots.' },
+  { id: 203507, name: 'Giannis Antetokounmpo', team: 'MIA', position: 'Forward', fg: 55, three: 28, ppg: 30, threeShare: 12, style: 'Almost all points at the rim and from the free-throw line.' },
+  { id: 1629029, name: 'Luka Dončić', team: 'LAL', position: 'Guard', fg: 46, three: 35, ppg: 28, threeShare: 45, style: 'Slow, step-back threes and pull-up jumpers.' },
+  { id: 1628983, name: 'Shai Gilgeous-Alexander', team: 'OKC', position: 'Guard', fg: 54, three: 36, ppg: 31, threeShare: 25, style: 'The mid-range master: gets to his spot and rarely misses.' },
+  { id: 1641705, name: 'Victor Wembanyama', team: 'SAS', position: 'Center', fg: 47, three: 33, ppg: 24, threeShare: 40, style: 'Seven foot five and shoots threes: a rim protector who spaces the floor.' },
+  { id: 203954, name: 'Joel Embiid', team: 'PHI', position: 'Center', fg: 47, three: 34, ppg: 28, threeShare: 20, style: 'Elbow jumpers and post moves, and he lives at the free-throw line.' },
+  { id: 1626164, name: 'Devin Booker', team: 'PHX', position: 'Guard', fg: 49, three: 37, ppg: 26, threeShare: 35, style: 'A classic mid-range scorer who also shoots from deep.' },
+  { id: 1630162, name: 'Anthony Edwards', team: 'MIN', position: 'Guard', fg: 46, three: 36, ppg: 26, threeShare: 45, style: 'Explosive drives and deep pull-up threes.' },
+  { id: 1628973, name: 'Jalen Brunson', team: 'NYK', position: 'Guard', fg: 48, three: 40, ppg: 26, threeShare: 35, style: 'Footwork and pull-up jumpers: a lot of points from 10 to 18 feet.' },
+  { id: 202695, name: 'Kawhi Leonard', team: 'LAC', position: 'Forward', fg: 50, three: 40, ppg: 24, threeShare: 30, style: 'Efficient from mid-range and the wing, with few wasted shots.' },
+  { id: 201935, name: 'James Harden', team: 'LAC', position: 'Guard', fg: 43, three: 36, ppg: 22, threeShare: 55, style: 'Step-back threes and free throws: the original "Moreyball" shot diet.' },
 ]
 
 export const headshotUrl = (id: number) => `https://cdn.nba.com/headshots/nba/latest/1040x760/${id}.png`
