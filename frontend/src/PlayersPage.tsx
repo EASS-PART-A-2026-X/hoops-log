@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Shot } from './api'
-import { MIN_SHOTS_FOR_MATCH, rankPlayers } from './court/nba'
+import { MIN_SHOTS_FOR_MATCH, compareOverall, rankPlayers } from './court/nba'
 import { PLAYERS, TEAMS, headshotUrl, initials, logoUrl } from './court/players'
 import type { Player } from './court/players'
 
@@ -17,7 +17,40 @@ function Img({ src, alt, fallback, className }: { src: string; alt: string; fall
   return <img className={className} src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} />
 }
 
-function Card({ player, score, best, benchmark, onCompare }: { player: Player; score: number | null; best: boolean; benchmark: boolean; onCompare: (id: number) => void }) {
+interface Mine {
+  fg: number | null
+  three: number | null
+}
+
+/** "You 44%" under a player's number, with how far apart you are. */
+function Yours({ mine, theirs }: { mine: number | null | undefined; theirs: number }) {
+  if (mine === null || mine === undefined) return <span className="you">You –</span>
+  const diff = mine - theirs
+  const cls = diff > 0 ? 'you up' : diff < 0 ? 'you down' : 'you'
+  const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '='
+  return (
+    <span className={cls}>
+      You {mine}% <span aria-hidden="true">{arrow}</span>
+      <span className="sr-only">{diff > 0 ? ', above them' : diff < 0 ? ', below them' : ', the same'}</span>
+    </span>
+  )
+}
+
+function Card({
+  player,
+  score,
+  best,
+  benchmark,
+  mine,
+  onCompare,
+}: {
+  player: Player
+  score: number | null
+  best: boolean
+  benchmark: boolean
+  mine: Mine | null
+  onCompare: (id: number) => void
+}) {
   const team = TEAMS[player.team]
   return (
     <li className={best ? 'player best' : 'player'} style={{ '--team': team.color } as React.CSSProperties}>
@@ -28,6 +61,12 @@ function Card({ player, score, best, benchmark, onCompare }: { player: Player; s
           alt={`Photo of ${player.name}`}
           fallback={initials(player.name)}
         />
+        {score !== null && (
+          <div className={best ? 'match-badge best' : 'match-badge'}>
+            <strong>{score}%</strong>
+            <span>{best ? 'closest to you' : 'like you'}</span>
+          </div>
+        )}
         <Img
           className="player-logo"
           src={logoUrl(team.id)}
@@ -44,10 +83,12 @@ function Card({ player, score, best, benchmark, onCompare }: { player: Player; s
           <div>
             <dt>FG</dt>
             <dd>{player.fg}%</dd>
+            {mine && <Yours mine={mine.fg} theirs={player.fg} />}
           </div>
           <div>
             <dt>3P</dt>
             <dd>{player.three}%</dd>
+            {mine && <Yours mine={mine.three} theirs={player.three} />}
           </div>
           <div>
             <dt>PPG</dt>
@@ -56,12 +97,9 @@ function Card({ player, score, best, benchmark, onCompare }: { player: Player; s
         </dl>
         <p className="player-style">{player.style}</p>
         <div className="player-foot">
-          {score !== null && (
-            <span className={best ? 'match best' : 'match'}>{best ? 'Closest to you · ' : ''}{score}% match</span>
-          )}
           <button type="button" className="btn" onClick={() => onCompare(player.id)} aria-pressed={benchmark}>
-            {benchmark ? 'Comparing' : 'Compare with me'}
-            <span className="sr-only"> {player.name}</span>
+            {benchmark ? 'Comparing now' : 'Compare my shots'}
+            <span className="sr-only"> with {player.name}</span>
           </button>
         </div>
       </div>
@@ -83,6 +121,11 @@ export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
   const list = ranking ? ranking.map((m) => m.player) : PLAYERS
   const shown = team ? list.filter((p) => p.team === team) : list
   const top = ranking?.[0]
+  const mine = useMemo<Mine | null>(() => {
+    if (!shots || shots.length === 0) return null
+    const [fg, three] = compareOverall(shots)
+    return { fg: fg.mine, three: three.mine }
+  }, [shots])
 
   return (
     <section aria-labelledby="players-title">
@@ -106,8 +149,10 @@ export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
       <p className="nba-note match-note">
         {top ? (
           <>
-            Sorted by how close each player's shooting is to your log: field goal %, three-point % and how
-            often you shoot threes. You shoot most like <strong>{top.player.name}</strong> ({top.score}%).
+            The big number on each photo is how alike your shooting is, from 0 to 100%. Under each stat,
+            "You" is your own number from the log: ▲ means you are better, ▼ means they are. You shoot most like{' '}
+            <strong>{top.player.name}</strong> ({top.score}%). Press "Compare my shots" to colour the heat map
+            and the vs NBA tab against that player.
           </>
         ) : (
           <>Log at least {MIN_SHOTS_FOR_MATCH} shots and the players are sorted by how close they are to you.</>
@@ -115,7 +160,7 @@ export default function PlayersPage({ shots, benchmarkId, onCompare }: Props) {
       </p>
       <ul className="players">
         {shown.map((p) => (
-          <Card key={p.id} player={p} score={scoreOf(p.id)} best={top?.player.id === p.id} benchmark={benchmarkId === p.id} onCompare={onCompare} />
+          <Card key={p.id} player={p} score={scoreOf(p.id)} best={top?.player.id === p.id} benchmark={benchmarkId === p.id} mine={mine} onCompare={onCompare} />
         ))}
       </ul>
     </section>
