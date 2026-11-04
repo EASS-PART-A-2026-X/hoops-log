@@ -562,7 +562,7 @@ h3 {
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 2px;
   padding: 8px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -628,8 +628,8 @@ h3 {
 
 .stage-canvas {
   position: relative;
-  /* The filters and cards sit above the court, so keep it well under the window height: the whole map section should fit on one screen. */
-  height: clamp(340px, 62vh, 820px);
+  /* Window height minus the fixed chrome (~490px: top bar 67, page padding 20, intro 116, notice slot 60, map card padding 50, map heading 79, stat cards 98) so the filters, cards and court fit one screen. */
+  height: clamp(340px, calc(100vh - 490px), 820px);
   cursor: grab;
 }
 
