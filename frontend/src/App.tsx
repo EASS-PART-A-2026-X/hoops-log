@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
 import type { ShotInput } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
 import ShooterSelect from './ShooterSelect'
+import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
 import ShotList from './ShotList'
 import ShotMap from './ShotMap'
 import { useShots } from './useShots'
+
+/** The drawer covers the page below this width (the layout breakpoint in index.css). */
+const NARROW = '(max-width: 960px)'
 
 interface Notice {
   kind: 'ok' | 'error'
@@ -20,14 +24,16 @@ export default function App() {
   const { shots, truncated, loading, loadError, refresh } = useShots()
   const [notice, setNotice] = useState<Notice | null>(null)
   const [tab, setTab] = useState<'log' | 'nba' | 'players'>('log')
-  // The player the vs NBA tab compares you with; null means the league average.
   // Whose shots everything shows. null = not chosen yet, so use the default (the player with the
   // most shots); '' = every player's shots together; otherwise a player's name.
   const [shooterChoice, setShooterChoice] = useState<string | null>(null)
+  // The player the vs NBA tab compares you with; null means the league average.
   const [benchmarkId, setBenchmarkId] = useState<number | null>(null)
   // The side drawer with the shot list and the add form: closed by default, so the page is just the map.
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLElement>(null)
   const [pickedId, setPickedId] = useState<number | null>(null)
   // Where to scroll after the next render: the target row or the map only exists once the
   // selection has been drawn (a row past the first 100, say), so scrolling cannot happen in the click.
@@ -40,6 +46,8 @@ export default function App() {
     const saved = await createShot(input)
     setNotice({ kind: 'ok', text: `Saved shot #${saved.id} for ${saved.player}.` })
     await refresh()
+    // The map shows one player's shots: switch to the saved shot's player so the new shot is visible.
+    setShooterChoice(saved.player)
     setDrawerView('list') // show the new row
   }
 
@@ -82,6 +90,49 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedId, tab, drawerOpen])
 
+  // Good news goes away by itself; errors stay until dismissed.
+  useEffect(() => {
+    if (notice?.kind !== 'ok') return
+    const timer = window.setTimeout(() => setNotice(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
+  // A drawer that covers the page (small screens) is a dialog; on desktop it stays a side panel
+  // next to the usable map.
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches)
+  useEffect(() => {
+    const query = window.matchMedia(NARROW)
+    const onChange = () => setNarrow(query.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+
+  // Focus moves into the drawer when it opens and back to the "Shots" button when it closes.
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (drawerOpen) drawerRef.current?.querySelector<HTMLElement>('button')?.focus()
+    else if (wasOpen.current) toggleRef.current?.focus()
+    wasOpen.current = drawerOpen
+  }, [drawerOpen])
+
+  // While the drawer covers the page, Tab stays inside it.
+  function trapTab(e: React.KeyboardEvent) {
+    if (!narrow || e.key !== 'Tab' || !drawerRef.current) return
+    const items = [...drawerRef.current.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href]')].filter(
+      (el) => !el.closest('[hidden]') && !(el as HTMLButtonElement).disabled,
+    )
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (!first || !last) return
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
   useEffect(() => {
     if (!scrollTarget) return
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -104,19 +155,25 @@ export default function App() {
   function locate(id: number | null) {
     setPickedId(id)
     if (id === null) return
+    // A shot by someone else is hidden on the map, so show that player's shots.
+    const player = shots?.find((s) => s.id === id)?.player
+    if (player !== undefined && shooter !== '' && player !== shooter) setShooterChoice(player)
     setDrawerOpen(false) // the drawer would cover the map
     setScrollTarget({ id: 'map-title', block: 'start' })
   }
 
-  const shooters = useMemo(() => [...new Set((shots ?? []).map((s) => s.player))].sort(), [shots])
-  const defaultShooter = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
-    // Most shots wins; ties go to the first name alphabetically (shooters is sorted).
-    return shooters.reduce((best, p) => ((counts.get(p) ?? 0) > (counts.get(best) ?? 0) ? p : best), shooters[0] ?? '')
-  }, [shots, shooters])
-  // A chosen player who was deleted falls back to the default.
-  const shooter = shooterChoice === '' ? '' : shooterChoice !== null && shooters.includes(shooterChoice) ? shooterChoice : defaultShooter
+  const shooters = useMemo(() => listShooters(shots), [shots])
+  const defaultShooter = useMemo(() => pickDefaultShooter(shots), [shots])
+  const shooter = resolveShooter(shooterChoice, shooters, defaultShooter)
+  // Make the shown shooter the explicit choice, so a save or delete never silently changes whose
+  // shots are shown. A chosen player with no shots left is replaced by the default, and the user is told.
+  // (Set during render, which React allows for a component's own state.)
+  if (shooters.length > 0 && !loadError && shooter !== shooterChoice) {
+    setShooterChoice(shooter)
+    if (shooterChoice !== null) {
+      setNotice({ kind: 'ok', text: `${shooterChoice} has no shots left, so the shots of ${shooter} are shown.` })
+    }
+  }
   const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
   const shooterPicker = <ShooterSelect players={shooters} value={shooter} onChange={setShooterChoice} />
 
@@ -135,6 +192,7 @@ export default function App() {
         {tab === 'log' && (
           <button
             type="button"
+            ref={toggleRef}
             className="drawer-toggle"
             aria-expanded={drawerOpen}
             aria-controls="shots-drawer"
@@ -204,7 +262,11 @@ export default function App() {
           {/* Always mounted (only hidden when closed), so a half-typed shot survives closing the drawer. */}
           <aside
             id="shots-drawer"
+            ref={drawerRef}
             className={drawerOpen ? 'drawer open' : 'drawer'}
+            role={narrow && drawerOpen ? 'dialog' : undefined}
+            aria-modal={narrow && drawerOpen ? true : undefined}
+            onKeyDown={trapTab}
             aria-label="Shots"
             aria-busy={loading}
             inert={!drawerOpen}

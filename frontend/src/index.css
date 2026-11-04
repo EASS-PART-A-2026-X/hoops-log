@@ -94,7 +94,7 @@ h3 {
   position: absolute;
   top: 6px;
   left: 50%;
-  z-index: 25;
+  z-index: 60;
   width: min(560px, calc(100% - 32px));
   transform: translateX(-50%);
   pointer-events: none;
@@ -1525,12 +1525,29 @@ h3 {
   font-size: 26px;
 }
 
+/* While the drawer is open the notice would sit under it: put it above, at the bottom of the screen,
+   in the space left of the drawer on desktop and across the full width on phones. */
+.log-view:has(.drawer.open) .notice-slot {
+  position: fixed;
+  top: auto;
+  bottom: 16px;
+  left: calc((100% - 460px) / 2);
+  width: min(560px, calc(100% - 460px - 32px));
+}
+
+@media (max-width: 960px) {
+  .log-view:has(.drawer.open) .notice-slot {
+    left: 50%;
+    width: calc(100% - 32px);
+  }
+}
+
 /* On small screens the drawer covers the page, so dim what is behind it */
 .drawer-scrim {
   display: none;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 960px) {
   .drawer-scrim {
     display: block;
     position: fixed;
