@@ -90,9 +90,9 @@ h3 {
 }
 
 .notice-slot {
-  /* A toast over the top of the map, so it takes no room from the court. */
-  position: absolute;
-  top: 6px;
+  /* A toast under the top bar, on every tab, so it takes no room from the page. */
+  position: fixed;
+  top: calc(var(--topbar-h, 72px) + 6px);
   left: 50%;
   z-index: 60;
   width: min(560px, calc(100% - 32px));
@@ -1482,6 +1482,10 @@ h3 {
     visibility 0s linear 0.25s;
 }
 
+.drawer:focus {
+  outline: none; /* focus lands here when its plain text is clicked */
+}
+
 .drawer.open {
   transform: none;
   visibility: visible;
@@ -1527,7 +1531,7 @@ h3 {
 
 /* While the drawer is open the notice would sit under it: put it above, at the bottom of the screen,
    in the space left of the drawer on desktop and across the full width on phones. */
-.log-view:has(.drawer.open) .notice-slot {
+.app:has(.drawer.open) .notice-slot {
   position: fixed;
   top: auto;
   bottom: 16px;
@@ -1536,7 +1540,7 @@ h3 {
 }
 
 @media (max-width: 960px) {
-  .log-view:has(.drawer.open) .notice-slot {
+  .app:has(.drawer.open) .notice-slot {
     left: 50%;
     width: calc(100% - 32px);
   }

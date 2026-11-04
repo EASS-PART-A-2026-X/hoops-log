@@ -5,6 +5,8 @@ import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
 import ShooterSelect from './ShooterSelect'
+import { tabTarget } from './focusTrap'
+import { deletedText, withShooterSwitch } from './notices'
 import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
@@ -34,6 +36,8 @@ export default function App() {
   const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
   const toggleRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLElement>(null)
+  const appRef = useRef<HTMLDivElement>(null)
+  const topbarRef = useRef<HTMLElement>(null)
   const [pickedId, setPickedId] = useState<number | null>(null)
   // Where to scroll after the next render: the target row or the map only exists once the
   // selection has been drawn (a row past the first 100, say), so scrolling cannot happen in the click.
@@ -69,7 +73,7 @@ export default function App() {
   async function remove(id: number) {
     try {
       await deleteShot(id)
-      setNotice({ kind: 'ok', text: `Deleted shot #${id}.` })
+      setNotice({ kind: 'ok', text: deletedText(id) })
     } catch (caught) {
       const text = caught instanceof ApiError ? caught.message : 'Could not delete the shot.'
       setNotice({ kind: 'error', text })
@@ -89,6 +93,18 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedId, tab, drawerOpen])
+
+  // The toast sits just under the top bar, which is taller when its tabs wrap on a phone.
+  useEffect(() => {
+    const bar = topbarRef.current
+    const app = appRef.current
+    if (!bar || !app) return
+    const sync = () => app.style.setProperty('--topbar-h', `${bar.offsetHeight}px`)
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [])
 
   // Good news goes away by itself; errors stay until dismissed.
   useEffect(() => {
@@ -115,23 +131,27 @@ export default function App() {
     wasOpen.current = drawerOpen
   }, [drawerOpen])
 
-  // While the drawer covers the page, Tab stays inside it.
-  function trapTab(e: React.KeyboardEvent) {
-    if (!narrow || e.key !== 'Tab' || !drawerRef.current) return
-    const items = [...drawerRef.current.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href]')].filter(
-      (el) => !el.closest('[hidden]') && !(el as HTMLButtonElement).disabled,
-    )
-    const first = items[0]
-    const last = items[items.length - 1]
-    if (!first || !last) return
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault()
-      last.focus()
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault()
-      first.focus()
+  // While the drawer covers the page, Tab stays inside it, wherever focus is (even on the body,
+  // after a click on plain text or after the focused button went away). Only a focusable element
+  // of the drawer counts as being in it; the drawer itself (focused by that click) does not.
+  useEffect(() => {
+    if (!narrow || !drawerOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      const drawer = drawerRef.current
+      if (e.key !== 'Tab' || !drawer) return
+      const items = [...drawer.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href]')].filter(
+        (el) => !el.closest('[hidden]') && !(el as HTMLButtonElement).disabled,
+      )
+      const active = document.activeElement as HTMLElement | null
+      const target = tabTarget(items, active, !!active && items.includes(active), e.shiftKey)
+      if (target) {
+        e.preventDefault()
+        target.focus()
+      }
     }
-  }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [narrow, drawerOpen])
 
   useEffect(() => {
     if (!scrollTarget) return
@@ -171,7 +191,11 @@ export default function App() {
   if (shooters.length > 0 && !loadError && shooter !== shooterChoice) {
     setShooterChoice(shooter)
     if (shooterChoice !== null) {
-      setNotice({ kind: 'ok', text: `${shooterChoice} has no shots left, so the shots of ${shooter} are shown.` })
+      // A delete confirmation stays visible: the sentence is added to it (and adding twice is a no-op).
+      setNotice((prev) => ({
+        kind: 'ok',
+        text: withShooterSwitch(prev?.kind === 'ok' ? prev.text : null, shooterChoice, shooter),
+      }))
     }
   }
   const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
@@ -186,8 +210,8 @@ export default function App() {
   const made = shots?.filter((s) => s.made).length ?? 0
 
   return (
-    <div className="app">
-      <header className="topbar">
+    <div className="app" ref={appRef}>
+      <header className="topbar" ref={topbarRef}>
         <span className="brand">HOOPS LOG</span>
         {tab === 'log' && (
           <button
@@ -215,6 +239,18 @@ export default function App() {
         </nav>
       </header>
 
+      {/* Outside the tab views, so a notice is seen (and its timer is not wasted) on every tab. */}
+      <div role="status" aria-live="polite" className="notice-slot">
+        {notice && (
+          <p className={`notice ${notice.kind}`}>
+            {notice.text}
+            <button type="button" className="link" onClick={() => setNotice(null)}>
+              Dismiss
+            </button>
+          </p>
+        )}
+      </div>
+
       <main className={tab === 'log' ? 'page fit' : 'page'}>
         {tab === 'players' && (
           <PlayersPage
@@ -234,17 +270,6 @@ export default function App() {
         {/* Always mounted, only hidden, so the form, row edits and map filters survive a tab switch.
             The map's scene stops drawing while hidden and re-measures when shown again. */}
         <div className="log-view" hidden={tab !== 'log'}>
-          <div role="status" aria-live="polite" className="notice-slot">
-            {notice && (
-              <p className={`notice ${notice.kind}`}>
-                {notice.text}
-                <button type="button" className="link" onClick={() => setNotice(null)}>
-                  Dismiss
-                </button>
-              </p>
-            )}
-          </div>
-
           <ShotMap
             shots={shots}
             players={shooters}
@@ -266,7 +291,7 @@ export default function App() {
             className={drawerOpen ? 'drawer open' : 'drawer'}
             role={narrow && drawerOpen ? 'dialog' : undefined}
             aria-modal={narrow && drawerOpen ? true : undefined}
-            onKeyDown={trapTab}
+            tabIndex={-1}
             aria-label="Shots"
             aria-busy={loading}
             inert={!drawerOpen}
