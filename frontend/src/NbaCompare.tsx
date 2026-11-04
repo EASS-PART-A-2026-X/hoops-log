@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { Shot } from './api'
 import { LEAGUE, SMALL_SAMPLE, benchmarkOf, compareOverall, compareZones } from './court/nba'
-import { PLAYERS, TEAMS } from './court/players'
+import { PLAYERS } from './court/players'
+import PlayerPicker from './PlayerPicker'
 
 function Diff({ diff }: { diff: number | null }) {
   if (diff === null) return <span className="nba-diff">–</span>
@@ -29,17 +30,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
       <div className="map-head">
         <h2 id="nba-title">You vs {player ? player.name : 'the NBA'}</h2>
         <div className="filters">
-          <label className="player-filter">
-            <span className="sr-only">Compare with</span>
-            <select value={benchmarkId ?? ''} onChange={(e) => onBenchmark(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">NBA average</option>
-              {PLAYERS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({TEAMS[p.team].abbr})
-                </option>
-              ))}
-            </select>
-          </label>
+          <PlayerPicker value={benchmarkId} onChange={onBenchmark} />
           <button type="button" className="chip" onClick={onBrowse}>
             Browse players
           </button>
