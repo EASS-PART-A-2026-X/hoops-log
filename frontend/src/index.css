@@ -67,9 +67,9 @@ h3 {
 }
 
 .page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 16px 64px;
+  /* Fluid: the app uses the whole window instead of floating in a centred column. */
+  width: 100%;
+  padding: 28px clamp(16px, 3vw, 56px) 64px;
 }
 
 .intro {
@@ -116,7 +116,7 @@ h3 {
 
 .columns {
   display: grid;
-  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, clamp(340px, 28vw, 480px)) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -235,15 +235,15 @@ h3 {
 }
 
 .pill.on {
-  border-color: var(--green);
-  background: #10261e;
-  color: var(--green);
+  border-color: var(--orange);
+  background: var(--orange-bg);
+  color: var(--orange-soft);
 }
 
 .pill.on.miss {
-  border-color: var(--red);
-  background: #2a1414;
-  color: var(--red);
+  border-color: var(--blue);
+  background: #111d33;
+  color: #8db8ff;
 }
 
 .pill:focus-within {
@@ -371,13 +371,13 @@ h3 {
 }
 
 .mark.made {
-  color: var(--green);
-  background: #10261e;
+  color: var(--orange-soft);
+  background: var(--orange-bg);
 }
 
 .mark.missed {
-  color: var(--red);
-  background: #2a1414;
+  color: #8db8ff;
+  background: #111d33;
 }
 
 .shot-main {
@@ -411,7 +411,6 @@ h3 {
 .shot-meta {
   color: var(--muted);
   font-size: 14px;
-  text-transform: capitalize;
 }
 
 .shot-note {
@@ -420,9 +419,444 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.btn.more {
+  width: 100%;
+  margin-top: 12px;
+}
+
 .row-actions {
   display: flex;
   gap: 8px;
+}
+
+/* Zone labels drawn into the 3D scene by CSS2DRenderer */
+.zone-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 11px 5px;
+  line-height: 1.05;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 154, 92, 0.55);
+  border-radius: 12px;
+  background: rgba(9, 13, 19, 0.82);
+}
+
+.zone-label .zl-name {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.zone-label strong {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.zone-label .zl-sub {
+  font-size: 11px;
+  color: var(--orange-soft);
+}
+
+/* Selected shot (clicked on the map, or "Show on map") */
+.shot.selected {
+  margin: 0 -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-radius: 14px;
+  background: var(--orange-bg);
+  box-shadow: inset 0 0 0 1px var(--orange);
+}
+
+/* Shot map */
+.map {
+  margin-bottom: 24px;
+  padding: 24px;
+}
+
+.map-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.map-head h2 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.filters,
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 44px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
+  cursor: pointer;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--orange-soft);
+}
+
+.chip[aria-pressed='true'] {
+  color: var(--orange-soft);
+  background: var(--orange-bg);
+  border-color: var(--orange);
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.player-filter select {
+  min-height: 44px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+}
+
+.kpi.hot {
+  border-color: #5a3a24;
+}
+
+.kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.kpi.hot .kpi-label {
+  color: var(--orange-soft);
+}
+
+.kpi-value {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 38px;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.kpi-value.small {
+  font-size: 30px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.map-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 21vw, 360px);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .map-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stage-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg);
+}
+
+.stage-canvas {
+  position: relative;
+  /* Tall on big screens, never taller than the window: the court should fill the view. */
+  height: clamp(360px, 72vh, 1100px);
+  cursor: grab;
+}
+
+.stage-canvas:active {
+  cursor: grabbing;
+}
+
+.stage-msg {
+  position: absolute;
+  inset: auto 0 38% 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 2px 18px #000;
+  pointer-events: none;
+}
+
+.stage-msg-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.stage-msg-error p {
+  margin: 0;
+}
+
+.stage-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 4px 6px 4px 14px;
+  font-size: 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--orange);
+  border-radius: 22px;
+  background: rgba(9, 13, 19, 0.94);
+}
+
+.kpi-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stage-hint {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  border-radius: 12px;
+  background: rgba(11, 15, 20, 0.7);
+  pointer-events: none;
+}
+
+.legend {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 6px 12px;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+  border-radius: 14px;
+  background: rgba(11, 15, 20, 0.78);
+  pointer-events: none;
+}
+
+.legend .legend-note {
+  width: 100%;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 8px var(--orange);
+}
+
+.legend .cross {
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(45deg, transparent 38%, #8ec1ff 38% 62%, transparent 62%),
+    linear-gradient(-45deg, transparent 38%, #8ec1ff 38% 62%, transparent 62%);
+}
+
+.legend .ramp {
+  width: 44px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #3b82f6, #3a425c, #ff7a2f, #ffd68c);
+}
+
+.tip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 230px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  text-transform: capitalize;
+  border: 1px solid var(--orange);
+  border-radius: 12px;
+  background: rgba(9, 13, 19, 0.94);
+  pointer-events: none;
+}
+
+.tip.plain {
+  text-transform: none;
+}
+
+.tip strong {
+  font-size: 15px;
+  color: #fff;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.tip-made {
+  color: var(--orange-soft);
+  font-weight: 600;
+}
+
+.tip-missed {
+  color: #8db8ff;
+  font-weight: 600;
+}
+
+.tip-note {
+  text-transform: none;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.stage-fallback {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg);
+}
+
+.stage-fallback img {
+  /* The backend draws the basket at the bottom; flip it so the basket is at the top, like
+     the shooter-view 3D court (left stays left). */
+  transform: scaleY(-1);
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.zones {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg);
+}
+
+.zones h3 {
+  margin-bottom: 10px;
+  font-size: 22px;
+}
+
+.zones ul {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zone-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.zone-num {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.zone-bar {
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.zone-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #3b82f6, #ff7a2f);
 }
 
 @media (prefers-reduced-motion: reduce) {
