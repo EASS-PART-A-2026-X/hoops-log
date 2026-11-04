@@ -21,6 +21,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
   const player = PLAYERS.find((p) => p.id === benchmarkId) ?? null
   const bench = player ? benchmarkOf(player) : LEAGUE
   const overall = useMemo(() => compareOverall(shots ?? [], bench), [shots, bench])
+  const who = player ? player.name.split(' ').slice(-1)[0] : 'NBA average'
   const zones = useMemo(() => compareZones(shots ?? []), [shots])
 
   return (
@@ -56,16 +57,37 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
         <p className="state">No shots yet. Log some on the My log tab and they show up here.</p>
       ) : (
         <>
-          <div className="kpis nba-kpis">
-            {overall.map((o) => (
-              <div className="kpi" key={o.label}>
-                <span className="kpi-label">{o.label.toUpperCase()}</span>
-                <span className="kpi-value">{o.mine === null ? '–' : `${o.mine}%`}</span>
-                <span className="kpi-sub">
-                  {player ? player.name.split(' ').slice(-1)[0] : 'NBA'} about {o.nba}% · {o.attempts} {o.attempts === 1 ? 'shot' : 'shots'}
-                </span>
-              </div>
-            ))}
+          <div className="nba-vs">
+            {overall.map((o) => {
+              const diff = o.mine === null ? null : Math.round((o.mine - o.nba) * 10) / 10
+              return (
+                <div className="vs-card" key={o.label}>
+                  <span className="kpi-label">{o.label.toUpperCase()}</span>
+                  <div className="vs-row">
+                    <div className="vs-side mine">
+                      <span className="vs-num">{o.mine === null ? '–' : `${o.mine}%`}</span>
+                      <span className="vs-who">You</span>
+                    </div>
+                    <span className="vs-mid" aria-hidden="true">
+                      vs
+                    </span>
+                    <div className="vs-side">
+                      <span className="vs-num">{o.nba}%</span>
+                      <span className="vs-who">{who}</span>
+                    </div>
+                  </div>
+                  <span className="vs-foot">
+                    {diff === null
+                      ? 'No shots of this kind yet'
+                      : diff === 0
+                        ? 'Exactly level'
+                        : `You are ${Math.abs(diff)} points ${diff > 0 ? 'above' : 'below'}`}
+                    {' · '}
+                    {o.attempts} {o.attempts === 1 ? 'shot' : 'shots'}
+                  </span>
+                </div>
+              )
+            })}
           </div>
 
           <h3 className="nba-zones-title">By zone (vs league average)</h3>
@@ -82,10 +104,12 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
                 </div>
                 <div className="nba-zone-foot">
                   <span>
-                    You {z.mine === null ? '–' : `${z.mine}%`} · {z.made}/{z.attempts}
+                    You <strong>{z.mine === null ? '–' : `${z.mine}%`}</strong> · {z.made}/{z.attempts}
                     {z.attempts > 0 && z.attempts < SMALL_SAMPLE ? ' (small sample)' : ''}
                   </span>
-                  <span>NBA {z.nba}%</span>
+                  <span>
+                    {who} <strong>{z.nba}%</strong>
+                  </span>
                 </div>
               </li>
             ))}

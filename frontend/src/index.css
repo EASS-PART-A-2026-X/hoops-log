@@ -1209,3 +1209,82 @@ h3 {
 .you.down {
   color: #7fb0ff;
 }
+
+/* Head to head: both numbers the same size */
+.nba-vs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 760px) {
+  .nba-vs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vs-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+}
+
+.vs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vs-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vs-side:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.vs-num {
+  font-family: var(--display);
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+
+.vs-side.mine .vs-num {
+  color: var(--orange-soft);
+}
+
+.vs-who {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vs-mid {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.vs-foot {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.nba-zone-foot strong {
+  color: #fff;
+  font-size: 16px;
+}
