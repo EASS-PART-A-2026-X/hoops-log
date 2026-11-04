@@ -321,9 +321,7 @@ export class CourtScene {
   setSelected(index: number | null): void {
     this.selected = index !== null && index >= 0 && index < this.pts.length ? index : null
     if (this.selected !== null) {
-      const p = this.pts[this.selected]
-      const [wx, wz] = toWorld(p.x, p.y)
-      this.marker.position.set(wx, 0, wz)
+      this.updateMarker()
     }
     this.marker.visible = this.selected !== null
     // Dim every other shot while one is selected, so the marker is what the eye lands on.
@@ -334,6 +332,39 @@ export class CourtScene {
       m.needsUpdate = true
     }
     this.dirty = true
+  }
+
+  /** Place the marker and the lit copy of the selected shot (the mode decides how tall the shot is). */
+  private updateMarker(): void {
+    const p = this.selected === null ? undefined : this.pts[this.selected]
+    if (!p) return // nothing selected, or the data changed under the selection
+    const [wx, wz] = toWorld(p.x, p.y)
+    this.marker.position.set(wx, 0, wz)
+    const beams = this.mode === 'beams'
+    const top = beams && p.made ? (p.three ? 6 : 3.4) + 0.45 : p.made ? 0.5 : 0.1
+    const ball = this.marker.getObjectByName('heroBall')
+    const xa = this.marker.getObjectByName('heroXa')
+    const xb = this.marker.getObjectByName('heroXb')
+    if (ball) {
+      ball.visible = p.made
+      ball.position.set(0, top, 0)
+      ball.scale.setScalar(1.7)
+    }
+    for (const x of [xa, xb]) {
+      if (!x) continue
+      x.visible = !p.made
+      x.position.set(0, 0.16, 0)
+      x.scale.setScalar(1.55)
+    }
+    // The column starts just above the lit shot and runs up to the pin.
+    const start = top + 1.6
+    const end = 17.5
+    const column = this.marker.getObjectByName('column')
+    if (column) {
+      column.visible = end - start > 1
+      column.scale.y = Math.max(end - start, 0.01)
+      column.position.y = start + (end - start) / 2
+    }
   }
 
   /** Pixel position of a shot inside the container (for tests and focus helpers). */
@@ -477,18 +508,30 @@ export class CourtScene {
       m.renderOrder = 5
       return m
     }
-    const ring = flat(new THREE.RingGeometry(1.7, 2.35, 56), mat(1), 0.1)
-    const outer = flat(new THREE.RingGeometry(3.1, 3.4, 56), mat(0.7), 0.1)
-    const disc = flat(new THREE.CircleGeometry(1.7, 40), mat(0.22), 0.08)
-    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 17, 12, 1, true), mat(0.5, true))
-    column.position.y = 8.5
+    const ring = flat(new THREE.RingGeometry(2.3, 2.9, 56), mat(1), 0.1)
+    const outer = flat(new THREE.RingGeometry(3.6, 3.9, 56), mat(0.7), 0.1)
+    // Unit-height column; updateMarker stretches it so it starts above the shot, not through it.
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1, 12, 1, true), mat(0.5, true))
+    column.name = 'column'
     column.renderOrder = 5
     // A pin above the shot pointing down at it; it bobs in tick.
     const pin = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 4).rotateX(Math.PI), mat(1))
     pin.name = 'pin'
     pin.position.y = 19
     pin.renderOrder = 6
-    this.marker.add(ring, outer, disc, column, pin)
+    // The chosen shot itself, drawn bigger and in a light colour, so it is what stands out and
+    // nothing of the marker covers it. A ball for a made shot, a cross for a miss.
+    const lit = (hex: string) => new THREE.MeshBasicMaterial({ color: hex })
+    const heroBall = new THREE.Mesh(this.orbGeo, lit('#ffe3cc'))
+    heroBall.name = 'heroBall'
+    const heroXa = new THREE.Mesh(this.xGeo, lit('#e6f2ff'))
+    heroXa.name = 'heroXa'
+    heroXa.rotation.y = Math.PI / 4
+    const heroXb = new THREE.Mesh(this.xGeo, lit('#e6f2ff'))
+    heroXb.name = 'heroXb'
+    heroXb.rotation.y = -Math.PI / 4
+    for (const m of [heroBall, heroXa, heroXb]) m.renderOrder = 4
+    this.marker.add(ring, outer, column, pin, heroBall, heroXa, heroXb)
     this.marker.visible = false
     this.scene.add(this.marker)
   }
@@ -723,6 +766,7 @@ export class CourtScene {
     if (this.hexMesh) this.hexMesh.visible = m === 'heat'
     this.hexStart = performance.now()
     this.hexGrowing = m === 'heat'
+    this.updateMarker()
     for (const label of this.labels) label.visible = m === 'heat'
     if (this.arcs) this.arcs.visible = m === 'arcs'
     this.dirty = true
