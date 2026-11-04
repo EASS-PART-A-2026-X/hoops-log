@@ -219,13 +219,15 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   )
 
   const hovered = hover ? filtered[hover.index] : undefined
-  // "Show on map" for a shot the current filters hide: say so, and offer the way out.
-  const hiddenSelected =
-    selectedId !== null && (shots ?? []).some((s) => s.id === selectedId) && !filtered.some((s) => s.id === selectedId)
+  // "Show on map" for a shot the map hides: either its player is not the shown shooter, or the
+  // area/result filters hide it.
+  const selectedShot = selectedId === null ? undefined : (shots ?? []).find((s) => s.id === selectedId)
+  const hiddenByPlayer = !!selectedShot && !!activePlayer && selectedShot.player !== activePlayer
+  const hiddenSelected = !!selectedShot && !filtered.some((s) => s.id === selectedId)
+  // Only the map's own filters; "Shots of" is shared with the other tabs and is not touched.
   const clearFilters = () => {
     setArea('all')
     setResult('all')
-    onPlayerChange('')
   }
   const loading = shots === null
   const label = loading
@@ -308,12 +310,20 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                   Clear selection<span className="sr-only"> (shot #{selectedId})</span>
                 </button>
               )}
-              {hiddenSelected && (
+              {hiddenSelected && selectedShot && (
                 <div className="stage-notice">
-                  Shot #{selectedId} is hidden by the current filters.
-                  <button type="button" className="link" onClick={clearFilters}>
-                    Show all shots
-                  </button>
+                  {hiddenByPlayer
+                    ? `Shot #${selectedId} is by ${selectedShot.player}, not ${activePlayer}.`
+                    : `Shot #${selectedId} is hidden by the area or result filter.`}
+                  {hiddenByPlayer ? (
+                    <button type="button" className="link" onClick={() => onPlayerChange(selectedShot.player)}>
+                      Show {selectedShot.player}'s shots
+                    </button>
+                  ) : (
+                    <button type="button" className="link" onClick={clearFilters}>
+                      Clear filters
+                    </button>
+                  )}
                 </div>
               )}
               {ready && !loading && filtered.length === 0 && (

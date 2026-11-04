@@ -152,7 +152,7 @@ export default function PlayersPage({ shots, shooter, shooterPicker, benchmarkId
             and the vs NBA tab against that player.
           </>
         ) : (
-          <>Log at least {MIN_SHOTS_FOR_MATCH} shots and the players are sorted by how close they are to you.</>
+          <>Log at least {MIN_SHOTS_FOR_MATCH} shots and the players are sorted by how close they are to {shooter || 'the whole log'}.</>
         )}
       </p>
       <ul className="players">
