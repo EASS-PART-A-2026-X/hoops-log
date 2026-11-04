@@ -51,9 +51,19 @@ export interface ZoneStat {
   made: number
   attempts: number
   pct: number
-  /** Average position of the shots in this zone, in court feet. */
+  /** Where the zone label goes, in court feet: the average position of its shots (see ZONE_LABEL_SPOT). */
   x: number
   y: number
+}
+
+/**
+ * Where a zone's label goes on the court. Normally that is the average position of the zone's
+ * shots, but mid range wraps around the lane and the elbows, so its shots average out to a spot
+ * between the restricted area and the paint, which is not mid range. It gets a fixed spot at
+ * the top of the key, inside the arc and above the free-throw line (y 19), instead.
+ */
+const ZONE_LABEL_SPOT: Record<string, { x: number; y: number } | undefined> = {
+  mid_range: { x: 25, y: 22.5 },
 }
 
 /** One row per zone that has shots, most attempts first (ties: more makes, then name). */
@@ -74,8 +84,8 @@ export function zoneStats(shots: MapShot[]): ZoneStat[] {
       made: z.made,
       attempts: z.attempts,
       pct: pct(z.made, z.attempts) ?? 0,
-      x: z.sx / z.attempts,
-      y: z.sy / z.attempts,
+      x: ZONE_LABEL_SPOT[zone]?.x ?? z.sx / z.attempts,
+      y: ZONE_LABEL_SPOT[zone]?.y ?? z.sy / z.attempts,
     }))
     .sort((a, b) => b.attempts - a.attempts || b.made - a.made || a.zone.localeCompare(b.zone))
 }
