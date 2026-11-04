@@ -13,23 +13,28 @@ function Diff({ diff }: { diff: number | null }) {
 
 interface Props {
   shots: Shot[] | null
+  /** Whose shots these are ('' = every player's). */
+  shooter: string
+  shooterPicker: React.ReactNode
   benchmarkId: number | null
   onBenchmark: (id: number | null) => void
   onBrowse: () => void
 }
 
-export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }: Props) {
+export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId, onBenchmark, onBrowse }: Props) {
   const player = PLAYERS.find((p) => p.id === benchmarkId) ?? null
   const bench = useMemo(() => (player ? benchmarkOf(player) : LEAGUE), [player])
   const overall = useMemo(() => compareOverall(shots ?? [], bench), [shots, bench])
+  const mine = shooter || 'Everyone'
   const who = player ? lastName(player.name) : 'NBA average'
   const zones = useMemo(() => compareZones(shots ?? [], bench), [shots, bench])
 
   return (
     <section aria-labelledby="nba-title">
       <div className="map-head">
-        <h2 id="nba-title">You vs {player ? player.name : 'the NBA'}</h2>
+        <h2 id="nba-title">{mine} vs {player ? player.name : 'the NBA'}</h2>
         <div className="filters">
+          {shooterPicker}
           <PlayerPicker value={benchmarkId} onChange={onBenchmark} />
           <button type="button" className="chip" onClick={onBrowse}>
             Browse players
@@ -45,7 +50,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
       {!shots ? (
         <p className="state">Loading shots…</p>
       ) : shots.length === 0 ? (
-        <p className="state">No shots yet. Log some on the My log tab and they show up here.</p>
+        <p className="state">{shooter ? `No shots for ${shooter} yet.` : 'No shots yet.'} Log some on the My log tab and they show up here.</p>
       ) : (
         <>
           <div className="nba-vs">
@@ -57,7 +62,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
                   <div className="vs-row">
                     <div className="vs-side mine">
                       <span className="vs-num">{o.mine === null ? '–' : `${o.mine}%`}</span>
-                      <span className="vs-who">You</span>
+                      <span className="vs-who">{mine}</span>
                     </div>
                     <span className="vs-mid" aria-hidden="true">
                       vs
@@ -72,7 +77,7 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
                       ? 'No shots of this kind yet'
                       : diff === 0
                         ? 'Exactly level'
-                        : `You are ${Math.abs(diff)} points ${diff > 0 ? 'above' : 'below'}`}
+                        : `${shooter ? shooter + ' is' : 'Everyone is'} ${Math.abs(diff)} points ${diff > 0 ? 'above' : 'below'}`}
                     {' · '}
                     {o.attempts} {o.attempts === 1 ? 'shot' : 'shots'}
                   </span>
@@ -95,11 +100,11 @@ export default function NbaCompare({ shots, benchmarkId, onBenchmark, onBrowse }
                 </div>
                 <div className="nba-zone-foot">
                   <span>
-                    You <strong>{z.mine === null ? '–' : `${z.mine}%`}</strong> · {z.made}/{z.attempts}
+                    {mine} <strong>{z.mine === null ? '–' : `${z.mine}%`}</strong> · {z.made}/{z.attempts}
                     {z.attempts > 0 && z.attempts < SMALL_SAMPLE ? ' (small sample)' : ''}
                   </span>
                   <span>
-                    {who} <strong>{z.nba}%</strong>
+                    {player ? who : 'NBA'} <strong>{z.nba}%</strong>
                   </span>
                 </div>
               </li>

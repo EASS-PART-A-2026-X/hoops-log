@@ -45,15 +45,45 @@ export function pct(made: number, attempts: number): number | null {
   return attempts === 0 ? null : Math.round((made / attempts) * 100)
 }
 
+/** The zone names the API sends (see backend/app/court.py). */
+export type ZoneName =
+  | 'restricted_area'
+  | 'paint'
+  | 'mid_range'
+  | 'left_elbow'
+  | 'right_elbow'
+  | 'left_corner_3'
+  | 'right_corner_3'
+  | 'left_wing_3'
+  | 'right_wing_3'
+  | 'top_3'
+
 export interface ZoneStat {
   zone: string
   label: string
   made: number
   attempts: number
   pct: number
-  /** Average position of the shots in this zone, in court feet. */
+  /** Average position of the zone's shots, in court feet. */
   x: number
   y: number
+  /** Where the zone's label goes, in court feet: the average position, except where ZONE_LABEL_SPOT overrides it. */
+  labelX: number
+  labelY: number
+}
+
+/**
+ * Where a zone's label goes when the average position of its shots would be misleading. Mid
+ * range wraps around the lane and the elbows, so its shots average out to a spot between the
+ * restricted area and the paint, which is not mid range. It gets a fixed spot at the top of the
+ * key, inside the arc and above the free-throw line (y 19), instead.
+ */
+const ZONE_LABEL_SPOT: Readonly<Partial<Record<ZoneName, { x: number; y: number }>>> = {
+  mid_range: { x: 25, y: 22.5 },
+}
+
+function labelSpotOf(zone: string): { x: number; y: number } | undefined {
+  return Object.hasOwn(ZONE_LABEL_SPOT, zone) ? ZONE_LABEL_SPOT[zone as ZoneName] : undefined
 }
 
 /** One row per zone that has shots, most attempts first (ties: more makes, then name). */
@@ -68,15 +98,22 @@ export function zoneStats(shots: MapShot[]): ZoneStat[] {
     acc.set(s.zone, z)
   }
   return [...acc.entries()]
-    .map(([zone, z]) => ({
-      zone,
-      label: zoneLabel(zone),
-      made: z.made,
-      attempts: z.attempts,
-      pct: pct(z.made, z.attempts) ?? 0,
-      x: z.sx / z.attempts,
-      y: z.sy / z.attempts,
-    }))
+    .map(([zone, z]) => {
+      const x = z.sx / z.attempts
+      const y = z.sy / z.attempts
+      const spot = labelSpotOf(zone)
+      return {
+        zone,
+        label: zoneLabel(zone),
+        made: z.made,
+        attempts: z.attempts,
+        pct: pct(z.made, z.attempts) ?? 0,
+        x,
+        y,
+        labelX: spot?.x ?? x,
+        labelY: spot?.y ?? y,
+      }
+    })
     .sort((a, b) => b.attempts - a.attempts || b.made - a.made || a.zone.localeCompare(b.zone))
 }
 
