@@ -37,7 +37,8 @@ export interface SceneOptions {
   reducedMotion: boolean
   /** Index into the current points, or null; x and y are pixels inside the container. */
   onHover: (index: number | null, x: number, y: number) => void
-  onPick: (index: number) => void
+  /** A shot was clicked, or null when the click hit empty space. */
+  onPick: (index: number | null) => void
   /** The hex under the pointer in heat mode (null when none); x and y as for onHover. */
   onHoverCell: (cell: HexCell | null, x: number, y: number) => void
   onFail: () => void
@@ -893,7 +894,7 @@ export class CourtScene {
     if (moved > 5 || performance.now() - d.t > 500) return // that was a drag
     if (this.mode === 'heat') return // hexes are groups of shots, not shots
     const index = this.pick(e.clientX, e.clientY)
-    if (index !== null) this.opts.onPick(index)
+    this.opts.onPick(index)
   }
 
   private onContextLost = (e: Event): void => {
