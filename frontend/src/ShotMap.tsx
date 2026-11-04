@@ -189,8 +189,8 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
         points: filtered.map((s) => ({ x: s.x, y: s.y, made: s.made, three: s.shot_type === '3PT' })),
         // Only the busiest zones get a label: the rest are in the Zones list beside the court.
         labels: zones.slice(0, MAX_LABELS).map((z) => ({
-          x: z.x,
-          y: z.y,
+          x: z.labelX,
+          y: z.labelY,
           title: z.label,
           value: `${z.pct}%`,
           sub: `${z.made}/${z.attempts}`,

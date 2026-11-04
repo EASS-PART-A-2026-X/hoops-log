@@ -54,6 +54,8 @@ const SETTLE_MS = 520
 const ARC_SEGMENTS = 36
 const PICK_RADIUS_PX = 16
 const MISS_STUB = 1.3 // height of the short beam over a missed shot
+const MARKER_PIN_Y = 19 // resting height of the selected-shot pin
+const MARKER_COLUMN_END = MARKER_PIN_Y - 1.5 // the column stops just under the pin
 
 // The camera stands on the half-court side and looks toward the basket (+Z).
 const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
@@ -89,6 +91,10 @@ export class CourtScene {
   private labelRenderer = new CSS2DRenderer()
   private labels: CSS2DObject[] = []
   private marker = new THREE.Group()
+  // The parts of the marker that tick animates; set in buildMarker.
+  private markerRing: THREE.Mesh | null = null
+  private markerOuter: THREE.Mesh | null = null
+  private markerPin: THREE.Mesh | null = null
 
   // Shared geometry and materials, made once.
   private beamGeo: THREE.CylinderGeometry
@@ -360,7 +366,7 @@ export class CourtScene {
     }
     // The column starts just above the lit shot and runs up to the pin.
     const start = top + 1.6
-    const end = 17.5
+    const end = MARKER_COLUMN_END
     const column = this.marker.getObjectByName('column')
     if (column) {
       column.visible = end - start > 1
@@ -490,7 +496,7 @@ export class CourtScene {
   /**
    * The marker for the selected shot. It has to be easy to find among hundreds of shots, so it is
    * big and a colour nothing else on the court uses (SELECTED), and the other shots are dimmed
-   * while it is shown (see setSelected). The first child is the pulsing ring (tick animates it).
+   * while it is shown (see setSelected). The ring, outer ring and pin are kept as fields because tick animates them.
    */
   private buildMarker(): void {
     const accent = SELECTED
@@ -519,7 +525,7 @@ export class CourtScene {
     // A pin above the shot pointing down at it; it bobs in tick.
     const pin = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 4).rotateX(Math.PI), mat(1))
     pin.name = 'pin'
-    pin.position.y = 19
+    pin.position.y = MARKER_PIN_Y
     pin.renderOrder = 6
     // The chosen shot itself, drawn bigger and in a light colour, so it is what stands out and
     // nothing of the marker covers it. A ball for a made shot, a cross for a miss.
@@ -533,6 +539,9 @@ export class CourtScene {
     heroXb.name = 'heroXb'
     heroXb.rotation.y = -Math.PI / 4
     for (const m of [heroBall, heroXa, heroXb]) m.renderOrder = 4
+    this.markerRing = ring
+    this.markerOuter = outer
+    this.markerPin = pin
     this.marker.add(ring, outer, column, pin, heroBall, heroXa, heroXb)
     this.marker.visible = false
     this.scene.add(this.marker)
@@ -862,10 +871,10 @@ export class CourtScene {
     }
     if (this.marker.visible && !this.opts.reducedMotion) {
       const pulse = 1 + 0.22 * Math.sin(now / 260)
-      this.marker.children[0].scale.set(pulse, 1, pulse)
-      this.marker.children[1].scale.set(1 + 0.08 * Math.sin(now / 260 + 1.5), 1, 1 + 0.08 * Math.sin(now / 260 + 1.5))
-      const pin = this.marker.getObjectByName('pin')
-      if (pin) pin.position.y = 19 + 0.7 * Math.sin(now / 320)
+      this.markerRing?.scale.set(pulse, 1, pulse)
+      const outerPulse = 1 + 0.08 * Math.sin(now / 260 + 1.5)
+      this.markerOuter?.scale.set(outerPulse, 1, outerPulse)
+      if (this.markerPin) this.markerPin.position.y = MARKER_PIN_Y + 0.7 * Math.sin(now / 320)
     }
     this.runPendingHover()
     this.composer.render()
