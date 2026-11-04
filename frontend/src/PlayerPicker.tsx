@@ -77,7 +77,15 @@ export default function PlayerPicker({ value, onChange }: Props) {
   }, [open, active, listId])
 
   return (
-    <div className="pp" ref={root} onKeyDown={onKeyDown}>
+    <div
+      className="pp"
+      ref={root}
+      onKeyDown={onKeyDown}
+      onBlur={(e) => {
+        // Tab (or anything else) moved focus out of the picker: close the list.
+        if (!root.current?.contains(e.relatedTarget as Node | null)) setOpen(false)
+      }}
+    >
       <button
         type="button"
         className="pp-button"
@@ -98,7 +106,9 @@ export default function PlayerPicker({ value, onChange }: Props) {
         </span>
       </button>
       {open && (
-        <ul className="pp-list" role="listbox" id={listId} aria-label="Compare with">
+        <ul className="pp-list" role="listbox" id={listId} aria-label="Compare with"
+          // Keep focus on the button while clicking or dragging the list, so the blur above does not close it first.
+          onMouseDown={(e) => e.preventDefault()}>
           {options.map((p, i) => (
             <li
               key={p?.id ?? 'nba'}

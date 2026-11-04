@@ -886,22 +886,6 @@ h3 {
   gap: 8px;
 }
 
-@media (max-width: 640px) {
-  .topbar {
-    flex-wrap: wrap;
-  }
-
-  /* Tabs get their own full row under the brand; the pills share it equally. */
-  .tabs {
-    flex: 1 1 100%;
-  }
-
-  .tabs button {
-    flex: 1 1 0;
-    padding-inline: 8px;
-  }
-}
-
 .tabs button {
   min-height: 44px;
   padding: 8px 18px;
@@ -923,6 +907,22 @@ h3 {
   color: var(--orange-soft);
   background: var(--orange-bg);
   border-color: var(--orange);
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  /* Tabs get their own full row under the brand; the pills share it equally. */
+  .tabs {
+    flex: 1 1 100%;
+  }
+
+  .tabs button {
+    flex: 1 1 0;
+    padding-inline: 8px;
+  }
 }
 
 /* You vs the NBA */
