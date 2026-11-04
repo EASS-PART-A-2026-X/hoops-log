@@ -173,7 +173,10 @@ export function heatGrid(shots: MapShot[], cellsPerFoot = 2, sigma = 3.2): HeatG
 
 /** What a typical shooter makes, by shot type. Hex colour compares a spot to this, so a
  *  36% three is "typical" and a 36% layup is cold. Rounded figures, used only for colour. */
-export const TYPICAL_FG = { '2PT': 0.47, '3PT': 0.36 } as const
+export const TYPICAL_FG: Typical = { '2PT': 0.47, '3PT': 0.36 }
+
+/** Expected make rate (0..1) per shot type: the baseline the hex colours compare against. */
+export type Typical = Record<'2PT' | '3PT', number>
 
 export interface HexCell {
   /** Centre of the hex, in court feet. */
@@ -219,7 +222,11 @@ function hexRound(q: number, r: number): [number, number] {
  * its makes with what a typical shooter would make from the same shots, pulled toward
  * "typical" when the cell has few shots, so one lucky make does not look like a hot spot.
  */
-export function hexBins(shots: MapShot[], radius = hexRadiusFor(shots.length)): HexBins {
+export function hexBins(
+  shots: MapShot[],
+  radius = hexRadiusFor(shots.length),
+  typical: Typical = TYPICAL_FG,
+): HexBins {
   const sqrt3 = Math.sqrt(3)
   const bins = new Map<string, { q: number; r: number; attempts: number; made: number; expected: number }>()
   for (const s of shots) {
@@ -230,7 +237,7 @@ export function hexBins(shots: MapShot[], radius = hexRadiusFor(shots.length)): 
     const bin = bins.get(key) ?? { q: rq, r: rr, attempts: 0, made: 0, expected: 0 }
     bin.attempts += 1
     bin.made += s.made ? 1 : 0
-    bin.expected += TYPICAL_FG[s.shot_type]
+    bin.expected += typical[s.shot_type]
     bins.set(key, bin)
   }
   let maxAttempts = 0

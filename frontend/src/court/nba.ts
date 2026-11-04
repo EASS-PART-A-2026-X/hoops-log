@@ -1,6 +1,7 @@
 import { PLAYERS } from './players'
 import type { Player } from './players'
 import { pct, zoneLabel } from './stats'
+import type { Typical } from './stats'
 import type { MapShot } from './stats'
 
 /**
@@ -120,4 +121,16 @@ export function rankPlayers(shots: MapShot[]): Match[] | null {
     const dist = parts.reduce((a, b) => a + b, 0) / parts.length
     return { player, score: Math.max(0, Math.round(100 - dist * 2)) }
   }).sort((a, b) => b.score - a.score || a.player.name.localeCompare(b.player.name))
+}
+
+/**
+ * The make rates the map compares a spot to when a player is the baseline. Only the overall
+ * and three-point % are known, so the two-point rate is what is left of the overall %
+ * once the threes are taken out.
+ */
+export function typicalOf(p: Player): Typical {
+  const three = p.three / 100
+  const s = p.threeShare / 100
+  const two = s >= 1 ? 0.5 : (p.fg / 100 - s * three) / (1 - s)
+  return { '2PT': Math.min(0.75, Math.max(0.3, two)), '3PT': three }
 }

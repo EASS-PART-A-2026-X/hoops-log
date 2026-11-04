@@ -3,7 +3,7 @@ import { BACKEND_URL } from './api'
 import type { Shot } from './api'
 import type { CourtScene, MapMode, ViewName } from './court/CourtScene'
 import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneStats } from './court/stats'
-import type { HexCell } from './court/stats'
+import type { HexCell, Typical } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
 
 interface Props {
@@ -16,6 +16,8 @@ interface Props {
   selectedId: number | null
   /** A shot was clicked on the map; null means a click on empty space or the clear button. */
   onSelect: (id: number | null) => void
+  /** A player the heat map compares each spot with, instead of a typical shooter. */
+  baseline: { name: string; typical: Typical } | null
 }
 
 interface Hover {
@@ -84,7 +86,7 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [player, setPlayer] = useState('')
@@ -111,7 +113,12 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const summary = useMemo(() => summarize(filtered), [filtered])
   const zones = useMemo(() => zoneStats(filtered), [filtered])
   const hottest = useMemo(() => hottestZone(zones), [zones])
-  const hexes = useMemo(() => hexBins(filtered), [filtered])
+  const typical = baseline?.typical ?? TYPICAL_FG
+  const hexes = useMemo(
+    () => hexBins(filtered, undefined, typical),
+    [filtered, typical['2PT'], typical['3PT']],
+  )
+  const baseWord = baseline ? baseline.name.split(' ').slice(-1)[0] : 'typical'
 
   // Latest values for scene callbacks, which outlive any one render.
   const filteredRef = useRef(filtered)
@@ -335,7 +342,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                     </li>
                     <li>Bigger, taller hex = more shots</li>
                     <li className="legend-note">
-                      vs a typical {Math.round(TYPICAL_FG['2PT'] * 100)}% on twos, {Math.round(TYPICAL_FG['3PT'] * 100)}% on threes
+                      vs {baseline ? `${baseline.name}'s` : 'a typical'} {Math.round(typical['2PT'] * 100)}% on twos, {Math.round(typical['3PT'] * 100)}% on threes
                     </li>
                   </>
                 ) : (
@@ -364,15 +371,15 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                     {cellHover.cell.made} of {cellHover.cell.attempts} made
                   </strong>
                   <span className={cellHover.cell.heat >= 0.5 ? 'tip-made' : 'tip-missed'}>
-                    {Math.round((cellHover.cell.made / cellHover.cell.attempts) * 100)}% here · typical{' '}
+                    {Math.round((cellHover.cell.made / cellHover.cell.attempts) * 100)}% here · {baseWord}{' '}
                     {cellHover.cell.expectedPct}%
                   </span>
                   <span className="tip-note">
                     {cellHover.cell.heat >= 0.58
-                      ? 'Hotter than typical'
+                      ? `Hotter than ${baseWord}`
                       : cellHover.cell.heat <= 0.42
-                        ? 'Colder than typical'
-                        : 'About typical'}
+                        ? `Colder than ${baseWord}`
+                        : `About ${baseWord}`}
                     {cellHover.cell.attempts < 4 ? ' (only a few shots)' : ''}
                   </span>
                 </div>

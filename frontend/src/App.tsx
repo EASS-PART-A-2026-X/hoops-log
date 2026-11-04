@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
 import type { ShotInput } from './api'
 import NbaCompare from './NbaCompare'
+import { PLAYERS } from './court/players'
+import { typicalOf } from './court/nba'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
 import ShotList from './ShotList'
@@ -93,6 +95,12 @@ export default function App() {
     setScrollTarget({ id: 'map-title', block: 'start' })
   }
 
+  const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
+  const baseline = useMemo(
+    () => (benchPlayer ? { name: benchPlayer.name, typical: typicalOf(benchPlayer) } : null),
+    [benchPlayer],
+  )
+
   const made = shots?.filter((s) => s.made).length ?? 0
 
   return (
@@ -149,6 +157,7 @@ export default function App() {
           onRetry={() => void refresh()}
           selectedId={selectedId}
           onSelect={pickFromMap}
+          baseline={baseline}
         />
 
         <div className="columns">
