@@ -212,7 +212,9 @@ export class CourtScene {
       this.scene.add(this.heatPlane)
       // Zone labels are real HTML (crisp, selectable, untouched by the glow effect).
       const labelDom = this.labelRenderer.domElement
-      labelDom.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none'
+      // isolation: the library gives every label a huge z-index; keep it inside this layer so the
+      // tooltip (a normal z-index) always draws above the labels.
+      labelDom.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1;isolation:isolate'
       container.appendChild(labelDom)
       this.buildMarker()
 

@@ -1695,3 +1695,12 @@ h3 {
     gap: 8px;
   }
 }
+
+/* Hovering a hex: fade the zone labels so the hex and its tooltip can be read */
+.zone-label {
+  transition: opacity 0.12s ease;
+}
+
+.stage-frame.cell-hover .zone-label {
+  opacity: 0.18;
+}

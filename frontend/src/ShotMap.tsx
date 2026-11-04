@@ -291,7 +291,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               <img src={chartUrl} alt={`Shot chart: green circles are made shots, red crosses are misses.`} />
             </div>
           ) : (
-            <div className="stage-frame">
+            <div className={cellHover && mode === 'heat' ? 'stage-frame cell-hover' : 'stage-frame'}>
               <div ref={hostRef} className="stage-canvas" role="img" aria-label={label} />
               {!shots && loadError ? (
                 <div className="stage-msg stage-msg-error" role="alert">
