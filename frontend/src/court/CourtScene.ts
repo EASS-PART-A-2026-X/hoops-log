@@ -5,6 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { buildArena } from './arena'
 import { flightPoint, planFlight } from './flight'
 import type { FlightPlan } from './flight'
 import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
@@ -91,6 +92,7 @@ export class CourtScene {
   private labelRenderer = new CSS2DRenderer()
   private labels: CSS2DObject[] = []
   private marker = new THREE.Group()
+  private arena: THREE.Group | null = null
   // The parts of the marker that tick animates; set in buildMarker.
   private markerRing: THREE.Mesh | null = null
   private markerOuter: THREE.Mesh | null = null
@@ -313,6 +315,12 @@ export class CourtScene {
     }
   }
 
+  /** Show or hide the arena around the court. */
+  setArena(on: boolean): void {
+    if (this.arena) this.arena.visible = on
+    this.dirty = true
+  }
+
   setAutoRotate(on: boolean): void {
     this.controls.autoRotate = on && !this.opts.reducedMotion
   }
@@ -467,6 +475,10 @@ export class CourtScene {
     const grid = new THREE.GridHelper(400, 80, 0x1b2a3b, 0x121c28)
     grid.position.y = -0.5
     this.scene.add(ground, grid)
+
+    // The arena around the court: stands, crowd and ribbon board. See-through, drawn behind the shots.
+    this.arena = buildArena()
+    this.scene.add(this.arena)
 
     // The hoop: glass, rim and net.
     // No pole or arm: a stanchion between the camera and the rim would hide the key.

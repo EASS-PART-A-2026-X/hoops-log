@@ -21,7 +21,6 @@ interface Props {
   /** A player the heat map compares each spot with, instead of a typical shooter. */
   baseline: { name: string; typical: Typical } | null
   /** Everyone in the log, and whose shots to show ('' = everyone). The choice lives in App. */
-  players: string[]
   player: string
   onPlayerChange: (player: string) => void
 }
@@ -43,19 +42,27 @@ interface CellHover {
 const MAX_LABELS = 7 // more than this and the zone names print over each other
 
 function Chips<T extends string>(props: {
+  /** Names the group for screen readers. */
   label: string
+  /** The short word shown at the start of the box. */
+  short: string
   value: T
   options: [T, string][]
   onChange: (value: T) => void
   disabled?: boolean
 }) {
+  // One segmented control per choice: a label, then the options in one rounded box, one of them filled.
+  // The box is what tells you "pick one of these"; the old loose pills all looked like one long row.
   return (
-    <div className="chips" role="group" aria-label={props.label}>
+    <div className="seg" role="group" aria-label={props.label}>
+      <span className="seg-label" aria-hidden="true">
+        {props.short}
+      </span>
       {props.options.map(([id, text]) => (
         <button
           key={id}
           type="button"
-          className="chip"
+          className="seg-btn"
           aria-pressed={props.value === id}
           disabled={props.disabled}
           onClick={() => props.onChange(id)}
@@ -92,12 +99,13 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, players, player, onPlayerChange }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
   const [view, setView] = useState<ViewName>('shooter')
   const [auto, setAuto] = useState(false)
+  const [arena, setArena] = useState(true)
   const [ready, setReady] = useState(false)
   // Why the 3D view is not running: it never started, or the browser took the context away.
   const [failed, setFailed] = useState<'start' | 'lost' | null>(null)
@@ -205,6 +213,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
 
   useEffect(() => sceneRef.current?.setMode(mode), [ready, mode])
   useEffect(() => sceneRef.current?.setAutoRotate(auto), [ready, auto])
+  useEffect(() => sceneRef.current?.setArena(arena), [ready, arena])
   useEffect(() => {
     // The first view is the scene's own default; only move the camera for a real choice.
     if (view !== 'shooter' || introDone.current) sceneRef.current?.setView(view)
@@ -244,9 +253,9 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
           <h2 id="map-title">Where your shots live</h2>
         </div>
         <div className="filters">
-          <Chips label="Shot area" value={area} options={AREAS} onChange={setArea} disabled={failed !== null} />
-          <Chips label="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed !== null} />
-          <ShooterSelect players={players} value={player} onChange={onPlayerChange} />
+          <Chips label="Shot area" short="Area" value={area} options={AREAS} onChange={setArea} disabled={failed !== null} />
+          <Chips label="Result" short="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed !== null} />
+          <ShooterSelect shots={shots} value={player} onChange={onPlayerChange} />
         </div>
       </div>
 
@@ -336,6 +345,25 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               <p className="stage-hint" aria-hidden="true">
                 {mode === 'heat' ? 'Drag to orbit · scroll to zoom · hover a hex' : 'Drag to orbit · scroll to zoom · click a shot'}
               </p>
+            {/* Not a choice between options: one action and two on/off switches, so they look different. */}
+            <div className="tools" role="group" aria-label="Tools">
+              <button
+                type="button"
+                className="tool"
+                onClick={() => sceneRef.current?.replay()}
+                disabled={!ready || filtered.length === 0}
+              >
+                ▶ Replay
+              </button>
+              <button type="button" className="tool" aria-pressed={auto} onClick={() => setAuto(!auto)}>
+                <span className="tool-dot" aria-hidden="true" />
+                Auto-rotate
+              </button>
+              <button type="button" className="tool" aria-pressed={arena} onClick={() => setArena(!arena)}>
+                <span className="tool-dot" aria-hidden="true" />
+                Arena
+              </button>
+            </div>
               <ul className="legend" aria-hidden="true">
                 {mode === 'heat' ? (
                   <>
@@ -411,21 +439,8 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
 
           {!failed && (
             <div className="toolbar">
-              <Chips label="Map style" value={mode} options={MODES} onChange={setMode} />
-              <Chips label="Camera angle" value={view} options={VIEWS} onChange={setView} />
-              <div className="chips">
-                <button
-                  type="button"
-                  className="chip"
-                  onClick={() => sceneRef.current?.replay()}
-                  disabled={!ready || filtered.length === 0}
-                >
-                  ▶ Replay
-                </button>
-                <button type="button" className="chip" aria-pressed={auto} onClick={() => setAuto(!auto)}>
-                  Auto-rotate
-                </button>
-              </div>
+              <Chips label="Map style" short="Style" value={mode} options={MODES} onChange={setMode} />
+              <Chips label="Camera angle" short="Angle" value={view} options={VIEWS} onChange={setView} />
             </div>
           )}
         </div>

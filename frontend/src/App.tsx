@@ -4,6 +4,7 @@ import type { ShotInput } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
+import Logo from './Logo'
 import ShooterSelect from './ShooterSelect'
 import { tabTarget } from './focusTrap'
 import { deletedText, withShooterSwitch } from './notices'
@@ -199,7 +200,7 @@ export default function App() {
     }
   }
   const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
-  const shooterPicker = <ShooterSelect players={shooters} value={shooter} onChange={setShooterChoice} />
+  const shooterPicker = <ShooterSelect shots={shots} value={shooter} onChange={setShooterChoice} />
 
   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
   const baseline = useMemo(
@@ -207,12 +208,16 @@ export default function App() {
     [benchPlayer],
   )
 
-  const made = shots?.filter((s) => s.made).length ?? 0
+  // The drawer shows the same shots as the map: the chosen player's, or everyone's.
+  const made = shooterShots?.filter((s) => s.made).length ?? 0
 
   return (
     <div className="app" ref={appRef}>
       <header className="topbar" ref={topbarRef}>
-        <span className="brand">HOOPS LOG</span>
+        <button type="button" className="brand" onClick={() => setTab('log')} aria-label="Hoops Log, go to My log">
+          <Logo />
+          <span aria-hidden="true">HOOPS LOG</span>
+        </button>
         {tab === 'log' && (
           <button
             type="button"
@@ -223,7 +228,7 @@ export default function App() {
             onClick={() => setDrawerOpen((open) => !open)}
           >
             Shots
-            {shots && <span className="drawer-count">{shots.length}</span>}
+            {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
           </button>
         )}
         <nav className="tabs" aria-label="Pages">
@@ -272,7 +277,6 @@ export default function App() {
         <div className="log-view" hidden={tab !== 'log'}>
           <ShotMap
             shots={shots}
-            players={shooters}
             player={shooter}
             onPlayerChange={setShooterChoice}
             loadError={loadError}
@@ -299,7 +303,7 @@ export default function App() {
             <div className="drawer-head">
               <div className="chips" role="group" aria-label="Drawer view">
                 <button type="button" className="chip" aria-pressed={drawerView === 'list'} onClick={() => setDrawerView('list')}>
-                  Shots{shots ? ` (${shots.length})` : ''}
+                  Shots{shooterShots ? ` (${shooterShots.length})` : ''}
                 </button>
                 <button type="button" className="chip" aria-pressed={drawerView === 'add'} onClick={() => setDrawerView('add')}>
                   Add a shot
@@ -320,9 +324,9 @@ export default function App() {
               <section hidden={drawerView !== 'list'} aria-labelledby="list-title">
                 <div className="list-head">
                   <h2 id="list-title">Shots</h2>
-                  {shots && shots.length > 0 && (
+                  {shooterShots && shooterShots.length > 0 && (
                     <span className="count">
-                      {made} made of {shots.length}
+                      {made} made of {shooterShots.length}
                     </span>
                   )}
                 </div>
@@ -344,13 +348,15 @@ export default function App() {
 
                 {!shots && loading && <p className="state">Loading shots…</p>}
 
-                {shots && shots.length === 0 && !loadError && (
+                {shooterShots && shooterShots.length === 0 && !loadError && (
                   <p className="state">No shots yet. Open "Add a shot" to log your first one.</p>
                 )}
 
-                {shots && shots.length > 0 && (
+                {shooterShots && shooterShots.length > 0 && (
                   <ShotList
-                    shots={shots}
+                    // Another player starts the list again at its first page, without remounting the rows.
+                    resetKey={shooter}
+                    shots={shooterShots}
                     selectedId={selectedId}
                     onLocate={locate}
                     onSave={save}
