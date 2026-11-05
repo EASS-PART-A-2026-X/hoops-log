@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
 import type { ShotInput } from './api'
 import NbaCompare from './NbaCompare'
@@ -34,6 +34,7 @@ export default function App() {
   const [benchmarkId, setBenchmarkId] = useState<number | null>(null)
   // Face-offs already played this session, so they do not replay every time the vs NBA tab is opened.
   const [faceOffSeen, setFaceOffSeen] = useState<string[]>([])
+  const markFaceOffSeen = useCallback((key: string) => setFaceOffSeen((seen) => (seen.includes(key) ? seen : [...seen, key])), [])
   // The side drawer with the shot list and the add form: closed by default, so the page is just the map.
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
@@ -275,7 +276,7 @@ export default function App() {
           <NbaCompare shots={shooterShots} shooter={shooter} shooterPicker={shooterPicker} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId}
             onBrowse={() => setTab('players')}
             faceOffSeen={faceOffSeen}
-            onFaceOffSeen={(key) => setFaceOffSeen((seen) => (seen.includes(key) ? seen : [...seen, key]))}
+            onFaceOffSeen={markFaceOffSeen}
           />
         )}
         {/* Always mounted, only hidden, so the form, row edits and map filters survive a tab switch.
@@ -291,6 +292,7 @@ export default function App() {
             selectedId={selectedId}
             onSelect={pickFromMap}
             baseline={baseline}
+            visible={tab === 'log'}
           />
 
           {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}

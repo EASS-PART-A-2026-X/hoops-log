@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { tabTarget } from './focusTrap'
 import type { CardProfile } from './court/cardData'
 import { FACE_OFF_MS, faceOffRows, rowWinner } from './court/faceoff'
 import ShotCard from './ShotCard'
@@ -21,16 +22,31 @@ const show = (v: number | null, unit: string) => (v === null ? '–' : `${v}${un
 export default function FaceOff({ you, them, verdict, onClose }: Props) {
   const button = useRef<HTMLButtonElement>(null)
   const rows = faceOffRows(you, them)
+  // The latest onClose, so a parent that passes a new function every render does not restart the
+  // timer or the focus handling below.
+  const closeRef = useRef(onClose)
+  useEffect(() => {
+    closeRef.current = onClose
+  })
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
     button.current?.focus()
-    const timer = window.setTimeout(onClose, FACE_OFF_MS)
+    const timer = window.setTimeout(() => closeRef.current(), FACE_OFF_MS)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      e.preventDefault()
-      e.stopImmediatePropagation()
-      onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        closeRef.current()
+      } else if (e.key === 'Tab') {
+        // The button is the only control: keep focus on it, also when focus is on the body.
+        const items = button.current ? [button.current] : []
+        const target = tabTarget(items, document.activeElement as HTMLElement | null, items.includes(document.activeElement as HTMLButtonElement), e.shiftKey)
+        if (target) {
+          e.preventDefault()
+          target.focus()
+        } else if (items.length > 0) e.preventDefault()
+      }
     }
     window.addEventListener('keydown', onKey, true)
     return () => {
@@ -38,7 +54,7 @@ export default function FaceOff({ you, them, verdict, onClose }: Props) {
       window.removeEventListener('keydown', onKey, true)
       opener?.focus?.()
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div className="faceoff" role="dialog" aria-modal="true" aria-label={`Face-off: ${you.name} against ${them.name}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
