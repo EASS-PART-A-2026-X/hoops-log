@@ -11,6 +11,7 @@
   --green: #3ddc97;
   --blue: #3b82f6;
   --bench: #7fb0ff;
+  --missed: #7fb0ff;
   --red: #ff6b6b;
   --display: 'Barlow Condensed', system-ui, sans-serif;
   --body: 'Barlow', system-ui, sans-serif;
@@ -78,23 +79,6 @@ h3 {
   /* Fluid: the app uses the whole window instead of floating in a centred column. */
   width: 100%;
   padding: 20px clamp(16px, 3vw, 56px) 48px;
-}
-
-.intro {
-  margin-bottom: 20px;
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.16em;
-  color: var(--orange);
-}
-
-.intro h1 {
-  font-size: clamp(40px, 7vw, 68px);
-  line-height: 1;
 }
 
 .notice-slot {
@@ -365,7 +349,7 @@ h3 {
 }
 
 .shot.missed {
-  border-left-color: var(--bench);
+  border-left-color: var(--missed);
 }
 
 .shot:nth-child(even) {
@@ -473,7 +457,7 @@ h3 {
 }
 
 .result.missed {
-  color: var(--bench);
+  color: var(--missed);
 }
 
 .shot-id {
@@ -701,8 +685,6 @@ h3 {
   background: var(--orange);
   box-shadow: 0 0 6px var(--orange);
 }
-
-
 
 .kpis {
   display: grid;
@@ -1091,19 +1073,6 @@ h3 {
   font-size: 22px;
 }
 
-
-
-
-
-
-
-
-
-
-
-/* A thin white tick where the NBA average sits on the same scale */
-
-
 .stage-clear {
   position: absolute;
   top: 12px;
@@ -1302,19 +1271,6 @@ h3 {
   color: #7fb0ff;
 }
 
-/* Head to head: both numbers the same size */
-
-
-
-
-
-
-
-
-
-
-
-
 /* Player picker (the compare-with list) */
 .pp {
   position: relative;
@@ -1437,9 +1393,6 @@ h3 {
     width: 100%;
   }
 }
-
-/* Whose shots: the same choice on the map, vs NBA and Players */
-
 
 /* Shot list and add form: a drawer from the right, closed by default */
 .drawer-toggle {
