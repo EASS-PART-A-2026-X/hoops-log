@@ -21,7 +21,6 @@ interface Props {
   /** A player the heat map compares each spot with, instead of a typical shooter. */
   baseline: { name: string; typical: Typical } | null
   /** Everyone in the log, and whose shots to show ('' = everyone). The choice lives in App. */
-  players: string[]
   player: string
   onPlayerChange: (player: string) => void
 }
@@ -92,7 +91,7 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, players, player, onPlayerChange }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
@@ -246,7 +245,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
         <div className="filters">
           <Chips label="Shot area" value={area} options={AREAS} onChange={setArea} disabled={failed !== null} />
           <Chips label="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed !== null} />
-          <ShooterSelect players={players} value={player} onChange={onPlayerChange} />
+          <ShooterSelect shots={shots} value={player} onChange={onPlayerChange} />
         </div>
       </div>
 

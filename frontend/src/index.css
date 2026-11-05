@@ -10,6 +10,7 @@
   --orange-bg: #2a1b12;
   --green: #3ddc97;
   --blue: #3b82f6;
+  --bench: #7fb0ff;
   --red: #ff6b6b;
   --display: 'Barlow Condensed', system-ui, sans-serif;
   --body: 'Barlow', system-ui, sans-serif;
@@ -533,26 +534,7 @@ h3 {
   cursor: not-allowed;
 }
 
-.player-filter select {
-  min-height: 44px;
-  padding: 8px 14px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%239ba9ba' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 18px center;
-  border: 1px solid var(--line-strong);
-  border-radius: 22px;
-  /* Own arrow, 18px from the edge: the browser's arrow sat against the border. */
-  appearance: none;
-  padding-right: 44px;
-}
 
-.player-filter option {
-  background: var(--panel);
-  color: var(--text);
-  padding: 8px 12px;
-}
 
 .kpis {
   display: grid;
@@ -941,86 +923,18 @@ h3 {
   font-size: 22px;
 }
 
-.nba-zones {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 
-.nba-zone {
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--bg);
-}
 
-.nba-zone.empty {
-  opacity: 0.5;
-}
 
-.nba-zone-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-}
 
-.nba-zone-name {
-  font-weight: 600;
-}
 
-.nba-diff {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
-}
 
-.nba-diff.up {
-  color: var(--orange-soft);
-}
 
-.nba-diff.down {
-  color: #7fb0ff;
-}
 
-.nba-track {
-  position: relative;
-  height: 6px;
-  margin: 12px 0 8px;
-  border-radius: 3px;
-  background: var(--line);
-}
 
-.nba-fill {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: var(--orange);
-}
 
 /* A thin white tick where the NBA average sits on the same scale */
-.nba-tick {
-  position: absolute;
-  top: -4px;
-  width: 2px;
-  height: 14px;
-  margin-left: -1px;
-  border-radius: 1px;
-  background: #fff;
-}
 
-.nba-zone-foot {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 2px 8px;
-  color: var(--muted);
-  font-size: 13px;
-}
 
 .stage-clear {
   position: absolute;
@@ -1221,83 +1135,17 @@ h3 {
 }
 
 /* Head to head: both numbers the same size */
-.nba-vs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
 
-@media (max-width: 760px) {
-  .nba-vs {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
-.vs-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--bg);
-}
 
-.vs-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
 
-.vs-side {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
 
-.vs-side:last-child {
-  align-items: flex-end;
-  text-align: right;
-}
 
-.vs-num {
-  font-family: var(--display);
-  font-size: 44px;
-  font-weight: 700;
-  line-height: 1;
-  color: #fff;
-}
 
-.vs-side.mine .vs-num {
-  color: var(--orange-soft);
-}
 
-.vs-who {
-  margin-top: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 
-.vs-mid {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-}
 
-.vs-foot {
-  color: var(--muted);
-  font-size: 13px;
-}
 
-.nba-zone-foot strong {
-  color: #fff;
-  font-size: 16px;
-}
 
 /* Player picker (the compare-with list) */
 .pp {
@@ -1377,7 +1225,9 @@ h3 {
 .pp-list {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  /* Opens leftwards from the button's right edge: these pickers sit at the right of their toolbar. */
+  right: 0;
+  max-width: calc(100vw - 32px);
   z-index: 20;
   width: max(100%, 300px);
   max-height: min(60vh, 440px);
@@ -1421,18 +1271,7 @@ h3 {
 }
 
 /* Whose shots: the same choice on the map, vs NBA and Players */
-.shooter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.shooter-label {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
 
 /* Shot list and add form: a drawer from the right, closed by default */
 .drawer-toggle {
@@ -1724,4 +1563,321 @@ h3 {
 
 .stage-frame.cell-hover .zone-label {
   opacity: 0.18;
+}
+
+/* Picker: a label before the button ("Shots of") and the shooter's initials avatar */
+.pp-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-prefix {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pp-me {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--orange-soft);
+  background: var(--orange-bg);
+  border: 1px solid var(--orange);
+}
+
+/* You vs the NBA: who is who, who leads, by how much */
+.vs-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg);
+}
+
+.vs-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vs-id.them {
+  justify-content: flex-end;
+}
+
+.vs-id-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.vs-id-text.right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.vs-id-text strong {
+  font-family: var(--display);
+  font-size: 26px;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.vs-id-text small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vs-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.vs-avatar.you {
+  color: var(--orange-soft);
+  background: var(--orange-bg);
+  border: 2px solid var(--orange);
+}
+
+.vs-avatar.them {
+  background: var(--panel);
+  border: 2px solid var(--bench);
+}
+
+.vs-avatar-fallback {
+  color: var(--bench);
+}
+
+.vs-score {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: baseline;
+  justify-content: center;
+  column-gap: 10px;
+  text-align: center;
+}
+
+.vs-score small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vs-score-num {
+  font-family: var(--display);
+  font-size: 54px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.vs-score-num.you {
+  color: var(--orange-soft);
+}
+
+.vs-score-num.them {
+  color: var(--bench);
+}
+
+.vs-score-dash {
+  color: var(--muted);
+  font-size: 30px;
+}
+
+.vs-verdict {
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-size: 24px;
+  color: #fff;
+}
+
+.nba-vs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.vs-card,
+.nba-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+}
+
+.nba-zone.empty {
+  opacity: 0.55;
+}
+
+.vs-card-head,
+.nba-zone-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.nba-zone-name {
+  font-weight: 600;
+}
+
+/* The pill that says who leads: orange = the shooter, blue = the other side */
+.win-chip {
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.win-chip.you {
+  color: #1a0e06;
+  background: var(--orange-soft);
+}
+
+.win-chip.them {
+  color: #07111f;
+  background: var(--bench);
+}
+
+.win-chip.tie,
+.win-chip.none {
+  color: var(--muted);
+  font-weight: 600;
+  border-color: var(--line-strong);
+}
+
+.vs-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vs-bar-row {
+  display: grid;
+  grid-template-columns: minmax(48px, 92px) 1fr 3.6em;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.vs-bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vs-bar-row strong {
+  text-align: right;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.vs-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.vs-track span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.vs-bar-row.you .vs-track span {
+  background: var(--orange);
+}
+
+.vs-bar-row.them .vs-track span {
+  background: var(--bench);
+}
+
+/* The side that leads is bold and bright; the other fades back a little */
+.vs-bar-row.lead,
+.vs-bar-row.lead strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.vs-bars:has(.lead) .vs-bar-row:not(.lead) .vs-track span {
+  opacity: 0.55;
+}
+
+.vs-foot {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.nba-zones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 860px) {
+  .vs-head {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .vs-id.them {
+    justify-content: flex-start;
+    flex-direction: row-reverse;
+  }
+
+  .vs-id-text.right {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .nba-vs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* On phones the pickers sit at the left, so their lists open from the left edge instead */
+@media (max-width: 640px) {
+  .pp-list {
+    left: 0;
+    right: auto;
+  }
 }

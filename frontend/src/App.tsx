@@ -199,7 +199,7 @@ export default function App() {
     }
   }
   const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
-  const shooterPicker = <ShooterSelect players={shooters} value={shooter} onChange={setShooterChoice} />
+  const shooterPicker = <ShooterSelect shots={shots} value={shooter} onChange={setShooterChoice} />
 
   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
   const baseline = useMemo(
@@ -272,7 +272,6 @@ export default function App() {
         <div className="log-view" hidden={tab !== 'log'}>
           <ShotMap
             shots={shots}
-            players={shooters}
             player={shooter}
             onPlayerChange={setShooterChoice}
             loadError={loadError}
