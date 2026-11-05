@@ -209,8 +209,7 @@ export default function App() {
   )
 
   // The drawer shows the same shots as the map: the chosen player's, or everyone's.
-  const listed = shooterShots
-  const made = listed?.filter((s) => s.made).length ?? 0
+  const made = shooterShots?.filter((s) => s.made).length ?? 0
 
   return (
     <div className="app" ref={appRef}>
@@ -229,7 +228,7 @@ export default function App() {
             onClick={() => setDrawerOpen((open) => !open)}
           >
             Shots
-            {listed && <span className="drawer-count">{listed.length}</span>}
+            {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
           </button>
         )}
         <nav className="tabs" aria-label="Pages">
@@ -304,7 +303,7 @@ export default function App() {
             <div className="drawer-head">
               <div className="chips" role="group" aria-label="Drawer view">
                 <button type="button" className="chip" aria-pressed={drawerView === 'list'} onClick={() => setDrawerView('list')}>
-                  Shots{listed ? ` (${listed.length})` : ''}
+                  Shots{shooterShots ? ` (${shooterShots.length})` : ''}
                 </button>
                 <button type="button" className="chip" aria-pressed={drawerView === 'add'} onClick={() => setDrawerView('add')}>
                   Add a shot
@@ -325,9 +324,9 @@ export default function App() {
               <section hidden={drawerView !== 'list'} aria-labelledby="list-title">
                 <div className="list-head">
                   <h2 id="list-title">Shots</h2>
-                  {listed && listed.length > 0 && (
+                  {shooterShots && shooterShots.length > 0 && (
                     <span className="count">
-                      {made} made of {listed.length}
+                      {made} made of {shooterShots.length}
                     </span>
                   )}
                 </div>
@@ -349,15 +348,15 @@ export default function App() {
 
                 {!shots && loading && <p className="state">Loading shots…</p>}
 
-                {listed && listed.length === 0 && !loadError && (
+                {shooterShots && shooterShots.length === 0 && !loadError && (
                   <p className="state">No shots yet. Open "Add a shot" to log your first one.</p>
                 )}
 
-                {listed && listed.length > 0 && (
+                {shooterShots && shooterShots.length > 0 && (
                   <ShotList
-                    // A new key starts the list again at its first page when another player is chosen.
-                    key={shooter}
-                    shots={listed}
+                    // Another player starts the list again at its first page, without remounting the rows.
+                    resetKey={shooter}
+                    shots={shooterShots}
                     selectedId={selectedId}
                     onLocate={locate}
                     onSave={save}

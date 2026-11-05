@@ -20,8 +20,10 @@ const shot = (id: number): Shot => ({
 })
 const shots = (n: number) => Array.from({ length: n }, (_, i) => shot(i + 1))
 
-const renderList = (list: Shot[], selectedId: number | null = null) =>
-  render(<ShotList shots={list} selectedId={selectedId} onLocate={vi.fn()} onSave={vi.fn()} onDelete={vi.fn()} />)
+const listEl = (list: Shot[], resetKey = '', selectedId: number | null = null) => (
+  <ShotList shots={list} resetKey={resetKey} selectedId={selectedId} onLocate={vi.fn()} onSave={vi.fn()} onDelete={vi.fn()} />
+)
+const renderList = (list: Shot[], selectedId: number | null = null) => render(listEl(list, '', selectedId))
 
 const rows = () => document.querySelectorAll('li.shot')
 
@@ -52,5 +54,42 @@ describe('ShotList paging', () => {
     renderList(shots(45), 33)
     expect(document.getElementById('shot-33')).not.toBeNull()
     expect(rows()).toHaveLength(33)
+  })
+})
+
+describe('ShotList resetKey', () => {
+  it('goes back to the first page when resetKey changes', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(listEl(shots(45), 'Yuly'))
+    await user.click(screen.getByRole('button', { name: /Show 20 more/ }))
+    expect(rows()).toHaveLength(40)
+    rerender(listEl(shots(45), 'Noam'))
+    expect(rows()).toHaveLength(20)
+  })
+
+  it('keeps the shown page when the list changes but resetKey does not', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(listEl(shots(45), 'Yuly'))
+    await user.click(screen.getByRole('button', { name: /Show 20 more/ }))
+    rerender(listEl(shots(46), 'Yuly'))
+    expect(rows()).toHaveLength(40)
+  })
+
+  it('keeps an open edit form on a shot that is still listed when resetKey changes', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(listEl(shots(3), 'Yuly'))
+    await user.click(screen.getByRole('button', { name: /^Edit.*#2/ }))
+    expect(screen.getByRole('heading', { name: 'Edit shot #2' })).toBeTruthy()
+    rerender(listEl(shots(5), ''))
+    expect(screen.getByRole('heading', { name: 'Edit shot #2' })).toBeTruthy()
+    expect(rows()).toHaveLength(5)
+  })
+
+  it('keeps a pending delete confirmation on a shot that is still listed when resetKey changes', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(listEl(shots(3), 'Yuly'))
+    await user.click(screen.getByRole('button', { name: /^Delete.*#1/ }))
+    rerender(listEl(shots(5), ''))
+    expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeTruthy()
   })
 })

@@ -5,6 +5,8 @@ import ShotForm from './ShotForm'
 
 interface Props {
   shots: Shot[]
+  /** When this changes (e.g. another player is shown) the list goes back to its first page. */
+  resetKey: string
   selectedId: number | null
   onLocate: (id: number | null) => void
   onSave: (id: number, input: ShotInput) => Promise<void>
@@ -108,8 +110,14 @@ function Row({
 /** Rows shown at a time: a short first page, then "Show more". */
 const PAGE = 20
 
-export default function ShotList({ shots, selectedId, onLocate, onSave, onDelete }: Props) {
+export default function ShotList({ shots, resetKey, selectedId, onLocate, onSave, onDelete }: Props) {
   const [shown, setShown] = useState(PAGE)
+  const [seenKey, setSeenKey] = useState(resetKey)
+  if (seenKey !== resetKey) {
+    // Setting state during render restarts it straight away; the guard makes it settle after one pass.
+    setSeenKey(resetKey)
+    setShown(PAGE)
+  }
   // Render a page at a time: 5000 rows of DOM make the whole page slow. A selected shot
   // is always shown, however far down it is.
   const selectedAt = selectedId === null ? -1 : shots.findIndex((s) => s.id === selectedId)
