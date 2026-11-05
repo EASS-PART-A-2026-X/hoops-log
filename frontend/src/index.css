@@ -2241,3 +2241,267 @@ h3 {
     align-items: stretch;
   }
 }
+
+/* Shot cards: a trading card with a tilt and a foil shine that follows the pointer */
+.shot-card {
+  --card-accent: var(--orange);
+  --mx: 50%;
+  --my: 30%;
+  --rx: 0deg;
+  --ry: 0deg;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 1.1em 1.2em 0.9em;
+  overflow: hidden;
+  color: var(--text);
+  border: 2px solid var(--card-accent);
+  border-radius: 1.6em;
+  background: linear-gradient(155deg, #162133 0%, #0d1520 55%, #0b0f14 100%);
+  box-shadow: 0 1.2em 2.6em rgba(0, 0, 0, 0.45);
+  font-size: 15px;
+  transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.18s ease-out;
+}
+
+.shot-card.nba {
+  --card-accent: var(--bench);
+}
+
+.shot-card.big {
+  max-width: 400px;
+  font-size: 19px;
+}
+
+.shot-card.versus {
+  font-size: 17px;
+}
+
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8em;
+}
+
+.card-rating {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.card-rating strong {
+  font-family: var(--display);
+  font-size: 4.2em;
+  font-weight: 700;
+  color: #fff;
+}
+
+.card-rating span {
+  margin-top: 0.15em;
+  color: var(--muted);
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.card-style {
+  margin-top: 0.5em;
+  font-family: var(--display);
+  font-size: 1.35em;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--card-accent);
+}
+
+.shot-card.you .card-style {
+  color: var(--orange-soft);
+}
+
+.card-portrait {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.4em;
+  height: 4.4em;
+  border: 3px solid var(--card-accent);
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: var(--panel);
+  font-family: var(--display);
+  font-size: 1.6em;
+  font-weight: 700;
+  color: #fff;
+}
+
+.card-portrait.you {
+  color: var(--orange-soft);
+  background: var(--orange-bg);
+}
+
+.card-name {
+  margin: 0.5em 0 0;
+  font-size: 1.9em;
+  line-height: 1.05;
+}
+
+.card-sub {
+  margin: 0.1em 0 0;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.card-radar {
+  display: block;
+  width: 78%;
+  margin: 0.4em auto 0;
+}
+
+.radar-ring {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 0.8;
+}
+
+.radar-ring.outer {
+  stroke: var(--line-strong);
+}
+
+.radar-axis {
+  stroke: var(--line);
+  stroke-width: 0.6;
+}
+
+.radar-shape {
+  fill: color-mix(in srgb, var(--card-accent) 38%, transparent);
+  stroke: var(--card-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.radar-label {
+  fill: var(--text);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.radar-label.empty {
+  fill: var(--muted);
+  opacity: 0.6;
+}
+
+.card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5em;
+  margin: 0.5em 0 0;
+}
+
+.card-stats div {
+  padding: 0.45em 0.7em;
+  border: 1px solid var(--line);
+  border-radius: 0.8em;
+  background: var(--bg);
+}
+
+.card-stats dt {
+  color: var(--muted);
+  font-size: 0.72em;
+  font-weight: 600;
+}
+
+.card-stats dd {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.6em;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.card-foot {
+  margin: 0.6em 0 0;
+  color: var(--muted);
+  font-size: 0.72em;
+  text-align: right;
+}
+
+/* The foil: a rainbow sheen that follows the pointer, faint at rest */
+.card-foil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.28), transparent 38%),
+    linear-gradient(115deg, transparent 20%, rgba(255, 154, 92, 0.22) 36%, rgba(127, 176, 255, 0.24) 52%, rgba(255, 255, 255, 0.16) 60%, transparent 76%);
+  background-size: 100% 100%, 220% 220%;
+  background-position: 0 0, var(--mx) var(--my);
+  mix-blend-mode: color-dodge;
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shot-card {
+    transform: none;
+  }
+
+  .card-foil {
+    display: none;
+  }
+}
+
+/* Your card in the Players grid, and the full-size view */
+.player-you {
+  display: flex;
+}
+
+.card-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 1.6em;
+  cursor: pointer;
+}
+
+.card-open:focus-visible {
+  outline: 2px solid var(--orange-soft);
+  outline-offset: 4px;
+}
+
+.card-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(4, 7, 11, 0.82);
+  overflow-y: auto;
+}
+
+.card-dialog-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  width: min(400px, 100%);
+}
+
+.card-dialog-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.card-dialog-note {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}

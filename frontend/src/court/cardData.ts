@@ -153,3 +153,14 @@ export function playerProfile(p: Player): CardProfile {
     playerId: p.id,
   }
 }
+
+/** The corner of the radar for axis `i` of `n`: axis 0 points straight up, then clockwise. */
+export function radarPoint(i: number, n: number, fraction: number, cx: number, cy: number, r: number): [number, number] {
+  const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n
+  return [cx + Math.cos(angle) * r * fraction, cy + Math.sin(angle) * r * fraction]
+}
+
+/** The shape of a radar: one point per value (no data counts as the centre). Shared by the card and the downloaded picture. */
+export function radarPolygon(values: (number | null)[], cx: number, cy: number, r: number): [number, number][] {
+  return values.map((v, i) => radarPoint(i, values.length, radarFraction(v) ?? 0, cx, cy, r))
+}

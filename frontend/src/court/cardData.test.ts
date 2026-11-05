@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MIN_SHOTS_FOR_CARD, RADAR_AXES, effectiveFg, playerProfile, radarFraction, shooterProfile, shootingRating, styleOfPlayer, styleOfShots } from './cardData'
+import { MIN_SHOTS_FOR_CARD, RADAR_AXES, effectiveFg, playerProfile, radarFraction, radarPoint, radarPolygon, shooterProfile, shootingRating, styleOfPlayer, styleOfShots } from './cardData'
 import { PLAYERS } from './players'
 
 type S = { zone: string; made: boolean; shot_type: '2PT' | '3PT' }
@@ -135,5 +135,26 @@ describe('playerProfile', () => {
     const giannis = playerProfile(PLAYERS.find((p) => p.name === 'Giannis Antetokounmpo')!)
     const top = RADAR_AXES.findIndex((a) => a.key === 'top')
     expect(curry.radar[top]!).toBeGreaterThan(giannis.radar[top]!)
+  })
+})
+
+describe('radar geometry', () => {
+  it('puts axis 0 straight up and goes clockwise', () => {
+    const [x0, y0] = radarPoint(0, 4, 1, 100, 100, 50)
+    expect(x0).toBeCloseTo(100, 6)
+    expect(y0).toBeCloseTo(50, 6)
+    const [x1, y1] = radarPoint(1, 4, 1, 100, 100, 50)
+    expect(x1).toBeCloseTo(150, 6)
+    expect(y1).toBeCloseTo(100, 6)
+  })
+
+  it('puts the polygon corner at the centre for no data, and on the ring for 70% or more', () => {
+    const poly = radarPolygon([null, 70, 35, 100, 0], 100, 100, 70)
+    expect(poly).toHaveLength(5)
+    expect(poly[0]).toEqual([100, 100])
+    expect(Math.hypot(poly[1]![0] - 100, poly[1]![1] - 100)).toBeCloseTo(70, 6)
+    expect(Math.hypot(poly[2]![0] - 100, poly[2]![1] - 100)).toBeCloseTo(35, 6)
+    expect(Math.hypot(poly[3]![0] - 100, poly[3]![1] - 100)).toBeCloseTo(70, 6)
+    expect(poly[4]).toEqual([100, 100])
   })
 })
