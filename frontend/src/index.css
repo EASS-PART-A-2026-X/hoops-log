@@ -582,6 +582,119 @@ h3 {
   cursor: not-allowed;
 }
 
+/* Map controls. A segmented box is one choice (exactly one option filled); tools are separate. */
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  background: var(--bg);
+}
+
+.seg-label {
+  margin: 0 6px 0 10px;
+  padding-right: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-right: 1px solid var(--line-strong);
+}
+
+.seg-btn {
+  min-height: 36px;
+  padding: 4px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.seg-btn:hover:not(:disabled):not([aria-pressed='true']) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.seg-btn[aria-pressed='true'] {
+  color: #0b0f14;
+  background: var(--orange-soft);
+}
+
+.seg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* On the court, bottom right (the legend is bottom left): replay and the two switches */
+.stage-frame .tools {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(9, 13, 19, 0.82);
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.tool:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--orange-soft);
+}
+
+.tool:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The little light on a switch: lit orange while it is on */
+.tool-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.tool[aria-pressed='true'] {
+  color: var(--text);
+  border-style: solid;
+  border-color: var(--orange);
+}
+
+.tool[aria-pressed='true'] .tool-dot {
+  background: var(--orange);
+  box-shadow: 0 0 6px var(--orange);
+}
+
 
 
 .kpis {
@@ -1593,10 +1706,17 @@ h3 {
     display: none;
   }
 
-  .page.fit .chip,
-  .page.fit .player-filter select {
+  .page.fit .chip {
     min-height: 38px;
     padding-block: 4px;
+  }
+
+  .page.fit .seg-btn {
+    min-height: 30px;
+  }
+
+  .page.fit .tool {
+    min-height: 34px;
   }
 
   .page.fit .stage {
