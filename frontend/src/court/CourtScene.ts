@@ -6,6 +6,9 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { buildArena } from './arena'
+import { CINEMATIC, SESSION, STILL, frameAt, makePlan, shotStartMs } from './film'
+import type { FilmFrame, FilmPlan, Phase } from './film'
+import { FilmStage } from './filmStage'
 import { flightPoint, planFlight } from './flight'
 import type { FlightPlan } from './flight'
 import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
@@ -34,8 +37,25 @@ export interface SceneData {
   heat: HeatGrid | null
   hexes: HexBins | null
 }
+/** What the film is doing, for the on-screen graphics. */
+export interface FilmState {
+  /** True while a film is running (the camera is not the user's). */
+  active: boolean
+  /** The film's current shot, 0-based, and how many shots it has. */
+  k: number
+  total: number
+  phase: Phase
+  /** The current shot's index in the scene's points, or null. */
+  index: number | null
+  paused: boolean
+  /** True once, when a film has played to its end. */
+  finished: boolean
+}
+
 export interface SceneOptions {
   reducedMotion: boolean
+  /** The film started, moved to another shot or phase, was paused, stopped or finished. */
+  onFilm: (state: FilmState) => void
   /** Index into the current points, or null; x and y are pixels inside the container. */
   onHover: (index: number | null, x: number, y: number) => void
   /** A shot was clicked, or null when the click hit empty space. */
@@ -93,6 +113,11 @@ export class CourtScene {
   private labels: CSS2DObject[] = []
   private marker = new THREE.Group()
   private arena: THREE.Group | null = null
+  private filmStage: FilmStage | null = null
+  /** The film that is playing; the clock only moves while it is not paused. */
+  private film: { plan: FilmPlan; clock: number; paused: boolean; lastNow: number; last: { k: number; phase: Phase } } | null = null
+  /** What the last film was, so "watch again" can play it once more. */
+  private lastFilm: { indices: number[]; mode: 'shot' | 'session' } | null = null
   // The parts of the marker that tick animates; set in buildMarker.
   private markerRing: THREE.Mesh | null = null
   private markerOuter: THREE.Mesh | null = null
@@ -263,6 +288,7 @@ export class CourtScene {
   // ---------- public API ----------
 
   setData(data: SceneData, intro: boolean): void {
+    if (this.film) this.stopFilm() // the shots under the film are changing
     this.pts = data.points
     this.plans = data.points.map((p, i) => planFlight(p, i))
     // Crowded courts get dimmer beams, smaller markers and less glow, or they wash out to white.
@@ -339,13 +365,150 @@ export class CourtScene {
     if (this.selected !== null) {
       this.updateMarker()
     }
-    this.marker.visible = this.selected !== null
-    // Dim every other shot while one is selected, so the marker is what the eye lands on.
-    const dim = this.selected !== null
+    this.applyDim()
+  }
+
+  /**
+   * Dim every shot while one is selected (so the marker is what the eye lands on) or a film plays
+   * (so the film's ball is). The marker itself is hidden during a film.
+   */
+  private applyDim(): void {
+    const dim = this.selected !== null || this.film !== null
+    this.marker.visible = this.selected !== null && this.film === null
     for (const m of [this.solidMat, this.ballMat, this.arcMat, this.beamMat]) {
       m.transparent = dim || m === this.arcMat || m === this.beamMat
       m.opacity = dim ? 0.3 : 1
       m.needsUpdate = true
+    }
+    this.dirty = true
+  }
+
+  // ---------- the shot film ----------
+
+  /** Play a film of these shots (indices into the points): one shot in full, or a quicker session. */
+  startFilm(indices: number[], mode: 'shot' | 'session' = 'shot'): void {
+    if (this.disposed || !this.filmStage) return
+    const valid = indices.filter((i) => i >= 0 && i < this.pts.length)
+    if (valid.length === 0) return
+    const timings = this.opts.reducedMotion ? STILL : mode === 'session' ? SESSION : CINEMATIC
+    // A film that is already running keeps its original start, so the camera still returns to the user's view.
+    const startPose = this.film
+      ? this.film.plan.startPose
+      : { pos: this.camera.position.toArray() as [number, number, number], target: this.controls.target.toArray() as [number, number, number] }
+    this.tween = null
+    this.playing = false
+    this.hoverIndex = null
+    this.opts.onHover(null, 0, 0)
+    this.filmStage.reset()
+    const plan = makePlan(this.pts, valid, timings, startPose)
+    this.lastFilm = { indices: valid, mode }
+    this.film = { plan, clock: 0, paused: false, lastNow: performance.now(), last: { k: -1, phase: 'lead' } }
+    this.controls.enabled = false
+    this.applyDim()
+    this.emitFilm(frameAt(plan, 0), false)
+  }
+
+  /** Play the last film again from its first shot. */
+  restartFilm(): void {
+    if (this.lastFilm) this.startFilm(this.lastFilm.indices, this.lastFilm.mode)
+  }
+
+  pauseFilm(paused: boolean): void {
+    if (!this.film) return
+    this.film.paused = paused
+    this.film.lastNow = performance.now()
+    this.emitFilm(frameAt(this.film.plan, this.film.clock), false)
+  }
+
+  /** Jump to the next (+1) or previous (-1) shot; the previous one restarts the current shot first. */
+  stepFilm(delta: 1 | -1): void {
+    const f = this.film
+    if (!f || !this.filmStage) return
+    const frame = frameAt(f.plan, f.clock)
+    const total = f.plan.shots.length
+    let k = frame.k + delta
+    if (delta < 0 && frame.phaseT > 0 && frame.phase !== 'lead') k = frame.k // restart this shot
+    f.clock = shotStartMs(f.plan, Math.max(0, Math.min(total, k)))
+    this.filmStage.reset()
+    f.last = { k: -1, phase: 'lead' }
+  }
+
+  /** Stop now: the camera glides back to where the user had it. */
+  stopFilm(): void {
+    const f = this.film
+    if (!f) return
+    const frame = frameAt(f.plan, f.clock)
+    this.finishFilm(false)
+    if (this.opts.reducedMotion) {
+      this.camera.position.set(...f.plan.startPose.pos)
+      this.controls.target.set(...f.plan.startPose.target)
+      this.controls.update()
+      return
+    }
+    this.tween = {
+      t0: performance.now(),
+      dur: 700,
+      fromPos: this.camera.position.clone(),
+      toPos: new THREE.Vector3(...f.plan.startPose.pos),
+      fromTarget: new THREE.Vector3(...frame.camera.target),
+      toTarget: new THREE.Vector3(...f.plan.startPose.target),
+    }
+  }
+
+  private finishFilm(finished: boolean): void {
+    const f = this.film
+    if (!f) return
+    this.film = null
+    this.filmStage?.reset()
+    this.controls.enabled = true
+    if (finished) {
+      this.camera.position.set(...f.plan.startPose.pos)
+      this.controls.target.set(...f.plan.startPose.target)
+      this.controls.update()
+    }
+    this.applyDim()
+    const total = f.plan.shots.length
+    this.opts.onFilm({ active: false, k: Math.max(0, total - 1), total, phase: 'done', index: null, paused: false, finished })
+  }
+
+  private emitFilm(frame: FilmFrame, finished: boolean): void {
+    const f = this.film
+    if (!f) return
+    this.opts.onFilm({
+      active: true,
+      k: frame.k,
+      total: f.plan.shots.length,
+      phase: frame.phase,
+      index: f.plan.shots[frame.k]?.index ?? null,
+      paused: f.paused,
+      finished,
+    })
+  }
+
+  /** One frame of the film: move the camera and the ball, and set off the effects when a phase begins. */
+  private updateFilm(now: number): void {
+    const f = this.film
+    if (!f || !this.filmStage) return
+    // Capped, so a tab that was in the background does not make the film jump ahead.
+    const dt = Math.min(100, now - f.lastNow)
+    f.lastNow = now
+    if (!f.paused) f.clock += dt
+    const frame = frameAt(f.plan, f.clock)
+    const shake = this.filmStage.update(f.paused ? 0 : dt)
+    const [px, py, pz] = frame.camera.pos
+    const [tx, ty, tz] = frame.camera.target
+    this.camera.position.set(px + shake[0], py + shake[1], pz + shake[2])
+    this.controls.target.set(tx, ty, tz)
+    this.camera.lookAt(tx, ty, tz)
+    this.filmStage.setBall(frame.ball)
+
+    if (frame.k !== f.last.k || frame.phase !== f.last.phase) {
+      const fs = f.plan.shots[frame.k]
+      if (fs && frame.phase === 'drop') this.filmStage.impact(fs.shot.made ? 'make' : 'miss', fs.flight.hit)
+      if (fs && frame.phase === 'hold') this.filmStage.reaction(fs.shot.made ? 'make' : 'miss')
+      f.last = { k: frame.k, phase: frame.phase }
+      if (frame.phase === 'done') this.finishFilm(true)
+      else this.emitFilm(frame, false)
     }
     this.dirty = true
   }
@@ -503,6 +666,8 @@ export class CourtScene {
     )
     net.position.set(0, RIM_HEIGHT - 0.68, -HOOP_Y)
     this.scene.add(glass, glassEdge, rim, net)
+    const crowd = (this.arena?.getObjectByName('crowd') as THREE.InstancedMesh | undefined)?.material as THREE.Material | undefined
+    this.filmStage = new FilmStage(this.scene, net, crowd ?? null, this.opts.reducedMotion)
   }
 
   /**
@@ -875,7 +1040,10 @@ export class CourtScene {
       this.controls.target.lerpVectors(this.tween.fromTarget, this.tween.toTarget, e)
       if (u >= 1) this.tween = null
     }
-    this.controls.update()
+    // The film moves the camera itself. OrbitControls must not run then: it would pull the low
+    // shooter's-eye camera up to its own height limit.
+    if (this.film) this.updateFilm(now)
+    else this.controls.update()
     if (this.hexGrowing && this.mode === 'heat') this.layoutHexes(now)
     if (this.dirty || this.playing || (this.mode === 'arcs' && !this.opts.reducedMotion)) {
       this.layout(now)
@@ -964,6 +1132,7 @@ export class CourtScene {
   }
 
   private onPointerMove = (e: PointerEvent): void => {
+    if (this.film) return // the film is playing: nothing to hover
     if (e.buttons !== 0) return // dragging to orbit, not hovering
     this.pendingMove = e
   }
@@ -981,6 +1150,7 @@ export class CourtScene {
   }
 
   private onPointerDown = (e: PointerEvent): void => {
+    if (this.film) return
     this.down = { x: e.clientX, y: e.clientY, t: performance.now() }
     if (this.hoverIndex !== null) {
       this.hoverIndex = null
@@ -989,6 +1159,7 @@ export class CourtScene {
   }
 
   private onPointerUp = (e: PointerEvent): void => {
+    if (this.film) return
     const d = this.down
     this.down = null
     if (!d) return

@@ -97,9 +97,12 @@ export function makePlan(points: ShotLike[], indices: number[], timings: Timings
 }
 
 const shotMs = (t: Timings) => t.lead + t.flight + t.drop + t.hold
+/** The way back is skipped when there is no travelling at all (the still version). */
+const stillFilm = (t: Timings) => t.lead === 0 && t.flight === 0 && t.drop === 0
+const outroMs = (t: Timings) => (stillFilm(t) ? 0 : OUTRO_MS)
 
 export function planDuration(plan: FilmPlan): number {
-  return plan.shots.length === 0 ? 0 : plan.shots.length * shotMs(plan.timings) + OUTRO_MS
+  return plan.shots.length === 0 ? 0 : plan.shots.length * shotMs(plan.timings) + outroMs(plan.timings)
 }
 
 /** Where the film shot k starts, in milliseconds from the start of the film. */
@@ -159,7 +162,8 @@ export function frameAt(plan: FilmPlan, ms: number): FilmFrame {
 
   if (ms >= n * per) {
     const lastFs = plan.shots[last]!
-    const t = clamp01((ms - n * per) / OUTRO_MS)
+    const outro = outroMs(T)
+    const t = outro > 0 ? clamp01((ms - n * per) / outro) : 1
     if (t >= 1) return { k: last, phase: 'done', phaseT: 1, camera: plan.startPose, ball: null }
     return { k: last, phase: 'outro', phaseT: t, camera: poseLerp(reactionPose(lastFs.flight), plan.startPose, easeInOut(t)), ball: null }
   }
@@ -188,7 +192,8 @@ export function frameAt(plan: FilmPlan, ms: number): FilmFrame {
     return { k, phase: 'drop', phaseT: td, camera: poseLerp(flightEnd, reactionPose(fs.flight), DROP_BLEND * easeInOut(td)), ball: ballAt(dropProgress(td)) }
   }
   const th = part(T.lead + T.flight + T.drop, T.hold)
-  const blend = DROP_BLEND + (1 - DROP_BLEND) * easeInOut(th)
+  // The still version has no travelling: the camera is simply at the reaction view.
+  const blend = stillFilm(T) ? 1 : DROP_BLEND + (1 - DROP_BLEND) * easeInOut(th)
   return { k, phase: 'hold', phaseT: th, camera: poseLerp(flightEnd, reactionPose(fs.flight), blend), ball: ballAt(1) }
 }
 

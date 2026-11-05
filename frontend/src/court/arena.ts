@@ -111,6 +111,7 @@ export function buildArena(): THREE.Group {
     crowd.setMatrixAt(i, m)
     crowd.setColorAt(i, s.color)
   })
+  crowd.name = 'crowd' // the film makes it cheer and groan
   crowd.renderOrder = -2
   group.add(crowd)
 

@@ -119,11 +119,14 @@ describe('film timeline', () => {
     }
   })
 
-  it('has no travel at all in the still version, only the result', () => {
+  it('has no travel at all in the still version: the camera stays put, and there is no way back', () => {
     const plan = planOf([made], STILL)
-    expect(planDuration(plan)).toBe(STILL.hold + OUTRO_MS)
-    const f = frameAt(plan, 100)
-    expect(f.phase).toBe('hold')
+    expect(planDuration(plan)).toBe(STILL.hold)
+    const early = frameAt(plan, 100)
+    const late = frameAt(plan, STILL.hold - 100)
+    expect(early.phase).toBe('hold')
+    expect(early.camera).toEqual(late.camera)
+    expect(frameAt(plan, STILL.hold).phase).toBe('done')
   })
 
   it('finds the shot in the plan by its index, so the same shot always flies the same way', () => {
