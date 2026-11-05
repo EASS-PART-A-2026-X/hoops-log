@@ -46,12 +46,19 @@ interface Stand {
   length: number
 }
 
+// The sideline stands run from the far end stand's first row to the near end stand's first row, so they
+// stop where the end stands begin and the corners belong to the end stands (no box is drawn twice).
+const NEAR_END_START = COURTSIDE_GAP + 2 // feet behind the baseline
+const FAR_END_START = 36 // feet past the half-court line
+const SIDE_LENGTH = COURT_L + FAR_END_START + NEAR_END_START
+const SIDE_CENTRE = (NEAR_END_START - COURT_L - FAR_END_START) / 2
+
 /** The four stands. The half-court end sits far back so the default camera stays in front of it. */
 const STANDS: Stand[] = [
-  { axis: 'x', sign: 1, start: COURT_W / 2 + COURTSIDE_GAP, centre: -COURT_L / 2 - 6, length: COURT_L + 56 },
-  { axis: 'x', sign: -1, start: COURT_W / 2 + COURTSIDE_GAP, centre: -COURT_L / 2 - 6, length: COURT_L + 56 },
-  { axis: 'z', sign: 1, start: COURTSIDE_GAP + 2, centre: 0, length: COURT_W + 2 * (COURTSIDE_GAP + TIERS * TIER_DEPTH) },
-  { axis: 'z', sign: -1, start: 36, centre: 0, length: COURT_W + 2 * (COURTSIDE_GAP + TIERS * TIER_DEPTH) },
+  { axis: 'x', sign: 1, start: COURT_W / 2 + COURTSIDE_GAP, centre: SIDE_CENTRE, length: SIDE_LENGTH },
+  { axis: 'x', sign: -1, start: COURT_W / 2 + COURTSIDE_GAP, centre: SIDE_CENTRE, length: SIDE_LENGTH },
+  { axis: 'z', sign: 1, start: NEAR_END_START, centre: 0, length: COURT_W + 2 * (COURTSIDE_GAP + TIERS * TIER_DEPTH) },
+  { axis: 'z', sign: -1, start: FAR_END_START, centre: 0, length: COURT_W + 2 * (COURTSIDE_GAP + TIERS * TIER_DEPTH) },
 ]
 
 /** World z for a spot `dist` feet back from the court at an end: behind the baseline (+) or past the half-court line (-). */
