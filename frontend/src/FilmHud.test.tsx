@@ -54,6 +54,18 @@ describe('FilmHud', () => {
     expect(screen.getByText(/NBA 38\.5%/)).toBeTruthy()
   })
 
+  it('shows only the counts, with no percentage and no league figure, below five attempts in the zone', () => {
+    render(<FilmHud state={state()} shot={shot} zone={{ pct: 75, made: 3, attempts: 4 }} nbaPct={38.5} results={[true]} onPause={vi.fn()} onStep={vi.fn()} onClose={vi.fn()} />)
+    const stat = document.querySelector('.film-stat')?.textContent
+    expect(stat).toBe('3 of 4 from here')
+    expect(stat).not.toMatch(/%|NBA/)
+  })
+
+  it('shows the percentage and the league figure from five attempts on', () => {
+    render(<FilmHud state={state()} shot={shot} zone={{ pct: 80, made: 4, attempts: 5 }} nbaPct={38.5} results={[true]} onPause={vi.fn()} onStep={vi.fn()} onClose={vi.fn()} />)
+    expect(document.querySelector('.film-stat')?.textContent).toBe('80% from here (4 of 5) · NBA 38.5%')
+  })
+
   it('keeps the result hidden while the ball is in the air and shows it from the rim on', () => {
     const { rerender } = renderHud(state({ phase: 'flight' }))
     const result = () => document.querySelector('.film-result')?.textContent
@@ -110,12 +122,12 @@ describe('FilmHud', () => {
 })
 
 describe('FilmSummaryCard', () => {
-  const summary = { made: 7, total: 15, pct: 47, bestZone: { zone: 'restricted_area', made: 2, total: 2 } }
+  const summary = { made: 7, total: 15, pct: 47, bestZone: { zone: 'restricted_area', made: 3, total: 4 } }
 
   it('says how it went and which zone was best', () => {
     render(<FilmSummaryCard summary={summary} bestZoneName="Restricted area" onAgain={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByText('7 of 15 made')).toBeTruthy()
-    expect(screen.getByText(/47% · best from Restricted area: 2 of 2/)).toBeTruthy()
+    expect(screen.getByText(/47% · best from Restricted area: 3 of 4/)).toBeTruthy()
   })
 
   it('leaves the best zone out when there is none, and puts focus on Watch again', () => {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
-import { ARRIVE_AT, NET_DROP, RELEASE_HEIGHT } from './flight'
+import { ARRIVE_AT, NET_DROP, RELEASE_HEIGHT, planFlight } from './flight'
 import {
   CINEMATIC,
+  MIN_SHOTS_FOR_BEST_ZONE,
   OUTRO_MS,
   SESSION,
   STILL,
@@ -129,10 +130,18 @@ describe('film timeline', () => {
     expect(frameAt(plan, STILL.hold).phase).toBe('done')
   })
 
-  it('finds the shot in the plan by its index, so the same shot always flies the same way', () => {
-    const a = frameAt(makePlan([made, missed], [1], CINEMATIC, startPose), CINEMATIC.lead + 300).ball
-    const b = frameAt(makePlan([made, missed], [1], CINEMATIC, startPose), CINEMATIC.lead + 300).ball
-    expect(a).toEqual(b)
+  it('plans a shot from its index: the same index gives the same flight, a miss differs between indices, a make does not', () => {
+    // The plan looks the shot up by its index in the list, so pad the list up to that index.
+    const planAt = (shot: typeof made, index: number) => makePlan(Array.from({ length: index + 1 }, () => shot), [index], CINEMATIC, startPose).shots[0]!
+    // Same shot object, same index: the same plan every time.
+    expect(planAt(missed, 3).flight).toEqual(planAt(missed, 3).flight)
+    expect(planAt(missed, 3).flight).toEqual(planFlight(missed, 3))
+    // A miss: the index picks the kind and the landing spot, so some pair of indices must differ.
+    const flights = Array.from({ length: 12 }, (_, i) => planAt(missed, i).flight)
+    expect(new Set(flights.map((f) => f.kind)).size).toBeGreaterThan(1)
+    expect(new Set(flights.map((f) => f.land.join(','))).size).toBeGreaterThan(1)
+    // A make always swishes the same way, whatever the index.
+    expect(planAt(made, 0).flight).toEqual(planAt(made, 7).flight)
   })
 })
 
@@ -151,15 +160,18 @@ describe('latestIndices', () => {
 })
 
 describe('summarizeFilm', () => {
-  it('counts makes and finds the best zone with at least two shots', () => {
-    const s = summarizeFilm([
-      { made: true, zone: 'paint' },
-      { made: true, zone: 'paint' },
-      { made: false, zone: 'top_3' },
-      { made: true, zone: 'left_corner_3' },
-      { made: false, zone: 'left_corner_3' },
-    ])
-    expect(s).toEqual({ made: 3, total: 5, pct: 60, bestZone: { zone: 'paint', made: 2, total: 2 } })
+  const zone = (z: string, madeOf: boolean[]) => madeOf.map((made) => ({ made, zone: z }))
+
+  it('counts makes and finds the best zone with at least MIN_SHOTS_FOR_BEST_ZONE shots', () => {
+    expect(MIN_SHOTS_FOR_BEST_ZONE).toBe(3)
+    const s = summarizeFilm([...zone('paint', [true, true, false]), ...zone('top_3', [false]), ...zone('left_corner_3', [true, false])])
+    expect(s).toEqual({ made: 3, total: 6, pct: 50, bestZone: { zone: 'paint', made: 2, total: 3 } })
+  })
+
+  it('does not call a zone with fewer shots than the minimum the best, however well it went', () => {
+    const s = summarizeFilm([...zone('paint', [true, true]), ...zone('top_3', [true, false, false])])
+    expect(s.bestZone).toEqual({ zone: 'top_3', made: 1, total: 3 })
+    expect(summarizeFilm(zone('paint', [true, true])).bestZone).toBeNull()
   })
 
   it('has no best zone when every zone has one shot, and no percentage without shots', () => {
@@ -168,13 +180,7 @@ describe('summarizeFilm', () => {
   })
 
   it('breaks a tie on percentage by the zone with more shots', () => {
-    const s = summarizeFilm([
-      { made: true, zone: 'a' },
-      { made: true, zone: 'a' },
-      { made: true, zone: 'b' },
-      { made: true, zone: 'b' },
-      { made: true, zone: 'b' },
-    ])
+    const s = summarizeFilm([...zone('a', [true, true, true]), ...zone('b', [true, true, true, true])])
     expect(s.bestZone?.zone).toBe('b')
   })
 })

@@ -6,7 +6,7 @@ import { latestIndices, summarizeFilm } from './court/film'
 import type { FilmSummary } from './court/film'
 import { LEAGUE, benchZonePct } from './court/nba'
 import { FilmHud, FilmSummaryCard } from './FilmHud'
-import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneStats } from './court/stats'
+import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneShare, zoneStats } from './court/stats'
 import { lastName } from './court/players'
 import ShooterSelect from './ShooterSelect'
 import type { HexCell, Typical } from './court/stats'
@@ -27,6 +27,8 @@ interface Props {
   /** Everyone in the log, and whose shots to show ('' = everyone). The choice lives in App. */
   player: string
   onPlayerChange: (player: string) => void
+  /** Whether the log tab is showing. ShotMap stays mounted when it is hidden, and the film must not. */
+  visible: boolean
 }
 
 interface Hover {
@@ -103,7 +105,7 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
@@ -277,15 +279,29 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
     setFilmDone(null)
   }, [])
   const filmShot = film && film.index !== null ? filtered[film.index] : undefined
-  const filmZone = filmShot ? zones.find((z) => z.zone === filmShot.zone) : undefined
+  // The shooter's record from the shot's zone: the player filter applies, the Area and Result chips do not.
+  const shooterShots = useMemo(() => applyFilters(shots ?? [], { area: 'all', result: 'all', player: activePlayer }), [shots, activePlayer])
+  const filmZone = filmShot ? zoneShare(shooterShots, filmShot.zone) : null
   const watchLabel = selectedIndex >= 0 ? 'Watch shot' : 'Watch session'
 
   // While a film plays or its card is open the keyboard drives it: Space pauses, the arrows change
   // shot, Escape closes. Registered in the capture phase so the app's own Escape (close the drawer,
   // deselect) does not also fire.
   const filmOpen = film !== null || filmDone !== null
+  // Leaving the log tab ends the film: nothing is drawn there and its keys must not be swallowed.
+  const [wasVisible, setWasVisible] = useState(visible)
+  if (wasVisible !== visible) {
+    setWasVisible(visible)
+    if (!visible) {
+      setFilm(null)
+      setFilmDone(null)
+    }
+  }
   useEffect(() => {
-    if (!filmOpen) return
+    if (!visible) sceneRef.current?.stopFilm()
+  }, [visible])
+  useEffect(() => {
+    if (!filmOpen || !visible) return
     const onKey = (e: KeyboardEvent) => {
       const scene = sceneRef.current
       const target = e.target as HTMLElement | null
@@ -304,7 +320,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [filmOpen, film, closeFilm])
+  }, [filmOpen, visible, film, closeFilm])
   const loading = shots === null
   const label = loading
     ? loadError
@@ -438,7 +454,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                 <FilmHud
                   state={film}
                   shot={filmShot}
-                  zone={filmZone && filmZone.attempts >= 2 ? { pct: filmZone.pct, made: filmZone.made, attempts: filmZone.attempts } : null}
+                  zone={filmZone}
                   nbaPct={filmShot ? benchZonePct(filmShot.zone, LEAGUE) : null}
                   results={filmResults}
                   onPause={(paused) => sceneRef.current?.pauseFilm(paused)}

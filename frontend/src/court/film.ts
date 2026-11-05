@@ -206,12 +206,15 @@ export function latestIndices(items: { game_date: string; id: number }[], max = 
     .map((e) => e.i)
 }
 
+/** A zone needs this many shots in a film before the summary calls it the best. */
+export const MIN_SHOTS_FOR_BEST_ZONE = 3
+
 export interface FilmSummary {
   made: number
   total: number
   /** Whole-number percent, or null when there are no shots. */
   pct: number | null
-  /** The zone with the best percentage among zones with at least 2 shots (ties: more shots); null if none. */
+  /** The zone with the best percentage among zones with at least MIN_SHOTS_FOR_BEST_ZONE shots (ties: more shots); null if none. */
   bestZone: { zone: string; made: number; total: number } | null
 }
 
@@ -226,7 +229,7 @@ export function summarizeFilm(shots: { made: boolean; zone: string }[]): FilmSum
   }
   let best: FilmSummary['bestZone'] = null
   for (const [zone, z] of zones) {
-    if (z.total < 2) continue
+    if (z.total < MIN_SHOTS_FOR_BEST_ZONE) continue
     const better = !best || z.made / z.total > best.made / best.total || (z.made / z.total === best.made / best.total && z.total > best.total)
     if (better) best = { zone, made: z.made, total: z.total }
   }

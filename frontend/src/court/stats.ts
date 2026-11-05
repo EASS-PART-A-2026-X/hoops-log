@@ -117,6 +117,22 @@ export function zoneStats(shots: MapShot[]): ZoneStat[] {
     .sort((a, b) => b.attempts - a.attempts || b.made - a.made || a.zone.localeCompare(b.zone))
 }
 
+/**
+ * How a shooter did from one zone: pass all of the shooter's shots (the player filter applies, the
+ * area and result chips must not). Null when there is no shot from that zone.
+ */
+export function zoneShare(shots: MapShot[], zone: string): { pct: number; made: number; attempts: number } | null {
+  let made = 0
+  let attempts = 0
+  for (const s of shots) {
+    if (s.zone !== zone) continue
+    attempts += 1
+    made += s.made ? 1 : 0
+  }
+  if (attempts === 0) return null
+  return { pct: pct(made, attempts) ?? 0, made, attempts }
+}
+
 /** Best field-goal percentage among zones with enough attempts to mean something. */
 export function hottestZone(zones: ZoneStat[], minAttempts = 3): ZoneStat | null {
   const eligible = zones.filter((z) => z.attempts >= minAttempts)

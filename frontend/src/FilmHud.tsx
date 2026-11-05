@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react'
 import type { Shot } from './api'
 import type { FilmState } from './court/CourtScene'
 import type { FilmSummary } from './court/film'
+import { SMALL_SAMPLE } from './court/nba'
 import { zoneLabel } from './court/stats'
 
 interface HudProps {
   state: FilmState
   /** The shot on screen, or undefined while the film changes shot. */
   shot: Shot | undefined
-  /** The shown shooter's percentage from this shot's zone, if there are enough shots there to say. */
+  /** The shown shooter's record from this shot's zone. The percentage and the league figure show only from SMALL_SAMPLE attempts. */
   zone: { pct: number; made: number; attempts: number } | null
   /** The league's percentage from the same zone. */
   nbaPct: number | null
@@ -40,8 +41,16 @@ export function FilmHud({ state, shot, zone, nbaPct, results, onPause, onStep, o
             </span>
             {zone && (
               <span className="film-stat">
-                {zone.pct}% from here ({zone.made} of {zone.attempts})
-                {nbaPct !== null && <> · NBA {nbaPct}%</>}
+                {zone.attempts >= SMALL_SAMPLE ? (
+                  <>
+                    {zone.pct}% from here ({zone.made} of {zone.attempts})
+                    {nbaPct !== null && <> · NBA {nbaPct}%</>}
+                  </>
+                ) : (
+                  <>
+                    {zone.made} of {zone.attempts} from here
+                  </>
+                )}
               </span>
             )}
           </div>
