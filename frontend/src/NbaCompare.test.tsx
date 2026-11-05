@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { Shot } from './api'
 import NbaCompare from './NbaCompare'
 
@@ -29,7 +30,9 @@ const SHOTS: Shot[] = [...many(6, 'restricted_area', true), ...many(6, 'mid_rang
 
 const CURRY = 201939
 
-const renderCompare = (shots: Shot[] | null, benchmarkId: number | null = null, shooter = 'Yuly') =>
+// The face-off plays by itself the first time a pair is compared. These tests are about the page, so
+// by default the pair counts as already seen; the face-off tests below say otherwise.
+const renderCompare = (shots: Shot[] | null, benchmarkId: number | null = null, shooter = 'Yuly', faceOffSeen?: string[], onFaceOffSeen = vi.fn()) =>
   render(
     <NbaCompare
       shots={shots}
@@ -38,6 +41,8 @@ const renderCompare = (shots: Shot[] | null, benchmarkId: number | null = null, 
       benchmarkId={benchmarkId}
       onBenchmark={vi.fn()}
       onBrowse={vi.fn()}
+      faceOffSeen={faceOffSeen ?? [`${shooter}|${benchmarkId}`]}
+      onFaceOffSeen={onFaceOffSeen}
     />,
   )
 
@@ -125,5 +130,71 @@ describe('NbaCompare without shots', () => {
     renderCompare([make('paint', true)])
     expect(screen.getByText('Not enough shots yet to say who is ahead.')).toBeTruthy()
     expect(screen.getByRole('img', { name: 'Areas led: Yuly 0, NBA average 0' })).toBeTruthy()
+  })
+})
+
+describe('the face-off', () => {
+  const faceOff = () => screen.queryByRole('dialog', { name: /Face-off/ })
+
+  it('plays by itself the first time a player is compared, with both names and the verdict', () => {
+    renderCompare(SHOTS, CURRY, 'Yuly', [])
+    const dialog = faceOff()
+    expect(dialog).toBeTruthy()
+    expect(dialog?.getAttribute('aria-label')).toBe('Face-off: Yuly against Stephen Curry')
+    expect(within(dialog!).getByRole('status').textContent).toMatch(/Stephen Curry|Yuly/)
+    expect(within(dialog!).getByRole('button', { name: 'See the full comparison' })).toBeTruthy()
+  })
+
+  it('does not play against the league average, which has no card to show', () => {
+    renderCompare(SHOTS, null, 'Yuly', [])
+    expect(faceOff()).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Face-off' })).toBeNull()
+  })
+
+  it('does not play again for a pair it has already played', () => {
+    renderCompare(SHOTS, CURRY, 'Yuly', [`Yuly|${CURRY}`])
+    expect(faceOff()).toBeNull()
+  })
+
+  it('does not play with no shots to compare', () => {
+    renderCompare([], CURRY, 'Yuly', [])
+    expect(faceOff()).toBeNull()
+  })
+
+  it('does not play by itself when the person asked for less motion, but the Face-off button still shows it', async () => {
+    const user = userEvent.setup()
+    const original = window.matchMedia
+    window.matchMedia = ((query: string) => ({ matches: query.includes('reduce'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia
+    try {
+      renderCompare(SHOTS, CURRY, 'Yuly', [])
+      expect(faceOff()).toBeNull()
+      await user.click(screen.getByRole('button', { name: 'Face-off' }))
+      expect(faceOff()).toBeTruthy()
+    } finally {
+      window.matchMedia = original
+    }
+  })
+
+  it('reports the pair as seen when it is closed, with the button or with Escape', async () => {
+    const user = userEvent.setup()
+    const onSeen = vi.fn()
+    renderCompare(SHOTS, CURRY, 'Yuly', [], onSeen)
+    await user.click(screen.getByRole('button', { name: 'See the full comparison' }))
+    expect(onSeen).toHaveBeenLastCalledWith(`Yuly|${CURRY}`)
+    cleanup()
+    const onSeen2 = vi.fn()
+    renderCompare(SHOTS, CURRY, 'Yuly', [], onSeen2)
+    await user.keyboard('{Escape}')
+    expect(onSeen2).toHaveBeenLastCalledWith(`Yuly|${CURRY}`)
+  })
+
+  it('can be opened again from the Face-off button even after it was seen, and closes again', async () => {
+    const user = userEvent.setup()
+    renderCompare(SHOTS, CURRY, 'Yuly')
+    expect(faceOff()).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Face-off' }))
+    expect(faceOff()).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'See the full comparison' }))
+    expect(faceOff()).toBeNull()
   })
 })

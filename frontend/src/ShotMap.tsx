@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BACKEND_URL } from './api'
 import type { Shot } from './api'
-import type { CourtScene, MapMode, ViewName } from './court/CourtScene'
-import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneStats } from './court/stats'
+import type { CourtScene, FilmState, MapMode, ViewName } from './court/CourtScene'
+import { latestIndices, summarizeFilm } from './court/film'
+import type { FilmSummary } from './court/film'
+import { LEAGUE, benchZonePct } from './court/nba'
+import { FilmHud, FilmSummaryCard } from './FilmHud'
+import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneShare, zoneStats } from './court/stats'
 import { lastName } from './court/players'
 import ShooterSelect from './ShooterSelect'
 import type { HexCell, Typical } from './court/stats'
@@ -23,6 +27,8 @@ interface Props {
   /** Everyone in the log, and whose shots to show ('' = everyone). The choice lives in App. */
   player: string
   onPlayerChange: (player: string) => void
+  /** Whether the log tab is showing. ShotMap stays mounted when it is hidden, and the film must not. */
+  visible: boolean
 }
 
 interface Hover {
@@ -99,7 +105,7 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
@@ -111,6 +117,11 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const [failed, setFailed] = useState<'start' | 'lost' | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [cellHover, setCellHover] = useState<CellHover | null>(null)
+  // The shot film: what it is doing now, the shots it plays, and the card shown after it.
+  const [film, setFilm] = useState<FilmState | null>(null)
+  const [filmDone, setFilmDone] = useState<{ summary: FilmSummary; bestZoneName: string | null } | null>(null)
+  const filmShots = useRef<Shot[]>([])
+  const [filmResults, setFilmResults] = useState<boolean[]>([]) // made or missed, for the strip beside the controls
 
   const hostRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<CourtScene | null>(null)
@@ -171,6 +182,14 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               onSelectRef.current(shot ? shot.id : null)
             },
             onFail: () => fail('lost'),
+            onFilm: (state) => {
+              setFilm(state.active ? state : null)
+              // A single shot needs no summary; a session gets one.
+              if (state.finished && filmShots.current.length > 1) {
+                const summary = summarizeFilm(filmShots.current)
+                setFilmDone({ summary, bestZoneName: summary.bestZone ? zoneLabel(summary.bestZone.zone) : null })
+              }
+            },
           })
           sceneRef.current = scene
           if (import.meta.env.DEV) (window as unknown as { __court?: CourtScene }).__court = scene
@@ -238,6 +257,70 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
     setArea('all')
     setResult('all')
   }
+  // Watch the selected shot, or if none is selected the latest shots of the session.
+  const watch = () => {
+    const scene = sceneRef.current
+    if (!scene || filtered.length === 0) return
+    setFilmDone(null)
+    if (selectedIndex >= 0) {
+      filmShots.current = [filtered[selectedIndex]!]
+      setFilmResults([filtered[selectedIndex]!.made])
+      scene.startFilm([selectedIndex], 'shot')
+    } else {
+      const indices = latestIndices(filtered)
+      filmShots.current = indices.map((i) => filtered[i]!)
+      setFilmResults(filmShots.current.map((s) => s.made))
+      scene.startFilm(indices, 'session')
+    }
+  }
+  const closeFilm = useCallback(() => {
+    sceneRef.current?.stopFilm()
+    setFilm(null)
+    setFilmDone(null)
+  }, [])
+  const filmShot = film && film.index !== null ? filtered[film.index] : undefined
+  // The shooter's record from the shot's zone: the player filter applies, the Area and Result chips do not.
+  const shooterShots = useMemo(() => applyFilters(shots ?? [], { area: 'all', result: 'all', player: activePlayer }), [shots, activePlayer])
+  const filmZone = filmShot ? zoneShare(shooterShots, filmShot.zone) : null
+  const watchLabel = selectedIndex >= 0 ? 'Watch shot' : 'Watch session'
+
+  // While a film plays or its card is open the keyboard drives it: Space pauses, the arrows change
+  // shot, Escape closes. Registered in the capture phase so the app's own Escape (close the drawer,
+  // deselect) does not also fire.
+  const filmOpen = film !== null || filmDone !== null
+  // Leaving the log tab ends the film: nothing is drawn there and its keys must not be swallowed.
+  const [wasVisible, setWasVisible] = useState(visible)
+  if (wasVisible !== visible) {
+    setWasVisible(visible)
+    if (!visible) {
+      setFilm(null)
+      setFilmDone(null)
+    }
+  }
+  useEffect(() => {
+    if (!visible) sceneRef.current?.stopFilm()
+  }, [visible])
+  useEffect(() => {
+    if (!filmOpen || !visible) return
+    const onKey = (e: KeyboardEvent) => {
+      const scene = sceneRef.current
+      const target = e.target as HTMLElement | null
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return
+      if (e.key === 'Escape') {
+        closeFilm()
+      } else if (film && e.key === ' ') {
+        scene?.pauseFilm(!film.paused)
+      } else if (film && e.key === 'ArrowRight') {
+        scene?.stepFilm(1)
+      } else if (film && e.key === 'ArrowLeft') {
+        scene?.stepFilm(-1)
+      } else return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [filmOpen, visible, film, closeFilm])
   const loading = shots === null
   const label = loading
     ? loadError
@@ -302,7 +385,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               <img src={chartUrl} alt={`Shot chart: green circles are made shots, red crosses are misses.`} />
             </div>
           ) : (
-            <div className={cellHover && mode === 'heat' ? 'stage-frame cell-hover' : 'stage-frame'}>
+            <div className={`stage-frame${cellHover && mode === 'heat' ? ' cell-hover' : ''}${film ? ' film-on' : ''}`}>
               <div ref={hostRef} className="stage-canvas" role="img" aria-label={label} />
               {!shots && loadError ? (
                 <div className="stage-msg stage-msg-error" role="alert">
@@ -347,6 +430,9 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               </p>
             {/* Not a choice between options: one action and two on/off switches, so they look different. */}
             <div className="tools" role="group" aria-label="Tools">
+              <button type="button" className="tool film-start" onClick={watch} disabled={!ready || filtered.length === 0}>
+                ▶ {watchLabel}
+              </button>
               <button
                 type="button"
                 className="tool"
@@ -364,6 +450,29 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                 Arena
               </button>
             </div>
+              {film && (
+                <FilmHud
+                  state={film}
+                  shot={filmShot}
+                  zone={filmZone}
+                  nbaPct={filmShot ? benchZonePct(filmShot.zone, LEAGUE) : null}
+                  results={filmResults}
+                  onPause={(paused) => sceneRef.current?.pauseFilm(paused)}
+                  onStep={(delta) => sceneRef.current?.stepFilm(delta)}
+                  onClose={closeFilm}
+                />
+              )}
+              {filmDone && !film && (
+                <FilmSummaryCard
+                  summary={filmDone.summary}
+                  bestZoneName={filmDone.bestZoneName}
+                  onAgain={() => {
+                    setFilmDone(null)
+                    sceneRef.current?.restartFilm()
+                  }}
+                  onClose={closeFilm}
+                />
+              )}
               <ul className="legend" aria-hidden="true">
                 {mode === 'heat' ? (
                   <>

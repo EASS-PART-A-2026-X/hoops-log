@@ -3,7 +3,10 @@ import type { Shot } from './api'
 import { MIN_SHOTS_FOR_MATCH, compareOverall, rankPlayers } from './court/nba'
 import { PLAYERS, TEAMS, headshotUrl, initials, logoUrl } from './court/players'
 import type { Player } from './court/players'
+import { shooterProfile } from './court/cardData'
+import CardDialog from './CardDialog'
 import FallbackImage from './FallbackImage'
+import ShotCard from './ShotCard'
 
 interface Mine {
   fg: number | null
@@ -108,6 +111,7 @@ interface Props {
 
 export default function PlayersPage({ shots, shooter, shooterPicker, benchmarkId, onCompare }: Props) {
   const [team, setTeam] = useState('')
+  const [cardOpen, setCardOpen] = useState(false)
   const teamKeys = [...new Set(PLAYERS.map((p) => p.team))]
   const ranking = useMemo(() => rankPlayers(shots ?? []), [shots])
   const scoreOf = (id: number) => ranking?.find((m) => m.player.id === id)?.score ?? null
@@ -115,6 +119,8 @@ export default function PlayersPage({ shots, shooter, shooterPicker, benchmarkId
   const shown = team ? list.filter((p) => p.team === team) : list
   const top = ranking?.[0]
   const whose = shooter ? `${shooter}'s` : "the whole log's"
+  // Your card: the chosen shooter's shots, as a trading card.
+  const myCard = useMemo(() => (shots && shots.length > 0 ? shooterProfile(shooter, shots) : null), [shots, shooter])
   const mine = useMemo<Mine | null>(() => {
     if (!shots || shots.length === 0) return null
     const [fg, three] = compareOverall(shots)
@@ -156,10 +162,19 @@ export default function PlayersPage({ shots, shooter, shooterPicker, benchmarkId
         )}
       </p>
       <ul className="players">
+        {myCard && (
+          <li className="player-you" onClick={() => setCardOpen(true)}>
+            <ShotCard profile={myCard} size="tile" />
+            <button type="button" className="card-open" onClick={(e) => { e.stopPropagation(); setCardOpen(true) }}>
+              <span className="sr-only">Open {myCard.name}'s shot card at full size</span>
+            </button>
+          </li>
+        )}
         {shown.map((p) => (
           <Card key={p.id} player={p} score={scoreOf(p.id)} best={top?.player.id === p.id} benchmark={benchmarkId === p.id} mine={mine} onCompare={onCompare} />
         ))}
       </ul>
+      {cardOpen && myCard && <CardDialog profile={myCard} onClose={() => setCardOpen(false)} />}
     </section>
   )
 }

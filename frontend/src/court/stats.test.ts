@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyFilters, hexBins, summarize, zoneStats } from './stats'
+import { applyFilters, hexBins, summarize, zoneShare, zoneStats } from './stats'
 import type { Filters, MapShot, Typical } from './stats'
 
 let nextId = 1
@@ -220,5 +220,32 @@ describe('hexBins', () => {
       baseline,
     ).cells
     expect(cell.expectedPct).toBe(40)
+  })
+})
+
+describe('zoneShare', () => {
+  const mine = [
+    shot({ zone: 'paint', made: true }),
+    shot({ zone: 'paint', made: false }),
+    shot({ zone: 'paint', made: false }),
+    shot({ zone: 'paint', made: true }),
+    shot({ zone: 'top_3', made: true }),
+  ]
+
+  it('is the made, attempts and whole-number percent from that zone only', () => {
+    expect(zoneShare(mine, 'paint')).toEqual({ pct: 50, made: 2, attempts: 4 })
+    expect(zoneShare(mine, 'top_3')).toEqual({ pct: 100, made: 1, attempts: 1 })
+  })
+
+  it('is null for a zone with no shots', () => {
+    expect(zoneShare(mine, 'mid_range')).toBeNull()
+    expect(zoneShare([], 'paint')).toBeNull()
+  })
+
+  it('is given the shooter\'s shots, so the Result and Area chips do not change it', () => {
+    // The chips filter what the map shows; the lower third uses the unfiltered list.
+    const shown = applyFilters(mine, { area: 'all', result: 'missed', player: '' })
+    expect(zoneShare(shown, 'paint')?.pct).toBe(0) // what the filtered list would wrongly say
+    expect(zoneShare(applyFilters(mine, { area: 'all', result: 'all', player: '' }), 'paint')).toEqual({ pct: 50, made: 2, attempts: 4 })
   })
 })
