@@ -15,7 +15,20 @@ describe('effectiveFg and shootingRating', () => {
 
   it('rates the league average shooter 70 and moves about 3 points per point of effective percentage', () => {
     expect(shootingRating(47, 36.5, 40)).toBe(70)
-    expect(shootingRating(47, 36.5, 40) + 3).toBeLessThanOrEqual(shootingRating(48, 36.5, 40) + 1)
+    // 70 + 3.2 * (effective % - 54.3), rounded
+    expect(shootingRating(48, 36.5, 40)).toBe(73) // +1 point of fg: 73.2
+    expect(shootingRating(50, 36.5, 40)).toBe(80) // 79.6
+    expect(shootingRating(40, 36.5, 40)).toBe(48) // 47.6
+    expect(shootingRating(47, 46.5, 40)).toBe(76) // +10 three-point points at a 40% share: 76.4
+    expect(shootingRating(47, 36.5, 60)).toBe(82) // a 60% share of threes: 81.7
+  })
+
+  it('never rates lower for a higher field goal, three-point percentage or share of threes', () => {
+    for (let v = 30; v < 70; v += 1) {
+      expect(shootingRating(v + 1, 35, 40)).toBeGreaterThanOrEqual(shootingRating(v, 35, 40))
+      expect(shootingRating(47, v + 1, 40)).toBeGreaterThanOrEqual(shootingRating(47, v, 40))
+      expect(shootingRating(47, 35, v + 1)).toBeGreaterThanOrEqual(shootingRating(47, 35, v))
+    }
     expect(shootingRating(55, 40, 40)).toBeGreaterThan(shootingRating(47, 36.5, 40))
   })
 

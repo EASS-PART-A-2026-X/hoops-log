@@ -163,9 +163,10 @@ export default function PlayersPage({ shots, shooter, shooterPicker, benchmarkId
       </p>
       <ul className="players">
         {myCard && (
-          <li className="player-you">
-            <button type="button" className="card-open" onClick={() => setCardOpen(true)} aria-label={`Open ${myCard.name}'s shot card at full size`}>
-              <ShotCard profile={myCard} size="tile" />
+          <li className="player-you" onClick={() => setCardOpen(true)}>
+            <ShotCard profile={myCard} size="tile" />
+            <button type="button" className="card-open" onClick={(e) => { e.stopPropagation(); setCardOpen(true) }}>
+              <span className="sr-only">Open {myCard.name}'s shot card at full size</span>
             </button>
           </li>
         )}

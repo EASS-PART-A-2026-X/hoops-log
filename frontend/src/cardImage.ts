@@ -4,6 +4,7 @@ import { initials } from './court/players'
 
 const W = 600
 const H = 840
+const FONT_FACES = ['700 64px "Barlow Condensed"', '500 24px "Barlow"', '600 22px "Barlow"', '700 40px "Barlow Condensed"']
 
 /** Rounded rectangle path (the canvas has roundRect, but older browsers do not). */
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -21,9 +22,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
  * the page's card shows a photo from another site, and a canvas that has drawn one cannot be saved.
  */
 export async function drawCard(profile: CardProfile): Promise<HTMLCanvasElement> {
-  // Wait for the display font, or the first download would use a fallback face.
+  // Wait for every face the picture uses, or the first download would use a fallback face.
   try {
-    await document.fonts.load('700 64px "Barlow Condensed"')
+    await Promise.all(FONT_FACES.map((face) => document.fonts.load(face)))
   } catch {
     // no font loading: the fallback face is fine
   }
@@ -144,8 +145,9 @@ export async function drawCard(profile: CardProfile): Promise<HTMLCanvasElement>
   return canvas
 }
 
-function fileName(profile: CardProfile): string {
-  const slug = profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card'
+/** The download's file name: the name's letters and digits (any script) joined by dashes. */
+export function cardFileName(name: string): string {
+  const slug = name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 60).replace(/-$/, '') || 'card'
   return `hoops-log-card-${slug}.png`
 }
 
@@ -157,7 +159,7 @@ export async function downloadCard(profile: CardProfile): Promise<void> {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = fileName(profile)
+  a.download = cardFileName(profile.name)
   document.body.appendChild(a)
   a.click()
   a.remove()

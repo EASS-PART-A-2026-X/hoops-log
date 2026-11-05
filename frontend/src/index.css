@@ -2454,19 +2454,20 @@ h3 {
 
 /* Your card in the Players grid, and the full-size view */
 .player-you {
+  position: relative;
   display: flex;
+  cursor: pointer;
 }
 
+/* An invisible button laid over the card for keyboard and screen reader users. Mouse and touch go through to the card (the tile opens on click), so the card still tilts under the pointer. */
 .card-open {
-  display: block;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   padding: 0;
-  font: inherit;
-  text-align: left;
   background: none;
   border: 0;
   border-radius: 1.6em;
-  cursor: pointer;
+  pointer-events: none;
 }
 
 .card-open:focus-visible {

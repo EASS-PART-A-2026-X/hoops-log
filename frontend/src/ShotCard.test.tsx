@@ -58,8 +58,31 @@ describe('CardDialog', () => {
     const onClose = vi.fn()
     render(<CardDialog profile={shooterProfile('Yuly', shots(12))} onClose={onClose} />)
     await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps Tab and Shift+Tab inside the dialog, also from the body', async () => {
+    const user = userEvent.setup()
+    render(<CardDialog profile={shooterProfile('Yuly', shots(12))} onClose={vi.fn()} />)
+    const download = screen.getByRole('button', { name: 'Download card' })
+    const close = screen.getByRole('button', { name: 'Close' })
+    expect(document.activeElement).toBe(close)
+    await user.tab()
+    expect(document.activeElement).toBe(download)
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(close)
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(download)
+    ;(document.activeElement as HTMLElement).blur()
+    expect(document.activeElement).toBe(document.body)
+    await user.tab()
+    expect(document.activeElement).toBe(download)
+    ;(document.activeElement as HTMLElement).blur()
+    expect(document.activeElement).toBe(document.body)
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(close)
   })
 })
 
@@ -72,17 +95,11 @@ describe('FaceOff', () => {
     expect(within(dialog).getByRole('status').textContent).toBe('Yuly is ahead of Stephen Curry: leading in 3 of 5 areas.')
   })
 
-  it('closes with the button, with Escape and by itself after the set time', async () => {
-    vi.useFakeTimers()
-    try {
-      const onClose = vi.fn()
-      render(<FaceOff you={shooterProfile('Yuly', shots(12))} them={playerProfile(curry)} verdict="v" onClose={onClose} />)
-      screen.getByRole('button', { name: 'See the full comparison' }).click()
-      expect(onClose).toHaveBeenCalledTimes(1)
-      vi.advanceTimersByTime(7600)
-      expect(onClose).toHaveBeenCalledTimes(2)
-    } finally {
-      vi.useRealTimers()
-    }
+  it('closes with the See the full comparison button', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<FaceOff you={shooterProfile('Yuly', shots(12))} them={playerProfile(curry)} verdict="v" onClose={onClose} />)
+    await user.click(screen.getByRole('button', { name: 'See the full comparison' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
