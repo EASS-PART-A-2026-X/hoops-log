@@ -4,7 +4,7 @@ import FallbackImage from './FallbackImage'
 import { LEAGUE, SMALL_SAMPLE, benchmarkOf, compareOverall, compareZones } from './court/nba'
 import type { ZoneCompare } from './court/nba'
 import { PLAYERS, TEAMS, headshotUrl, initials, lastName } from './court/players'
-import { describeTally, gapPts, sideOf, tally } from './court/verdict'
+import { describeTally, gapPts, judge, sideOf, tally } from './court/verdict'
 import type { Side } from './court/verdict'
 import PlayerPicker from './PlayerPicker'
 
@@ -20,8 +20,8 @@ interface Props {
 
 const fmt = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-/** Who leads in a zone. Zones with only a few shots are shown but not judged, so they do not count towards the score. */
-const zoneSideOf = (z: ZoneCompare): Side | null => (z.attempts >= SMALL_SAMPLE ? sideOf(z.mine, z.nba) : null)
+/** Who leads in a zone; null below the minimum number of shots (see `judge`). */
+const zoneSideOf = (z: ZoneCompare): Side | null => judge(z.mine, z.nba, z.attempts)
 
 /** Who is ahead, as a coloured pill: orange for the shooter, blue for the other side. */
 function Lead({ side, mineName, theirName, mine, theirs }: { side: Side | null; mineName: string; theirName: string; mine: number | null; theirs: number }) {
@@ -73,15 +73,10 @@ export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId,
   const theirShort = player ? lastName(player.name) : 'NBA'
 
   const [fg, three, share] = overall
-  const score = useMemo(
-    () =>
-      tally([
-        sideOf(fg?.mine ?? null, fg?.nba ?? 0),
-        (three?.attempts ?? 0) > 0 ? sideOf(three?.mine ?? null, three?.nba ?? 0) : null,
-        ...zones.map(zoneSideOf),
-      ]),
-    [fg, three, zones],
-  )
+  const score = useMemo(() => {
+    const areas = [fg, three].map((o) => (o ? judge(o.mine, o.nba, o.attempts) : null))
+    return tally([...areas, ...zones.map(zoneSideOf)])
+  }, [fg, three, zones])
 
   return (
     <section aria-labelledby="nba-title">
@@ -146,8 +141,8 @@ export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId,
           </div>
           <p className="vs-verdict">{describeTally(mineName, theirName, score)}</p>
           <p className="nba-note">
-            Orange is {mineName}, blue is {theirName}; the pill says who leads and by how many points. {theirName === 'NBA average' ? 'NBA numbers are' : `${player?.name}'s numbers are`} rounded figures from recent seasons.
-            {player && ' Zone numbers for a player are estimates: the league zone figures scaled by how he shoots overall.'} Zones with fewer than {SMALL_SAMPLE} shots do not count towards the score.
+            Orange is {mineName}, blue is {theirName}; the pill says who leads and by how many points. {player ? `${player.name}'s numbers are` : 'NBA numbers are'} rounded figures from recent seasons.
+            {player && ' Zone numbers for a player are estimates: the league zone figures scaled by how he shoots overall.'} Counted: field goal, three point and each zone, when at least {SMALL_SAMPLE} shots; these areas overlap, a zone's shots are also in the field goal.
           </p>
 
           <div className="nba-vs">
@@ -156,9 +151,9 @@ export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId,
                 <div className="vs-card" key={o.label}>
                   <div className="vs-card-head">
                     <span className="kpi-label">{o.label.toUpperCase()}</span>
-                    <Lead side={sideOf(o.mine, o.nba)} mineName={mineName} theirName={theirShort} mine={o.mine} theirs={o.nba} />
+                    <Lead side={judge(o.mine, o.nba, o.attempts)} mineName={mineName} theirName={theirShort} mine={o.mine} theirs={o.nba} />
                   </div>
-                  <Bars mineName={mineName} theirName={theirShort} mine={o.mine} theirs={o.nba} side={sideOf(o.mine, o.nba)} />
+                  <Bars mineName={mineName} theirName={theirShort} mine={o.mine} theirs={o.nba} side={judge(o.mine, o.nba, o.attempts)} />
                   <span className="vs-foot">{o.attempts} {o.attempts === 1 ? 'shot' : 'shots'} taken</span>
                 </div>
               ) : null,

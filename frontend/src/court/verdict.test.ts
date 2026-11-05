@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LEVEL_PTS, describeTally, gapPts, sideOf, tally } from './verdict'
+import { SMALL_SAMPLE } from './nba'
+import { LEVEL_PTS, describeTally, gapPts, judge, sideOf, tally } from './verdict'
 
 describe('sideOf', () => {
   it('says who has the higher percentage', () => {
@@ -46,12 +47,50 @@ describe('describeTally', () => {
 
   it('says level when each side leads equally', () => {
     expect(describeTally('Yuly', 'NBA average', { you: 2, them: 2, ties: 0 })).toBe(
-      'Yuly and NBA average are level: 2 areas each out of 4 areas.',
+      'Yuly and NBA average are level: each leads in 2 areas.',
     )
+  })
+
+  it('says level in every area when all areas are ties', () => {
+    expect(describeTally('Yuly', 'Curry', { you: 0, them: 0, ties: 3 })).toBe('Yuly and Curry are level in all 3 areas.')
+    expect(describeTally('Yuly', 'Curry', { you: 0, them: 0, ties: 1 })).toBe('Yuly and Curry are level in the one area.')
+  })
+
+  it('reports equal leads together with ties', () => {
+    expect(describeTally('Yuly', 'Curry', { you: 2, them: 2, ties: 1 })).toBe(
+      'Yuly and Curry are level: each leads in 2 areas, level in 1 area.',
+    )
+    expect(describeTally('Yuly', 'Curry', { you: 2, them: 2, ties: 3 })).toBe(
+      'Yuly and Curry are level: each leads in 2 areas, level in 3 areas.',
+    )
+  })
+
+  it('uses the singular for a 1 against 1', () => {
+    expect(describeTally('Yuly', 'Curry', { you: 1, them: 1, ties: 0 })).toBe('Yuly and Curry are level: each leads in 1 area.')
   })
 
   it('says so when nothing could be judged, and uses the singular for one area', () => {
     expect(describeTally('Yuly', 'Curry', { you: 0, them: 0, ties: 0 })).toBe('Not enough shots yet to say who is ahead.')
     expect(describeTally('Yuly', 'Curry', { you: 1, them: 0, ties: 0 })).toBe('Yuly is ahead of Curry: leading in 1 of 1 area.')
+  })
+})
+
+describe('judge', () => {
+  it('judges like sideOf once there are enough shots', () => {
+    expect(judge(55, 47, SMALL_SAMPLE)).toBe('you')
+    expect(judge(40, 47, 20)).toBe('them')
+    expect(judge(47.2, 47, 10)).toBe('tie')
+  })
+
+  it('cannot judge below the minimum number of shots, however big the gap', () => {
+    expect(judge(100, 47, SMALL_SAMPLE - 1)).toBeNull()
+    expect(judge(0, 47, 1)).toBeNull()
+    expect(judge(0, 47, 0)).toBeNull()
+  })
+
+  it('cannot judge without a percentage, and takes a custom minimum', () => {
+    expect(judge(null, 47, 50)).toBeNull()
+    expect(judge(60, 47, 2, 2)).toBe('you')
+    expect(judge(60, 47, 1, 2)).toBeNull()
   })
 })
