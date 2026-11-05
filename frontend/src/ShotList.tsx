@@ -40,7 +40,11 @@ function Row({
   }
 
   return (
-    <li className={selected ? 'shot selected' : 'shot'} id={`shot-${shot.id}`} aria-current={selected || undefined}>
+    <li
+      className={`shot ${shot.made ? 'made' : 'missed'}${selected ? ' selected' : ''}`}
+      id={`shot-${shot.id}`}
+      aria-current={selected || undefined}
+    >
       <span className={shot.made ? 'mark made' : 'mark missed'} aria-hidden="true">
         {shot.made ? '●' : '✕'}
       </span>
@@ -48,10 +52,11 @@ function Row({
         <div className="shot-title">
           {/* React renders text as text, so a name like <b>x</b> shows literally. */}
           <strong>{shot.player}</strong>
-          <span className="sr-only">{shot.made ? ' made' : ' missed'}</span>
+          <span className={shot.made ? 'result made' : 'result missed'}>{shot.made ? 'Made' : 'Missed'}</span>
           <span className={shot.shot_type === '3PT' ? 'badge three' : 'badge'}>
             {shot.shot_type}
           </span>
+          <span className="shot-id">#{shot.id}</span>
         </div>
         <div className="shot-meta">
           {shot.game_date} · {zoneLabel(shot.zone)} · ({shot.x}, {shot.y})
