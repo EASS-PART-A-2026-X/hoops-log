@@ -60,11 +60,18 @@ h3 {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
   font-family: var(--display);
   font-weight: 700;
   font-size: 24px;
   letter-spacing: 0.08em;
   color: #fff;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 
 .page {

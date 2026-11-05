@@ -4,6 +4,7 @@ import type { ShotInput } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
+import Logo from './Logo'
 import ShooterSelect from './ShooterSelect'
 import { tabTarget } from './focusTrap'
 import { deletedText, withShooterSwitch } from './notices'
@@ -214,7 +215,10 @@ export default function App() {
   return (
     <div className="app" ref={appRef}>
       <header className="topbar" ref={topbarRef}>
-        <span className="brand">HOOPS LOG</span>
+        <button type="button" className="brand" onClick={() => setTab('log')} aria-label="Hoops Log, go to My log">
+          <Logo />
+          <span aria-hidden="true">HOOPS LOG</span>
+        </button>
         {tab === 'log' && (
           <button
             type="button"
