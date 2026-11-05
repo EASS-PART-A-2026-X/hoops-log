@@ -97,6 +97,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const [mode, setMode] = useState<MapMode>('beams')
   const [view, setView] = useState<ViewName>('shooter')
   const [auto, setAuto] = useState(false)
+  const [arena, setArena] = useState(true)
   const [ready, setReady] = useState(false)
   // Why the 3D view is not running: it never started, or the browser took the context away.
   const [failed, setFailed] = useState<'start' | 'lost' | null>(null)
@@ -204,6 +205,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
 
   useEffect(() => sceneRef.current?.setMode(mode), [ready, mode])
   useEffect(() => sceneRef.current?.setAutoRotate(auto), [ready, auto])
+  useEffect(() => sceneRef.current?.setArena(arena), [ready, arena])
   useEffect(() => {
     // The first view is the scene's own default; only move the camera for a real choice.
     if (view !== 'shooter' || introDone.current) sceneRef.current?.setView(view)
@@ -423,6 +425,9 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                 </button>
                 <button type="button" className="chip" aria-pressed={auto} onClick={() => setAuto(!auto)}>
                   Auto-rotate
+                </button>
+                <button type="button" className="chip" aria-pressed={arena} onClick={() => setArena(!arena)}>
+                  Arena
                 </button>
               </div>
             </div>
