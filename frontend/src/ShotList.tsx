@@ -100,7 +100,8 @@ function Row({
   )
 }
 
-const PAGE = 100
+/** Rows shown at a time: a short first page, then "Show more". */
+const PAGE = 20
 
 export default function ShotList({ shots, selectedId, onLocate, onSave, onDelete }: Props) {
   const [shown, setShown] = useState(PAGE)
