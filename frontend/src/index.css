@@ -2505,3 +2505,236 @@ h3 {
   color: var(--muted);
   font-size: 14px;
 }
+
+/* The face-off: one orchestrated moment. Cards slide in, VS lands, the bars fill, the verdict appears. */
+.faceoff {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* safe: when the content is taller than the window it starts at the top and scrolls, instead of being cut off above. */
+  justify-content: safe center;
+  gap: 18px;
+  padding: 20px 16px;
+  overflow-y: auto;
+  background: radial-gradient(ellipse at center, #0e1828 0%, #04070b 75%);
+  animation: fo-fade 0.3s ease-out;
+}
+
+@keyframes fo-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.fo-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 3vw, 44px);
+  width: 100%;
+}
+
+.fo-card {
+  flex: 0 1 330px;
+  min-width: 0;
+}
+
+.fo-card.left {
+  animation: fo-from-left 0.7s cubic-bezier(0.2, 1.15, 0.3, 1) 0.1s backwards;
+}
+
+.fo-card.right {
+  animation: fo-from-right 0.7s cubic-bezier(0.2, 1.15, 0.3, 1) 0.1s backwards;
+}
+
+@keyframes fo-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-60vw) rotate(-9deg);
+  }
+}
+
+@keyframes fo-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(60vw) rotate(9deg);
+  }
+}
+
+.fo-vs {
+  flex: none;
+  font-family: var(--display);
+  font-size: clamp(54px, 9vw, 120px);
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 28px rgba(255, 122, 47, 0.7);
+  animation: fo-slam 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) 0.75s backwards;
+}
+
+@keyframes fo-slam {
+  0% {
+    opacity: 0;
+    transform: scale(3.4) rotate(-6deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.92);
+  }
+}
+
+.fo-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(720px, 100%);
+}
+
+.fo-row {
+  display: grid;
+  grid-template-columns: 3.4em minmax(0, 1fr) 9.5em minmax(0, 1fr) 3.4em;
+  align-items: center;
+  gap: 10px;
+  animation: fo-row-in 0.4s ease-out calc(1.15s + var(--i) * 0.22s) backwards;
+}
+
+@keyframes fo-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.fo-label {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fo-val {
+  font-family: var(--display);
+  font-size: 22px;
+  color: var(--muted);
+}
+
+.fo-val.you {
+  text-align: right;
+}
+
+.fo-val.win {
+  color: #fff;
+}
+
+.fo-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.fo-bar.left {
+  justify-content: flex-end;
+}
+
+.fo-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  opacity: 0.5;
+  animation: fo-fill 0.7s ease-out calc(1.3s + var(--i, 0) * 0.22s) backwards;
+}
+
+.fo-row .fo-bar span {
+  animation-delay: calc(1.3s + var(--i) * 0.22s);
+}
+
+.fo-bar.left span {
+  background: var(--orange);
+  transform-origin: right center;
+}
+
+.fo-bar.right span {
+  background: var(--bench);
+  transform-origin: left center;
+}
+
+.fo-bar.win span {
+  opacity: 1;
+}
+
+@keyframes fo-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.fo-verdict {
+  margin: 4px 0 0;
+  max-width: 720px;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 26px;
+  color: #fff;
+  animation: fo-fade 0.5s ease-out 2.3s backwards;
+}
+
+.faceoff .btn {
+  animation: fo-fade 0.5s ease-out 2.5s backwards;
+}
+
+@media (max-width: 760px) {
+  .fo-stage {
+    gap: 6px;
+  }
+
+  .fo-card {
+    flex-basis: 44%;
+  }
+
+  .fo-card .shot-card {
+    font-size: 8.5px;
+  }
+
+  .fo-row {
+    grid-template-columns: 2.6em minmax(0, 1fr) 5.6em minmax(0, 1fr) 2.6em;
+    gap: 6px;
+  }
+
+  .fo-label {
+    font-size: 11px;
+  }
+
+  .fo-val {
+    font-size: 17px;
+  }
+}
+
+/* Short windows: smaller cards so the cards, the bars and the button all fit */
+@media (max-height: 820px) and (min-width: 761px) {
+  .fo-card .shot-card {
+    font-size: 13.5px;
+  }
+
+  .faceoff {
+    gap: 12px;
+  }
+}
+
+@media (max-height: 760px) and (min-width: 761px) {
+  .fo-card .shot-card {
+    font-size: 10.5px;
+  }
+
+  .fo-verdict {
+    font-size: 22px;
+  }
+
+  .fo-rows {
+    gap: 5px;
+  }
+}

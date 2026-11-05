@@ -32,6 +32,8 @@ export default function App() {
   const [shooterChoice, setShooterChoice] = useState<string | null>(null)
   // The player the vs NBA tab compares you with; null means the league average.
   const [benchmarkId, setBenchmarkId] = useState<number | null>(null)
+  // Face-offs already played this session, so they do not replay every time the vs NBA tab is opened.
+  const [faceOffSeen, setFaceOffSeen] = useState<string[]>([])
   // The side drawer with the shot list and the add form: closed by default, so the page is just the map.
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
@@ -270,7 +272,11 @@ export default function App() {
           />
         )}
         {tab === 'nba' && (
-          <NbaCompare shots={shooterShots} shooter={shooter} shooterPicker={shooterPicker} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId} onBrowse={() => setTab('players')} />
+          <NbaCompare shots={shooterShots} shooter={shooter} shooterPicker={shooterPicker} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId}
+            onBrowse={() => setTab('players')}
+            faceOffSeen={faceOffSeen}
+            onFaceOffSeen={(key) => setFaceOffSeen((seen) => (seen.includes(key) ? seen : [...seen, key]))}
+          />
         )}
         {/* Always mounted, only hidden, so the form, row edits and map filters survive a tab switch.
             The map's scene stops drawing while hidden and re-measures when shown again. */}

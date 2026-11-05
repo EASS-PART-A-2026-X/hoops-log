@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { Shot } from './api'
 import FallbackImage from './FallbackImage'
 import { LEAGUE, SMALL_SAMPLE, benchmarkOf, compareOverall, compareZones } from './court/nba'
@@ -6,6 +6,8 @@ import type { ZoneCompare } from './court/nba'
 import { PLAYERS, TEAMS, headshotUrl, initials, lastName } from './court/players'
 import { describeTally, gapPts, judge, sideOf, tally } from './court/verdict'
 import type { Side } from './court/verdict'
+import { playerProfile, shooterProfile } from './court/cardData'
+import FaceOff from './FaceOff'
 import PlayerPicker from './PlayerPicker'
 
 interface Props {
@@ -16,6 +18,9 @@ interface Props {
   benchmarkId: number | null
   onBenchmark: (id: number | null) => void
   onBrowse: () => void
+  /** Pairs the face-off has already played for this session ("shooter|player id"), kept above this page so it does not replay each visit. */
+  faceOffSeen: string[]
+  onFaceOffSeen: (key: string) => void
 }
 
 const fmt = (v: number | null) => (v === null ? '–' : `${v}%`)
@@ -63,12 +68,22 @@ function Bars({ mineName, theirName, mine, theirs, side }: { mineName: string; t
   )
 }
 
-export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId, onBenchmark, onBrowse }: Props) {
+export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId, onBenchmark, onBrowse, faceOffSeen, onFaceOffSeen }: Props) {
   const player = PLAYERS.find((p) => p.id === benchmarkId) ?? null
   const bench = useMemo(() => (player ? benchmarkOf(player) : LEAGUE), [player])
   const overall = useMemo(() => compareOverall(shots ?? [], bench), [shots, bench])
   const zones = useMemo(() => compareZones(shots ?? [], bench), [shots, bench])
   const mineName = shooter || 'Everyone'
+  // The face-off plays by itself the first time a pair is compared (unless the person asked for less
+  // motion), and any time from its button.
+  const [manualFaceOff, setManualFaceOff] = useState(false)
+  const pairKey = player && shots && shots.length > 0 ? `${shooter}|${player.id}` : null
+  const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+  const faceOffOpen = pairKey !== null && (manualFaceOff || (!reducedMotion && !faceOffSeen.includes(pairKey)))
+  const closeFaceOff = useCallback(() => {
+    setManualFaceOff(false)
+    if (pairKey) onFaceOffSeen(pairKey)
+  }, [pairKey, onFaceOffSeen])
   const theirName = player ? player.name : 'NBA average'
   const theirShort = player ? lastName(player.name) : 'NBA'
 
@@ -90,8 +105,17 @@ export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId,
           <button type="button" className="chip" onClick={onBrowse}>
             Browse players
           </button>
+          {player && pairKey && (
+            <button type="button" className="chip" onClick={() => setManualFaceOff(true)}>
+              Face-off
+            </button>
+          )}
         </div>
       </div>
+
+      {faceOffOpen && player && shots && (
+        <FaceOff you={shooterProfile(shooter, shots)} them={playerProfile(player)} verdict={describeTally(mineName, theirName, score)} onClose={closeFaceOff} />
+      )}
 
       {!shots ? (
         <p className="state">Loading shots…</p>
