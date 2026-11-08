@@ -31,6 +31,7 @@ export function useCelebrations(shots: Shots | null, truncated = false) {
   const [toasts, setToasts] = useState<GameToast[]>([])
   const [pop, setPop] = useState<XpPop | null>(null)
   const seen = useRef<Map<string, Snap> | null>(null)
+  const wasTruncated = useRef(false)
   // Trophies already announced this session, so one that is lost and won again (a shot added in the
   // middle of a streak, say) is not announced twice.
   const announced = useRef<Map<string, Set<string>>>(new Map())
@@ -50,7 +51,10 @@ export function useCelebrations(shots: Shots | null, truncated = false) {
       announced.current.set(player, set)
     }
     // The first load is silent, and so is a list cut short (the numbers are not the whole truth then).
-    if (!before || truncated) return
+    // When the list goes from cut short to whole (or back) the difference is the missing shots, not a new one.
+    const quiet = truncated || wasTruncated.current
+    wasTruncated.current = truncated
+    if (!before || quiet) return
 
     const fresh: GameToast[] = []
     const announcedBefore = priorAnnounced

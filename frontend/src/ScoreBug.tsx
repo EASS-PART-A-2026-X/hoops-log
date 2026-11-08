@@ -47,8 +47,10 @@ export default function ScoreBug({ armed, partial = false, name, made, attempts,
             <i style={{ width: `${fill}%` }} />
           </span>
           <span className="bug-xpnum">
-            {level.into} / {level.span} XP
-            {partial && <em className="bug-partial"> · loaded shots only</em>}
+            <span className="bug-xpval">
+              {level.into} / {level.span} XP
+            </span>
+            {partial && <em className="bug-partial">loaded shots only</em>}
           </span>
           {partial && <span className="sr-only">The log is longer than what is loaded, so this counts the loaded shots only.</span>}
         </span>

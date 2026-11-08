@@ -3144,8 +3144,7 @@ h3 {
 @media (max-width: 960px) {
   .scorebug > .bug-live,
   .scorebug > .bug-name,
-  .scorebug > .bug-fg,
-  .bug-xpnum {
+  .scorebug > .bug-fg {
     display: none;
   }
 }
@@ -3777,8 +3776,13 @@ h3 {
   color: var(--bench);
 }
 
+.bug-xpval + .bug-partial::before {
+  content: ' · ';
+}
+
+/* Narrow: the numbers go, but the note that the log is only partly loaded stays visible. */
 @media (max-width: 960px) {
-  .bug-xpnum {
+  .bug-xpval {
     display: none;
   }
 }

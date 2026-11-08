@@ -89,6 +89,15 @@ describe('useCelebrations', () => {
     expect(result.current.pop?.amount).toBeGreaterThan(0)
   })
 
+  it('a list that grows from cut short to whole does not burst into toasts', () => {
+    const part = Array.from({ length: 5 }, () => shot('A', { made: false }))
+    const whole = [...part, ...Array.from({ length: 40 }, () => shot('A'))]
+    const { result, rerender } = setup(part, true)
+    rerender({ shots: whole, truncated: false })
+    expect(result.current.toasts).toEqual([])
+    expect(result.current.pop).toBeNull()
+  })
+
   it('shows at most three toasts, keeping the newest', () => {
     const first = [shot('A', { made: false })]
     const { result, rerender } = setup(first)

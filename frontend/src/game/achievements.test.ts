@@ -90,10 +90,12 @@ describe('trophies', () => {
 
   it('Sniper stays unlocked when a shot is saved with an earlier game date', () => {
     const date = (i: number) => `2026-10-${String(i + 1).padStart(2, '0')}`
-    const base = Array.from({ length: 20 }, (_, i) => shot({ made: i < 12, game_date: date(i) }))
+    // 12 makes: the first and last shot and ten in the middle, so dropping either end of the 20 loses one.
+    const base = Array.from({ length: 20 }, (_, i) => shot({ made: i === 0 || i === 19 || (i >= 5 && i <= 14), game_date: date(i) }))
     expect(status(base, 'sniper').unlocked).toBe(true)
-    // Saved last (highest id) but dated into the middle of the makes: the save order is what counts.
-    const backdated = shot({ made: false, game_date: date(5) })
+    // Saved last (highest id) but dated into the middle. In date order this would leave at most 11 makes in
+    // any 20 shots in a row and lock the trophy; in save order the first 20 shots are untouched.
+    const backdated = shot({ made: false, game_date: date(10) })
     expect(status([...base, backdated], 'sniper').unlocked).toBe(true)
   })
 
@@ -115,6 +117,16 @@ describe('bestWindow', () => {
     expect(bestWindow(flags([true, false, true, true, false, false, true]), 3)).toBe(2)
     expect(bestWindow(flags([true, true, true]), 5)).toBe(3)
     expect(bestWindow([], 5)).toBe(0)
+  })
+
+  it('goes by the order the shots were saved (id), not by game date', () => {
+    // Saved make, make, miss; but the dates put the miss in the middle.
+    const list = [
+      shot({ made: true, game_date: '2026-09-01' }),
+      shot({ made: true, game_date: '2026-09-03' }),
+      shot({ made: false, game_date: '2026-09-02' }),
+    ]
+    expect(bestWindow(list, 2)).toBe(2)
   })
 })
 
