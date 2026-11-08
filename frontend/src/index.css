@@ -3056,7 +3056,7 @@ h3 {
 }
 
 .trophies {
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 
 .trophies-head {
@@ -3868,4 +3868,60 @@ h3 {
 
 .tools .pp-list {
   width: 280px;
+}
+
+/* ---------- Trophies: a button in the top bar and a drawer ---------- */
+.trophy-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
+  cursor: pointer;
+}
+
+.trophy-toggle:hover,
+.trophy-toggle[aria-expanded='true'] {
+  border-color: var(--orange-soft);
+}
+
+.trophy-toggle svg {
+  color: var(--orange-soft);
+}
+
+.trophy-count {
+  padding: 1px 8px;
+  font-size: 13px;
+  color: var(--orange-soft);
+  background: var(--orange-bg);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer-title {
+  margin: 0 0 0 4px;
+  font-family: var(--display);
+  font-size: 26px;
+  letter-spacing: 0.04em;
+}
+
+.trophies-count {
+  margin: 0 0 12px;
+}
+
+@media (max-width: 640px) {
+  .trophy-toggle {
+    padding-inline: 12px;
+  }
+
+  .trophy-toggle svg {
+    display: none;
+  }
 }

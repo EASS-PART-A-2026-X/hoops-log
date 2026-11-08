@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import ScoreBug from './ScoreBug'
 import Trophies from './Trophies'
+import { trophyStatus } from './game/achievements'
 import { levelInfo } from './game/xp'
 
 afterEach(cleanup)
@@ -53,14 +54,14 @@ describe('Trophies', () => {
   const shot = (over = {}) => ({ id: 1, player: 'A', game_date: '2026-11-01', made: true, zone: 'paint', shot_type: '2PT' as const, x: 25, y: 8, ...over })
 
   it('counts unlocked trophies and shows progress on locked ones', () => {
-    const { container } = render(<Trophies shots={[shot()]} shooter="A" />)
+    const { container } = render(<Trophies list={trophyStatus([shot()])} shooter="A" />)
     expect(container.querySelector('.count')!.textContent).toBe('1 of 12 unlocked · A')
     expect(container.querySelectorAll('.trophy.got')).toHaveLength(1)
     expect(container.textContent).toContain('1 / 10') // Warm-Up
   })
 
   it('warns when the list was cut short', () => {
-    const { container } = render(<Trophies shots={[shot()]} shooter="A" partial />)
+    const { container } = render(<Trophies list={trophyStatus([shot()])} shooter="A" partial />)
     expect(container.querySelector('.trophies-note')).not.toBeNull()
   })
 })

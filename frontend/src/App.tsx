@@ -15,6 +15,7 @@ import ShotList from './ShotList'
 import ShotMap from './ShotMap'
 import { useShots } from './useShots'
 import GameToasts from './GameToasts'
+import TrophyDrawer from './TrophyDrawer'
 import TitleScreen from './TitleScreen'
 import { shouldShowTitle } from './game/titleSeen'
 import { TROPHIES } from './game/achievements'
@@ -48,6 +49,10 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
   const toggleRef = useRef<HTMLButtonElement>(null)
+  // The trophy wall: a second drawer, from its own button in the top bar. Only one drawer is open at a time.
+  const [trophyOpen, setTrophyOpen] = useState(false)
+  const trophyToggleRef = useRef<HTMLButtonElement>(null)
+  const closeTrophies = useCallback(() => setTrophyOpen(false), [])
   const drawerRef = useRef<HTMLElement>(null)
   const appRef = useRef<HTMLDivElement>(null)
   const topbarRef = useRef<HTMLElement>(null)
@@ -240,6 +245,8 @@ export default function App() {
   const made = shooterShots?.filter((s) => s.made).length ?? 0
   const level = useMemo(() => levelInfo(xpOf(shooterShots ?? [])), [shooterShots])
   const celebrations = useCelebrations(shots, truncated)
+  const trophyList = useMemo(() => trophiesOf(shooterShots ?? []), [shooterShots])
+  const trophyCount = trophyList.filter((t) => t.unlocked).length
   // The title screen: shown once per tab. The app is already loading behind it.
   const [title, setTitle] = useState(shouldShowTitle)
   // True from the moment the player presses start, while the wipe is still running.
@@ -253,11 +260,11 @@ export default function App() {
             level: level.level,
             rank: level.title,
             shots: shooterShots.length,
-            trophies: trophiesOf(shooterShots).filter((t) => t.unlocked).length,
+            trophies: trophyCount,
             trophyTotal: TROPHIES.length,
           }
         : null,
-    [shooterShots, shooter, level],
+    [shooterShots, shooter, level, trophyCount],
   )
 
   return (
@@ -277,12 +284,35 @@ export default function App() {
             className="drawer-toggle"
             aria-expanded={drawerOpen}
             aria-controls="shots-drawer"
-            onClick={() => setDrawerOpen((open) => !open)}
+            onClick={() => {
+              setTrophyOpen(false)
+              setDrawerOpen((open) => !open)
+            }}
           >
             Shots
             {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
           </button>
         )}
+        <button
+          type="button"
+          ref={trophyToggleRef}
+          className="trophy-toggle"
+          aria-expanded={trophyOpen}
+          aria-controls="trophy-drawer"
+          onClick={() => {
+            setDrawerOpen(false)
+            setTrophyOpen((open) => !open)
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 4h10v5a5 5 0 01-10 0V4z" fill="currentColor" />
+            <path d="M7 6H4a3 3 0 003 4M17 6h3a3 3 0 01-3 4M12 14v4M8 20h8" />
+          </svg>
+          Trophies
+          <span className="trophy-count">
+            {trophyCount}/{trophyList.length}
+          </span>
+        </button>
         <MuteButton />
         <nav className="tabs" aria-label="Pages">
           <button type="button" aria-current={tab === 'log' ? 'page' : undefined} onClick={() => setTab('log')}>
@@ -309,13 +339,14 @@ export default function App() {
         )}
       </div>
 
+      <TrophyDrawer open={trophyOpen} onClose={closeTrophies} list={trophyList} shooter={shooter} partial={truncated} narrow={narrow} toggleRef={trophyToggleRef} />
+
       <GameToasts toasts={celebrations.toasts} onDismiss={celebrations.dismiss} />
 
       <main className={tab === 'log' ? 'page fit' : 'page'}>
         {tab === 'players' && (
           <PlayersPage
             shots={shooterShots}
-            partial={truncated}
             shooter={shooter}
             benchmarkId={benchmarkId}
             onCompare={(id) => {
