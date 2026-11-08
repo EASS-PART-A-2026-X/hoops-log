@@ -3785,4 +3785,9 @@ h3 {
   .bug-xpval {
     display: none;
   }
+
+  /* The separator belongs between the numbers and the note, so it goes with the numbers. */
+  .bug-xpval + .bug-partial::before {
+    content: none;
+  }
 }
