@@ -3814,9 +3814,10 @@ h3 {
 }
 
 /* ---------- Top bar player list, style dropdown ---------- */
+/* Above the page, so the player list drops over it; below the shot list drawer (40) and its scrim (35), so the drawer covers the bar. */
 .topbar {
   position: relative;
-  z-index: 55;
+  z-index: 30;
 }
 
 /* A list that lines up with the left edge of its button (the one in the top bar). */
