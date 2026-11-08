@@ -1,4 +1,5 @@
 /** Trophies: each is a rule over the shots, so what is unlocked is always just a function of the data. */
+import { ZONE_NAMES } from '../court/stats'
 import { chronological } from './xp'
 import type { XpShot } from './xp'
 
@@ -18,7 +19,7 @@ export interface Trophy {
 const CORNERS = new Set(['left_corner_3', 'right_corner_3'])
 const PAINT = new Set(['paint', 'restricted_area'])
 const MID = new Set(['mid_range', 'left_elbow', 'right_elbow'])
-export const ZONE_COUNT = 10
+export const ZONE_COUNT = ZONE_NAMES.length
 
 function count(shots: TrophyShot[], test: (s: TrophyShot) => boolean): number {
   return shots.filter(test).length
@@ -35,8 +36,22 @@ export function bestStreak(shots: TrophyShot[]): number {
   return best
 }
 
-const MIN_SNIPER_SHOTS = 20
-const SNIPER_PCT = 0.6
+/** Sniper: this many makes inside any stretch of this many shots in a row. */
+export const SNIPER_WINDOW = 20
+export const SNIPER_MAKES = 12
+
+/** The most makes in any run of `window` shots in a row (all the shots when there are fewer). Adding later shots can never lower it. */
+export function bestWindow(shots: TrophyShot[], window: number): number {
+  const made = chronological(shots).map((s) => (s.made ? 1 : 0))
+  let sum = 0
+  let best = 0
+  for (let i = 0; i < made.length; i++) {
+    sum += made[i]!
+    if (i >= window) sum -= made[i - window]!
+    best = Math.max(best, sum)
+  }
+  return best
+}
 
 export const TROPHIES: Trophy[] = [
   { id: 'first-bucket', title: 'First Bucket', how: 'Make your first shot', progress: (s) => ({ done: count(s, (x) => x.made), target: 1 }) },
@@ -88,11 +103,8 @@ export const TROPHIES: Trophy[] = [
   {
     id: 'sniper',
     title: 'Sniper',
-    how: `Shoot ${SNIPER_PCT * 100}% or better over ${MIN_SNIPER_SHOTS}+ shots`,
-    progress: (s) => {
-      if (s.length < MIN_SNIPER_SHOTS) return { done: 0, target: 1 }
-      return { done: count(s, (x) => x.made) / s.length >= SNIPER_PCT ? 1 : 0, target: 1 }
-    },
+    how: `Make ${SNIPER_MAKES} of ${SNIPER_WINDOW} shots in a row`,
+    progress: (s) => ({ done: bestWindow(s, SNIPER_WINDOW), target: SNIPER_MAKES }),
   },
 ]
 

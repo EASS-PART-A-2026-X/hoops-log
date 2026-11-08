@@ -3,7 +3,7 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TitleScreen from './TitleScreen'
-import { LEAVE_MS, shouldShowTitle } from './game/titleSeen'
+import { LEAVE_MS, isStartKey, shouldShowTitle } from './game/titleSeen'
 
 const stats = { name: 'Demo Yuly', level: 4, rank: 'GYM RAT', shots: 150, trophies: 7, trophyTotal: 12 }
 
@@ -87,5 +87,40 @@ describe('TitleScreen', () => {
       configurable: true,
     })
     expect(shouldShowTitle()).toBe(true)
+  })
+
+  it('browser keys do not start it and are not blocked', async () => {
+    const onStart = vi.fn()
+    render(<TitleScreen stats={stats} onStart={onStart} onDone={() => {}} />)
+    for (const key of ['F5', 'F12', 'F11', 'Escape', 'Tab', 'Shift', 'Control']) {
+      const ev = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      window.dispatchEvent(ev)
+      expect(ev.defaultPrevented).toBe(false)
+    }
+    const reload = new KeyboardEvent('keydown', { key: 'r', ctrlKey: true, bubbles: true, cancelable: true })
+    window.dispatchEvent(reload)
+    expect(reload.defaultPrevented).toBe(false)
+    expect(onStart).not.toHaveBeenCalled()
+  })
+
+  it('Space starts it without scrolling the page behind', () => {
+    const onStart = vi.fn()
+    render(<TitleScreen stats={stats} onStart={onStart} onDone={() => {}} />)
+    const ev = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+    window.dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(true)
+    expect(onStart).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('isStartKey', () => {
+  const k = (key: string, mods = {}) => ({ key, metaKey: false, ctrlKey: false, altKey: false, ...mods })
+  it('accepts letters, digits, Enter, Space and arrows', () => {
+    for (const key of ['a', 'Z', '5', ' ', 'Enter', 'ArrowUp']) expect(isStartKey(k(key))).toBe(true)
+  })
+  it('refuses function keys, Escape, Tab, modifiers and shortcuts', () => {
+    for (const key of ['F5', 'Escape', 'Tab', 'Shift', 'Meta']) expect(isStartKey(k(key))).toBe(false)
+    expect(isStartKey(k('r', { ctrlKey: true }))).toBe(false)
+    expect(isStartKey(k('l', { metaKey: true }))).toBe(false)
   })
 })

@@ -46,17 +46,19 @@ export function pct(made: number, attempts: number): number | null {
 }
 
 /** The zone names the API sends (see backend/app/court.py). */
-export type ZoneName =
-  | 'restricted_area'
-  | 'paint'
-  | 'mid_range'
-  | 'left_elbow'
-  | 'right_elbow'
-  | 'left_corner_3'
-  | 'right_corner_3'
-  | 'left_wing_3'
-  | 'right_wing_3'
-  | 'top_3'
+export const ZONE_NAMES = [
+  'restricted_area',
+  'paint',
+  'mid_range',
+  'left_elbow',
+  'right_elbow',
+  'left_corner_3',
+  'right_corner_3',
+  'left_wing_3',
+  'right_wing_3',
+  'top_3',
+] as const
+export type ZoneName = (typeof ZONE_NAMES)[number]
 
 export interface ZoneStat {
   zone: string

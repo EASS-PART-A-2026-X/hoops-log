@@ -19,3 +19,9 @@ export function markSeen(): void {
     /* not remembered, so it shows again next time */
   }
 }
+
+/** Letters, digits, Enter, Space and the arrows start the game; browser keys, shortcuts and Tab do not. */
+export function isStartKey(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey'>): boolean {
+  if (e.metaKey || e.ctrlKey || e.altKey) return false
+  return e.key.length === 1 || e.key === 'Enter' || e.key.startsWith('Arrow')
+}

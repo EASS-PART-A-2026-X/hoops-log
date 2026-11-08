@@ -27,10 +27,13 @@ type Shots = (TrophyShot & { player: string })[]
  * Watches the shots for changes after the first load: XP earned, level ups and new trophies, per player.
  * The first load is silent (you open the app to your existing trophies, not a pile of banners).
  */
-export function useCelebrations(shots: Shots | null) {
+export function useCelebrations(shots: Shots | null, truncated = false) {
   const [toasts, setToasts] = useState<GameToast[]>([])
   const [pop, setPop] = useState<XpPop | null>(null)
   const seen = useRef<Map<string, Snap> | null>(null)
+  // Trophies already announced this session, so one that is lost and won again (a shot added in the
+  // middle of a streak, say) is not announced twice.
+  const announced = useRef<Map<string, Set<string>>>(new Map())
   const nextId = useRef(1)
 
   useEffect(() => {
@@ -38,10 +41,19 @@ export function useCelebrations(shots: Shots | null) {
     const now = new Map<string, Snap>()
     for (const [player, list] of byPlayer(shots)) now.set(player, snapOf(list))
     const before = seen.current
+    const priorAnnounced = new Map([...announced.current].map(([k, v]) => [k, new Set(v)]))
     seen.current = now
-    if (!before) return // first load
+    // Everything unlocked so far counts as announced.
+    for (const [player, snap] of now) {
+      const set = announced.current.get(player) ?? new Set<string>()
+      for (const id of snap.unlocked) set.add(id)
+      announced.current.set(player, set)
+    }
+    // The first load is silent, and so is a list cut short (the numbers are not the whole truth then).
+    if (!before || truncated) return
 
     const fresh: GameToast[] = []
+    const announcedBefore = priorAnnounced
     let gain: XpPop | null = null
     for (const [player, snap] of now) {
       const change = diffSnap(before.get(player) ?? EMPTY_SNAP, snap)
@@ -50,6 +62,7 @@ export function useCelebrations(shots: Shots | null) {
         fresh.push({ id: nextId.current++, kind: 'level', title: `LEVEL ${change.levelUp}`, sub: `${rankTitle(change.levelUp)} · ${player}` })
       }
       for (const id of change.newTrophyIds) {
+        if (announcedBefore.get(player)?.has(id)) continue
         const trophy = TROPHIES.find((t) => t.id === id)
         if (trophy) fresh.push({ id: nextId.current++, kind: 'trophy', title: trophy.title, sub: `TROPHY UNLOCKED · ${trophy.how}` })
       }
@@ -57,11 +70,13 @@ export function useCelebrations(shots: Shots | null) {
     // State is set from an effect on purpose: it reacts to data that arrived from the server.
     if (gain) setPop(gain)
     if (fresh.length > 0) {
+      // The newest toasts stay when there are too many, so a level up (the big news) goes last.
+      fresh.sort((a, b) => Number(a.kind === 'level') - Number(b.kind === 'level'))
       setToasts((list) => [...list, ...fresh].slice(-MAX_TOASTS))
       if (fresh.some((t) => t.kind === 'level')) play('levelup', 350)
       else play('trophy', 350)
     }
-  }, [shots])
+  }, [shots, truncated])
 
   useEffect(() => {
     if (toasts.length === 0) return

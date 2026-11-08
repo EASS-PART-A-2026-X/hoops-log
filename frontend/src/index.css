@@ -3765,3 +3765,9 @@ h3 {
     clip-path: circle(0% at 50% 50%);
   }
 }
+
+.trophies-note {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}

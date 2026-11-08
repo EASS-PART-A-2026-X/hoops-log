@@ -17,11 +17,12 @@ import { useShots } from './useShots'
 import GameToasts from './GameToasts'
 import TitleScreen from './TitleScreen'
 import { shouldShowTitle } from './game/titleSeen'
-import { TROPHIES, unlockedIds } from './game/achievements'
+import { TROPHIES } from './game/achievements'
+import { trophiesOf, xpOf } from './game/profile'
 import ScoreBug, { MuteButton } from './ScoreBug'
 import { play, unlockAudio } from './game/audio'
 import { useCelebrations } from './game/useCelebrations'
-import { levelInfo, totalXp } from './game/xp'
+import { levelInfo } from './game/xp'
 
 /** The drawer covers the page below this width (the layout breakpoint in index.css). */
 const NARROW = '(max-width: 960px)'
@@ -237,8 +238,8 @@ export default function App() {
 
   // The drawer shows the same shots as the map: the chosen player's, or everyone's.
   const made = shooterShots?.filter((s) => s.made).length ?? 0
-  const level = useMemo(() => levelInfo(totalXp(shooterShots ?? [])), [shooterShots])
-  const celebrations = useCelebrations(shots)
+  const level = useMemo(() => levelInfo(xpOf(shooterShots ?? [])), [shooterShots])
+  const celebrations = useCelebrations(shots, truncated)
   // The title screen: shown once per tab. The app is already loading behind it.
   const [title, setTitle] = useState(shouldShowTitle)
   // True from the moment the player presses start, while the wipe is still running.
@@ -252,7 +253,7 @@ export default function App() {
             level: level.level,
             rank: level.title,
             shots: shooterShots.length,
-            trophies: unlockedIds(shooterShots).length,
+            trophies: trophiesOf(shooterShots).filter((t) => t.unlocked).length,
             trophyTotal: TROPHIES.length,
           }
         : null,
@@ -268,7 +269,7 @@ export default function App() {
           <Logo />
           <span aria-hidden="true">HOOPS LOG</span>
         </button>
-        <ScoreBug armed={!covered} name={shooter} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
+        <ScoreBug armed={!covered} partial={truncated} name={shooter} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
         {tab === 'log' && (
           <button
             type="button"
@@ -314,6 +315,7 @@ export default function App() {
         {tab === 'players' && (
           <PlayersPage
             shots={shooterShots}
+            partial={truncated}
             shooter={shooter}
             shooterPicker={shooterPicker}
             benchmarkId={benchmarkId}

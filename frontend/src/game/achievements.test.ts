@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { TROPHIES, bestStreak, trophyStatus, unlockedIds } from './achievements'
+import { TROPHIES, ZONE_COUNT, bestStreak, bestWindow, trophyStatus, unlockedIds } from './achievements'
+import { ZONE_NAMES } from '../court/stats'
 import type { TrophyShot } from './achievements'
 
 let n = 0
@@ -78,13 +79,38 @@ describe('trophies', () => {
     expect(status(['01', '02', '03'].map((d) => shot({ game_date: `2026-11-${d}` })), 'regular').unlocked).toBe(true)
   })
 
-  it('Sniper needs 20 shots and 60 percent', () => {
-    expect(status(many(19), 'sniper').unlocked).toBe(false)
-    expect(status([...many(12), ...many(8, { made: false })], 'sniper').unlocked).toBe(true)
-    expect(status([...many(11), ...many(9, { made: false })], 'sniper').unlocked).toBe(false)
+  it('Sniper needs 12 makes inside any 20 shots in a row', () => {
+    expect(status(many(11), 'sniper').unlocked).toBe(false)
+    expect(status(many(12), 'sniper').unlocked).toBe(true)
+    const ordered = (flags: boolean[]) => flags.map((made, i) => shot({ made, game_date: `2026-10-${String(i + 1).padStart(2, '0')}` }))
+    // 11 makes then 9 misses: only 11 in a window of 20
+    expect(status(ordered([...Array(11).fill(true), ...Array(9).fill(false)]), 'sniper').unlocked).toBe(false)
+    expect(status(ordered([...Array(12).fill(true), ...Array(8).fill(false)]), 'sniper').unlocked).toBe(true)
+  })
+
+  it('Sniper stays unlocked as more shots are added', () => {
+    const base = Array.from({ length: 12 }, (_, i) => shot({ game_date: `2026-10-${String(i + 1).padStart(2, '0')}` }))
+    expect(status(base, 'sniper').unlocked).toBe(true)
+    const later = Array.from({ length: 40 }, (_, i) => shot({ made: false, game_date: `2026-11-${String((i % 28) + 1).padStart(2, '0')}` }))
+    expect(status([...base, ...later], 'sniper').unlocked).toBe(true)
   })
 
   it('never reports more progress than the target', () => {
     expect(status(many(200), 'century').done).toBe(100)
+  })
+})
+
+describe('bestWindow', () => {
+  const flags = (list: boolean[]) => list.map((made, i) => shot({ made, game_date: `2026-09-${String(i + 1).padStart(2, '0')}` }))
+  it('is the most makes in any run of that many shots', () => {
+    expect(bestWindow(flags([true, false, true, true, false, false, true]), 3)).toBe(2)
+    expect(bestWindow(flags([true, true, true]), 5)).toBe(3)
+    expect(bestWindow([], 5)).toBe(0)
+  })
+})
+
+describe('zone list', () => {
+  it('Everywhere uses the real number of zones', () => {
+    expect(ZONE_COUNT).toBe(ZONE_NAMES.length)
   })
 })

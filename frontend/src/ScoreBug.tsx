@@ -5,6 +5,8 @@ import type { XpPop } from './game/useCelebrations'
 import type { LevelInfo } from './game/xp'
 
 interface Props {
+  /** The shot list was cut short, so XP covers only the loaded shots. */
+  partial?: boolean
   /** False while the title screen covers the app: the numbers wait at zero, then count up when it starts. */
   armed: boolean
   name: string
@@ -15,7 +17,7 @@ interface Props {
 }
 
 /** The top bar's TV score bug: whose shots, their field goal percent, and level with an XP bar. */
-export default function ScoreBug({ armed, name, made, attempts, level, pop }: Props) {
+export default function ScoreBug({ armed, partial = false, name, made, attempts, level, pop }: Props) {
   const pct = !armed || attempts === 0 ? 0 : Math.round((made / attempts) * 100)
   const shownPct = useTicker(pct)
   const shownXp = useTicker(armed ? level.into : 0)
@@ -24,7 +26,7 @@ export default function ScoreBug({ armed, name, made, attempts, level, pop }: Pr
 
   return (
     <div className="scorebug-wrap">
-    <div className="scorebug" role="group" aria-label={`${name || 'Everyone'}: level ${level.level} ${level.title}`}>
+    <div className="scorebug" role="group" aria-label={`${name || 'Everyone'}: level ${level.level} ${level.title}`} title={partial ? 'Level counts the loaded shots only: the log is longer.' : undefined}>
       <span className="bug-live" aria-hidden="true">
         <i /> LIVE
       </span>

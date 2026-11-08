@@ -1,10 +1,19 @@
 import { useMemo } from 'react'
-import { trophyStatus } from './game/achievements'
 import type { TrophyShot } from './game/achievements'
+import { trophiesOf } from './game/profile'
 
 /** The trophy wall: unlocked ones in foil, locked ones as silhouettes with their progress. */
-export default function Trophies({ shots, shooter }: { shots: TrophyShot[]; shooter: string }) {
-  const list = useMemo(() => trophyStatus(shots), [shots])
+export default function Trophies({
+  shots,
+  shooter,
+  partial = false,
+}: {
+  shots: (TrophyShot & { player: string })[]
+  shooter: string
+  /** The shot list was cut short, so the numbers cover only part of the log. */
+  partial?: boolean
+}) {
+  const list = useMemo(() => trophiesOf(shots), [shots])
   const got = list.filter((t) => t.unlocked).length
   return (
     <section className="trophies" aria-labelledby="trophies-title">
@@ -14,6 +23,7 @@ export default function Trophies({ shots, shooter }: { shots: TrophyShot[]; shoo
           {got} of {list.length} unlocked{shooter ? ` · ${shooter}` : ''}
         </span>
       </div>
+      {partial && <p className="trophies-note">Based on the first shots only: the log is longer than what is loaded.</p>}
       <ul>
         {list.map(({ trophy, done, target, unlocked }) => (
           <li key={trophy.id} className={unlocked ? 'trophy got' : 'trophy'}>

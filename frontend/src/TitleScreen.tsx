@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Logo from './Logo'
 import { play, unlockAudio } from './game/audio'
-import { LEAVE_MS, markSeen } from './game/titleSeen'
+import { LEAVE_MS, isStartKey, markSeen } from './game/titleSeen'
 
 export interface TitleStats {
   name: string
@@ -59,8 +59,8 @@ export default function TitleScreen({ stats, onStart, onDone }: Props) {
   useEffect(() => {
     startRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.key === 'Tab' || e.key === 'Shift') return
-      e.preventDefault()
+      if (!isStartKey(e)) return // F5, F12, Escape, Tab and the like keep doing what the browser does with them
+      if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault() // no page scroll behind the title
       startRefFn.current()
     }
     window.addEventListener('keydown', onKey)
