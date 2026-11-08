@@ -2792,23 +2792,43 @@ h3 {
 }
 
 .scorebug > .bug-pick {
-  padding: 4px 10px;
+  padding: 4px 12px;
 }
 
-/* The same dropdown as everywhere, a little smaller to fit the bar. */
-.bug-pick .pp-button {
+/* The player's name keeps its big top-bar lettering; the only addition is the arrow that says it is a dropdown. */
+.bug-pick .pp-button.pp-plain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  min-height: 40px;
-  padding-right: 14px;
+  min-height: 0;
+  padding: 0;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: none;
+  border: 0;
+  border-radius: 0;
 }
 
-.bug-pick .pp-thumb {
-  width: 30px;
-  height: 30px;
+.bug-pick .pp-button.pp-plain:hover .pp-chev,
+.bug-pick .pp-button.pp-plain[aria-expanded='true'] .pp-chev {
+  color: var(--orange-soft);
 }
 
-.bug-pick .pp-label {
-  max-width: 180px;
+.bug-pick .pp-plain-name {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bug-pick .pp-plain .pp-chev {
+  margin-left: 0;
+  font-size: 14px;
 }
 
 .bug-fg {

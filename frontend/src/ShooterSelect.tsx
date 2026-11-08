@@ -25,6 +25,7 @@ export default function ShooterSelect({ shots, value, onChange, compact = false 
       {
         id: '',
         name: 'Every player',
+        buttonName: 'All players',
         sub: shotsLabel(shots?.length ?? 0),
         thumb: (
           <span className="pp-thumb pp-nba" aria-hidden="true">
@@ -53,6 +54,7 @@ export default function ShooterSelect({ shots, value, onChange, compact = false 
       prefix="Shots of"
       showPrefix={!compact}
       align={compact ? 'left' : 'right'}
+      plain={compact}
     />
   )
 }

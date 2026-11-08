@@ -10,6 +10,8 @@ export interface PickerOption {
   buttonSub?: string
   /** The round picture or badge on the left. */
   thumb: React.ReactNode
+  /** The name on the closed button when it should differ from `name` (plain look only). */
+  buttonName?: string
 }
 
 interface Props {
@@ -27,13 +29,15 @@ interface Props {
   align?: 'left' | 'right'
   /** Open the list above the button, for a picker at the bottom of the page. */
   up?: boolean
+  /** The closed button is just the name and an arrow, so it can sit inside text (the top bar). The list looks the same. */
+  plain?: boolean
 }
 
 /**
  * A custom dropdown: the browser's own list cannot show pictures or a second line, and looked bad.
  * Keyboard: ArrowUp/ArrowDown open and move, Enter picks, Escape closes, Tab closes and moves on.
  */
-export default function Picker({ options, value, onChange, ariaLabel, prefix, showPrefix = true, align = 'right', up = false }: Props) {
+export default function Picker({ options, value, onChange, ariaLabel, prefix, showPrefix = true, align = 'right', up = false, plain = false }: Props) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const root = useRef<HTMLDivElement>(null)
@@ -102,7 +106,7 @@ export default function Picker({ options, value, onChange, ariaLabel, prefix, sh
       >
         <button
           type="button"
-          className="pp-button"
+          className={plain ? 'pp-button pp-plain' : 'pp-button'}
           role="combobox"
           aria-label={prefix ? `${prefix}: ${current.name}` : undefined}
           aria-haspopup="listbox"
@@ -111,11 +115,17 @@ export default function Picker({ options, value, onChange, ariaLabel, prefix, sh
           aria-activedescendant={open ? `${listId}-${active}` : undefined}
           onClick={() => (open ? setOpen(false) : show())}
         >
-          {current.thumb}
-          <span className="pp-label">
-            <span className="pp-name">{current.name}</span>
-            <span className="pp-sub">{current.buttonSub ?? current.sub}</span>
-          </span>
+          {plain ? (
+            <span className="pp-plain-name">{current.buttonName ?? current.name}</span>
+          ) : (
+            <>
+              {current.thumb}
+              <span className="pp-label">
+                <span className="pp-name">{current.name}</span>
+                <span className="pp-sub">{current.buttonSub ?? current.sub}</span>
+              </span>
+            </>
+          )}
           <span className="pp-chev" aria-hidden="true">
             ▾
           </span>
