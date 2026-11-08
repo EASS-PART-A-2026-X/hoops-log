@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useRef, useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrophyDrawer from './TrophyDrawer'
@@ -59,6 +59,18 @@ describe('TrophyDrawer', () => {
     expect(document.activeElement).toBe(toggle)
   })
 
+  it('Escape stops at the drawer: a listener further up (the window) never sees it', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByText('Trophies toggle'))
+    const up = vi.fn()
+    window.addEventListener('keydown', up)
+    await user.keyboard('{Escape}')
+    window.removeEventListener('keydown', up)
+    expect(drawer().className).toBe('drawer')
+    expect(up).not.toHaveBeenCalled()
+  })
+
   it('a click on the dimmed page behind it (small screens) closes it', async () => {
     const user = userEvent.setup()
     const { container } = render(<Harness />)
@@ -73,10 +85,23 @@ describe('TrophyDrawer', () => {
     await user.click(screen.getByText('Trophies toggle'))
     expect(drawer().getAttribute('role')).toBe('dialog')
     expect(drawer().getAttribute('aria-modal')).toBe('true')
+    const close = screen.getByRole('button', { name: 'Close the trophies' })
+    expect(document.activeElement).toBe(close)
+    // The close button is the drawer's only control, so Tab and Shift+Tab must both land on it again,
+    // never on the page button behind the drawer.
     await user.tab()
-    expect(drawer().contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).toBe(close)
     await user.tab({ shift: true })
-    expect(drawer().contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).toBe(close)
+    expect(document.activeElement).not.toBe(screen.getByText('other page button'))
+  })
+
+  it('on a wide screen Tab is not trapped: it can leave the drawer', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByText('Trophies toggle'))
+    await user.tab({ shift: true })
+    expect(document.activeElement).not.toBe(screen.getByRole('button', { name: 'Close the trophies' }))
   })
 
   it('on a wide screen it is a side panel, not a dialog', async () => {

@@ -31,6 +31,10 @@ export default function TrophyDrawer({ open, onClose, list, shooter, partial, na
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // This press is the drawer's: stop it here so the app's own Escape handling (close the shot list,
+        // deselect a shot), which can be registered while this event is still travelling, never sees it.
+        e.preventDefault()
+        e.stopPropagation()
         onClose()
         return
       }

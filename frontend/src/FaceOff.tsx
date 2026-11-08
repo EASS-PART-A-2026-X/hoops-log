@@ -24,7 +24,7 @@ export default function FaceOff({ you, them, verdict, onClose }: Props) {
   const button = useRef<HTMLButtonElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const fitRef = useRef<HTMLDivElement>(null)
-  useFit(boxRef, fitRef)
+  useFit(boxRef, fitRef, 0) // .fo-fit has its own padding
   const rows = faceOffRows(you, them)
   // The latest onClose, so a parent that passes a new function every render does not restart the
   // timer or the focus handling below.

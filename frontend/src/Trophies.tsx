@@ -13,7 +13,7 @@ export default function Trophies({
 }) {
   const got = list.filter((t) => t.unlocked).length
   return (
-    <section className="trophies" aria-labelledby="trophies-title">
+    <section className="trophies" aria-label="Trophy list">
       <p className="count trophies-count">
         {got} of {list.length} unlocked{shooter ? ` · ${shooter}` : ''}
       </p>

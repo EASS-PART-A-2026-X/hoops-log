@@ -531,8 +531,7 @@ h3 {
   font-size: 28px;
 }
 
-.filters,
-.toolbar {
+.filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -629,7 +628,7 @@ h3 {
   gap: 8px;
 }
 
-/* On the court, bottom right (the legend is bottom left): replay and the two switches */
+/* On the court, bottom right (the legend is bottom left): watch, replay and the map style dropdown */
 .stage-frame .tools {
   position: absolute;
   right: 12px;
@@ -667,7 +666,6 @@ h3 {
   cursor: not-allowed;
 }
 
-/* The little light on a switch: lit orange while it is on */
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1331,7 +1329,7 @@ h3 {
 .pp-list {
   position: absolute;
   top: calc(100% + 6px);
-  /* Opens leftwards from the button's right edge: these pickers sit at the right of their toolbar. */
+  /* Opens leftwards from the button's right edge, as the pickers in the page headers sit at the right; .pp-left lines it up with the left edge instead (the top bar). */
   right: 0;
   max-width: calc(100vw - 32px);
   z-index: 20;
@@ -2512,6 +2510,15 @@ h3 {
   width: 100%;
   padding: 20px 16px;
   transform: translate(-50%, -50%) scale(var(--fit, 1));
+  /* Its empty sides belong to the backdrop (a click there closes the face-off): only what is drawn takes clicks. */
+  pointer-events: none;
+}
+
+.fo-fit .fo-card,
+.fo-fit .fo-rows,
+.fo-fit .fo-verdict,
+.fo-fit .btn {
+  pointer-events: auto;
 }
 
 @keyframes fo-fade {
@@ -3040,14 +3047,6 @@ h3 {
 
 .trophies {
   margin-bottom: 0;
-}
-
-.trophies-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
 }
 
 .trophies ul {

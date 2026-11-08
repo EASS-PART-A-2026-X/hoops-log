@@ -116,9 +116,10 @@ export default function App() {
   }, [])
 
   // Escape closes the drawer if it is open, otherwise deselects. Only on the log tab: the other
-  // tabs show neither.
+  // tabs show neither. While the trophy drawer is open Escape belongs to it, so one press never
+  // closes the drawer and also deselects a shot.
   useEffect(() => {
-    if (tab !== 'log' || (!drawerOpen && selectedId === null)) return
+    if (tab !== 'log' || trophyOpen || (!drawerOpen && selectedId === null)) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (drawerOpen) setDrawerOpen(false)
@@ -126,7 +127,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, tab, drawerOpen])
+  }, [selectedId, tab, drawerOpen, trophyOpen])
 
   // The toast sits just under the top bar, which is taller when its tabs wrap on a phone.
   useEffect(() => {
@@ -157,13 +158,15 @@ export default function App() {
     return () => query.removeEventListener('change', onChange)
   }, [])
 
-  // Focus moves into the drawer when it opens and back to the "Shots" button when it closes.
+  // Focus moves into the drawer when it opens and back to the "Shots" button when it closes, unless it
+  // closed because the trophy drawer took its place: then focus stays in the trophy drawer. (This effect
+  // runs after the trophy drawer's own, so without the check it would pull focus out of it.)
   const wasOpen = useRef(false)
   useEffect(() => {
     if (drawerOpen) drawerRef.current?.querySelector<HTMLElement>('button')?.focus()
-    else if (wasOpen.current) toggleRef.current?.focus()
+    else if (wasOpen.current && !trophyOpen) toggleRef.current?.focus()
     wasOpen.current = drawerOpen
-  }, [drawerOpen])
+  }, [drawerOpen, trophyOpen])
 
   // While the drawer covers the page, Tab stays inside it, wherever focus is (even on the body,
   // after a click on plain text or after the focused button went away). Only a focusable element
