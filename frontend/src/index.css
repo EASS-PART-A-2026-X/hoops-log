@@ -2742,6 +2742,8 @@ h3 {
   min-width: 0;
   font-family: var(--display);
   color: #fff;
+  /* Room for the plate's border, so the LIVE cell sits inside the box as it always did. */
+  border: 1px solid transparent;
   padding-right: 14px;
 }
 
@@ -2749,7 +2751,7 @@ h3 {
 .scorebug::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -1px;
   z-index: -1;
   background: linear-gradient(180deg, #17212e, #0f161f);
   border: 1px solid var(--line-strong);
