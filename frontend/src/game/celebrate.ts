@@ -23,7 +23,7 @@ export interface Change {
   newTrophyIds: string[]
 }
 
-/** Only increases count: deleting a shot never celebrates, and a trophy that comes back after a delete is new again. */
+/** Only increases count: deleting a shot never celebrates. (The hook, not this function, makes sure a trophy is announced once per session.) */
 export function diffSnap(prev: Snap, next: Snap): Change {
   return {
     xpGain: Math.max(0, next.xp - prev.xp),

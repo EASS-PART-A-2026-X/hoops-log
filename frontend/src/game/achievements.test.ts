@@ -80,16 +80,25 @@ describe('trophies', () => {
   })
 
   it('Sniper needs 12 makes inside any 20 shots in a row', () => {
-    expect(status(many(11), 'sniper').unlocked).toBe(false)
-    expect(status(many(12), 'sniper').unlocked).toBe(true)
+    expect(status(many(19), 'sniper').unlocked).toBe(false) // not a full 20 shots yet
+    expect(status(many(20), 'sniper').unlocked).toBe(true)
     const ordered = (flags: boolean[]) => flags.map((made, i) => shot({ made, game_date: `2026-10-${String(i + 1).padStart(2, '0')}` }))
     // 11 makes then 9 misses: only 11 in a window of 20
     expect(status(ordered([...Array(11).fill(true), ...Array(9).fill(false)]), 'sniper').unlocked).toBe(false)
     expect(status(ordered([...Array(12).fill(true), ...Array(8).fill(false)]), 'sniper').unlocked).toBe(true)
   })
 
+  it('Sniper stays unlocked when a shot is saved with an earlier game date', () => {
+    const date = (i: number) => `2026-10-${String(i + 1).padStart(2, '0')}`
+    const base = Array.from({ length: 20 }, (_, i) => shot({ made: i < 12, game_date: date(i) }))
+    expect(status(base, 'sniper').unlocked).toBe(true)
+    // Saved last (highest id) but dated into the middle of the makes: the save order is what counts.
+    const backdated = shot({ made: false, game_date: date(5) })
+    expect(status([...base, backdated], 'sniper').unlocked).toBe(true)
+  })
+
   it('Sniper stays unlocked as more shots are added', () => {
-    const base = Array.from({ length: 12 }, (_, i) => shot({ game_date: `2026-10-${String(i + 1).padStart(2, '0')}` }))
+    const base = Array.from({ length: 20 }, (_, i) => shot({ made: i < 12, game_date: `2026-10-${String(i + 1).padStart(2, '0')}` }))
     expect(status(base, 'sniper').unlocked).toBe(true)
     const later = Array.from({ length: 40 }, (_, i) => shot({ made: false, game_date: `2026-11-${String((i % 28) + 1).padStart(2, '0')}` }))
     expect(status([...base, ...later], 'sniper').unlocked).toBe(true)
@@ -110,7 +119,10 @@ describe('bestWindow', () => {
 })
 
 describe('zone list', () => {
-  it('Everywhere uses the real number of zones', () => {
-    expect(ZONE_COUNT).toBe(ZONE_NAMES.length)
+  it('Everywhere is unlocked by one shot in each zone the court has, and by no fewer', () => {
+    const all = ZONE_NAMES.map((zone) => shot({ zone }))
+    expect(ZONE_COUNT).toBeGreaterThan(0)
+    expect(status(all, 'everywhere').unlocked).toBe(true)
+    expect(status(all.slice(1), 'everywhere').unlocked).toBe(false)
   })
 })

@@ -42,8 +42,11 @@ export default function TitleScreen({ stats, onStart, onDone }: Props) {
     doneRef.current = onDone
   })
 
+  const started = useRef(false)
   function start() {
-    if (leaving) return
+    // A ref, not the state: Enter on the focused button runs the key handler and the click in one go.
+    if (started.current) return
+    started.current = true
     setLeaving(true)
     markSeen()
     onStart()

@@ -77,6 +77,27 @@ describe('useCelebrations', () => {
     expect(result.current.pop).toBeNull()
   })
 
+  it('after a cut-short list is whole again, what it showed is not announced late', () => {
+    const first = [shot('A', { made: false })]
+    const withMake = [...first, shot('A')]
+    const { result, rerender } = setup(first, true)
+    rerender({ shots: withMake, truncated: true })
+    rerender({ shots: withMake, truncated: false })
+    expect(result.current.toasts).toEqual([])
+    // ...but the next real change is celebrated again.
+    rerender({ shots: [...withMake, shot('A')], truncated: false })
+    expect(result.current.pop?.amount).toBeGreaterThan(0)
+  })
+
+  it('shows at most three toasts, keeping the newest', () => {
+    const first = [shot('A', { made: false })]
+    const { result, rerender } = setup(first)
+    const many = Array.from({ length: 12 }, () => shot('A', { zone: 'left_corner_3', shot_type: '3PT' }))
+    rerender({ shots: [...first, ...many], truncated: false })
+    expect(result.current.toasts.length).toBeLessThanOrEqual(3)
+    expect(result.current.toasts.length).toBeGreaterThan(0)
+  })
+
   it('toasts go away by themselves, one at a time, and the XP pop too', () => {
     const first = [shot('A', { made: false })]
     const { result, rerender } = setup(first)

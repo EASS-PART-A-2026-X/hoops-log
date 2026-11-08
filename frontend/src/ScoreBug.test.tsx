@@ -43,6 +43,9 @@ describe('ScoreBug', () => {
   it('says when the level covers only part of the log', () => {
     render(<ScoreBug armed partial name="Ann" made={1} attempts={1} level={level} pop={null} />)
     expect(screen.getByRole('group').getAttribute('title')).toContain('loaded shots only')
+    // Visible text and text for screen readers too: a tooltip alone does not reach touch or keyboard users.
+    expect(screen.getByRole('group').querySelector('.bug-partial')?.textContent).toContain('loaded shots only')
+    expect(screen.getByRole('group').querySelector('.sr-only')?.textContent).toContain('loaded shots only')
   })
 })
 

@@ -3771,3 +3771,14 @@ h3 {
   font-size: 13px;
   color: var(--muted);
 }
+
+.bug-partial {
+  font-style: normal;
+  color: var(--bench);
+}
+
+@media (max-width: 960px) {
+  .bug-xpnum {
+    display: none;
+  }
+}

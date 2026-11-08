@@ -103,6 +103,13 @@ describe('TitleScreen', () => {
     expect(onStart).not.toHaveBeenCalled()
   })
 
+  it('Enter on the focused button starts the game once, not twice', async () => {
+    const onStart = vi.fn()
+    render(<TitleScreen stats={stats} onStart={onStart} onDone={() => {}} />)
+    await userEvent.setup().keyboard('{Enter}')
+    expect(onStart).toHaveBeenCalledTimes(1)
+  })
+
   it('Space starts it without scrolling the page behind', () => {
     const onStart = vi.fn()
     render(<TitleScreen stats={stats} onStart={onStart} onDone={() => {}} />)

@@ -40,9 +40,12 @@ export function bestStreak(shots: TrophyShot[]): number {
 export const SNIPER_WINDOW = 20
 export const SNIPER_MAKES = 12
 
-/** The most makes in any run of `window` shots in a row (all the shots when there are fewer). Adding later shots can never lower it. */
+/**
+ * The most makes in any run of `window` shots in a row, in the order the shots were saved (by id, so a
+ * shot with an earlier game date does not move between others). Saving more shots can never lower it.
+ */
 export function bestWindow(shots: TrophyShot[], window: number): number {
-  const made = chronological(shots).map((s) => (s.made ? 1 : 0))
+  const made = [...shots].sort((a, b) => a.id - b.id).map((s) => (s.made ? 1 : 0))
   let sum = 0
   let best = 0
   for (let i = 0; i < made.length; i++) {
@@ -104,7 +107,11 @@ export const TROPHIES: Trophy[] = [
     id: 'sniper',
     title: 'Sniper',
     how: `Make ${SNIPER_MAKES} of ${SNIPER_WINDOW} shots in a row`,
-    progress: (s) => ({ done: bestWindow(s, SNIPER_WINDOW), target: SNIPER_MAKES }),
+    progress: (s) => {
+      const best = bestWindow(s, SNIPER_WINDOW)
+      // A full stretch of shots is needed: 12 makes in 12 shots is hot, but not yet 12 of 20.
+      return { done: s.length < SNIPER_WINDOW ? Math.min(best, SNIPER_MAKES - 1) : best, target: SNIPER_MAKES }
+    },
   },
 ]
 
