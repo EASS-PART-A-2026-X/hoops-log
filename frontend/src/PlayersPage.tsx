@@ -7,6 +7,7 @@ import { shooterProfile } from './court/cardData'
 import CardDialog from './CardDialog'
 import FallbackImage from './FallbackImage'
 import ShotCard from './ShotCard'
+import Trophies from './Trophies'
 
 interface Mine {
   fg: number | null
@@ -129,6 +130,7 @@ export default function PlayersPage({ shots, shooter, shooterPicker, benchmarkId
 
   return (
     <section aria-labelledby="players-title">
+      {shots && <Trophies shots={shots} shooter={shooter} />}
       <div className="map-head">
         <h2 id="players-title">NBA players</h2>
         <div className="filters">

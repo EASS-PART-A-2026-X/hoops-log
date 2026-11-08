@@ -2739,3 +2739,1029 @@ h3 {
     gap: 5px;
   }
 }
+
+/* ---------- Game feel: score bug, XP, trophies, toasts (orange / white / blue only) ---------- */
+.topbar .brand {
+  margin-right: 0;
+}
+
+.scorebug-wrap {
+  position: relative;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.scorebug {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  font-family: var(--display);
+  color: #fff;
+  background: linear-gradient(180deg, #17212e, #0f161f);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  padding-right: 14px;
+}
+
+.scorebug > span {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-right: 1px solid var(--line);
+}
+
+.scorebug > span:last-of-type {
+  border-right: 0;
+}
+
+.bug-live {
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: var(--muted);
+  background: #0b0f14;
+}
+
+.bug-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--orange);
+  animation: bug-live 1.6s ease-in-out infinite;
+}
+
+@keyframes bug-live {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.bug-name {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bug-fg {
+  gap: 4px;
+  align-items: baseline;
+  background: var(--orange-bg);
+  min-width: 96px;
+  justify-content: center;
+}
+
+.bug-fg b {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--orange-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.bug-fg small {
+  font-size: 14px;
+  color: var(--orange-soft);
+}
+
+.bug-fg em {
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.bug-level {
+  position: relative;
+  gap: 10px;
+}
+
+.bug-lvl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  padding: 3px 9px;
+  background: var(--blue);
+  border-radius: 3px;
+}
+
+.bug-lvl small {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+.bug-lvl b {
+  font-size: 22px;
+}
+
+.bug-xp {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 118px;
+}
+
+.bug-rank {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bug-bar {
+  display: block;
+  height: 8px;
+  background: #0b0f14;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bug-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), var(--orange-soft));
+  transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.bug-xpnum {
+  font-family: var(--body, inherit);
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.xp-pop {
+  position: absolute;
+  right: 30px;
+  top: 100%;
+  z-index: 70;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--orange-soft);
+  text-shadow: 0 2px 6px #000;
+  pointer-events: none;
+  animation: xp-pop 1.7s ease-out forwards;
+}
+
+@keyframes xp-pop {
+  0% {
+    opacity: 0;
+    transform: translate(0, -6px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0, 8px) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 30px) scale(1);
+  }
+}
+
+.mute-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.mute-btn:hover {
+  border-color: var(--orange-soft);
+}
+
+.mute-btn[aria-pressed='true'] {
+  color: var(--muted);
+}
+
+.game-toasts {
+  position: fixed;
+  top: calc(var(--topbar-h, 72px) + 70px);
+  left: 50%;
+  z-index: 65;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(460px, calc(100% - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.game-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(100deg, #1b2a3d, #121923 70%);
+  border: 1px solid var(--blue);
+  border-left-width: 6px;
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  animation: toast-in 0.5s cubic-bezier(0.2, 1.2, 0.3, 1) both;
+}
+
+.game-toast.kind-level {
+  border-color: var(--orange);
+  background: linear-gradient(100deg, #3a2314, #121923 75%);
+}
+
+.game-toast-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  color: #fff;
+  background: var(--blue);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+
+.kind-level .game-toast-icon {
+  background: var(--orange);
+}
+
+.game-toast-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.game-toast-text strong {
+  font-family: var(--display);
+  font-size: 26px;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.game-toast-text span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.game-toast-close {
+  flex: none;
+  min-width: 32px;
+  min-height: 32px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.92);
+  }
+}
+
+.trophies {
+  margin-bottom: 28px;
+}
+
+.trophies-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.trophies ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trophy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+}
+
+.trophy strong {
+  font-family: var(--display);
+  font-size: 19px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trophy-medal {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  background: #0b0f14;
+  border-radius: 50%;
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+.trophy-how {
+  font-size: 13px;
+}
+
+.trophy-state {
+  margin-top: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trophy-bar {
+  display: block;
+  height: 5px;
+  margin-top: 4px;
+  background: #0b0f14;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.trophy-bar i {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+}
+
+.trophy.got {
+  color: var(--text);
+  border-style: solid;
+  border-color: var(--orange);
+  background:
+    linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.09) 50%, transparent 65%) 0 0 / 250% 100%,
+    linear-gradient(160deg, #3a2314, #121923 70%);
+  animation: trophy-shine 4.5s ease-in-out infinite;
+}
+
+.trophy.got .trophy-medal {
+  color: #fff;
+  background: var(--orange);
+  filter: none;
+  opacity: 1;
+}
+
+.trophy.got .trophy-state {
+  color: var(--orange-soft);
+  font-weight: 700;
+}
+
+@keyframes trophy-shine {
+  0%,
+  60% {
+    background-position: 130% 0, 0 0;
+  }
+  100% {
+    background-position: -30% 0, 0 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .scorebug > .bug-live,
+  .scorebug > .bug-name,
+  .scorebug > .bug-fg,
+  .bug-xpnum {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .scorebug-wrap {
+    flex: 1 1 auto;
+  }
+
+  .game-toasts {
+    top: calc(var(--topbar-h, 110px) + 8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bug-live i,
+  .trophy.got,
+  .game-toast,
+  .xp-pop {
+    animation: none;
+  }
+
+  .bug-bar i {
+    transition: none;
+  }
+}
+
+/* ---------- Title screen: PRESS START ---------- */
+.title {
+  --ease-slam: cubic-bezier(0.2, 1.4, 0.3, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #fff;
+  background: #05080c;
+  font-family: var(--display);
+  cursor: pointer;
+  user-select: none;
+}
+
+.title.leaving {
+  animation: t-iris 0.9s cubic-bezier(0.7, 0, 0.3, 1) 0.12s forwards;
+  pointer-events: none;
+}
+
+/* While it wipes away, the background freezes: only the wipe itself is drawn each frame. */
+.title.leaving .t-bg *,
+.title.leaving .t-ball,
+.title.leaving .t-ball svg,
+.title.leaving .ltr {
+  animation-play-state: paused;
+}
+
+@keyframes t-iris {
+  0% {
+    clip-path: circle(150% at 50% 50%);
+  }
+  100% {
+    clip-path: circle(0% at 50% 50%);
+  }
+}
+
+.t-bg,
+.t-bg > * {
+  position: absolute;
+  inset: 0;
+}
+
+.t-sky {
+  background: radial-gradient(120% 90% at 50% 0%, #15263c 0%, #0a121c 55%, #05080c 100%);
+}
+
+/* Spotlights swinging over the court */
+.t-beam {
+  inset: -10% auto auto 50%;
+  width: 46vmax;
+  height: 120%;
+  margin-left: -23vmax;
+  transform-origin: 50% 0;
+  background: linear-gradient(180deg, rgba(150, 190, 255, 0.35), rgba(150, 190, 255, 0) 80%);
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.t-beam.b1 {
+  animation: t-sweep-a 7s ease-in-out infinite alternate;
+}
+
+.t-beam.b2 {
+  background: linear-gradient(180deg, rgba(255, 150, 90, 0.34), rgba(255, 150, 90, 0) 80%);
+  animation: t-sweep-b 9s ease-in-out infinite alternate;
+}
+
+.t-beam.b3 {
+  width: 30vmax;
+  margin-left: -15vmax;
+  animation: t-sweep-c 5.5s ease-in-out infinite alternate;
+}
+
+@keyframes t-sweep-a {
+  from {
+    transform: rotate(-38deg);
+  }
+  to {
+    transform: rotate(24deg);
+  }
+}
+
+@keyframes t-sweep-b {
+  from {
+    transform: rotate(34deg);
+  }
+  to {
+    transform: rotate(-22deg);
+  }
+}
+
+@keyframes t-sweep-c {
+  from {
+    transform: rotate(-8deg);
+  }
+  to {
+    transform: rotate(12deg);
+  }
+}
+
+/* The court floor in perspective, rushing towards you */
+.t-floor {
+  inset: 44% -30% -40% -30%;
+  perspective: 520px;
+  perspective-origin: 50% 0;
+  overflow: hidden;
+}
+
+.t-floor > * {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 0;
+  transform: rotateX(64deg);
+}
+
+.t-grid {
+  overflow: hidden;
+}
+
+.t-grid > div {
+  position: absolute;
+  inset: -90px 0 0 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 122, 47, 0.55) 0 2px, transparent 2px 90px),
+    repeating-linear-gradient(0deg, rgba(127, 176, 255, 0.45) 0 2px, transparent 2px 90px),
+    linear-gradient(180deg, #1a2433, #0d141d);
+  background-position: 0 0, 0 0, 0 90px;
+  will-change: transform;
+  animation: t-rush 1.6s linear infinite;
+}
+
+@keyframes t-rush {
+  to {
+    transform: translateY(90px);
+  }
+}
+
+.t-key {
+  inset: 0 36% 20% 36%;
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  border-top: 0;
+  background: rgba(255, 122, 47, 0.2);
+}
+
+.t-arc {
+  inset: 18% 12% auto 12%;
+  height: 90%;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+}
+
+/* Shock rings from the ball */
+.t-rings i {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: 100vmin;
+  height: 100vmin;
+  margin: -50vmin 0 0 -50vmin;
+  will-change: transform, opacity;
+  border: 3px solid var(--orange);
+  border-radius: 50%;
+  opacity: 0;
+  animation: t-ring 3.6s ease-out infinite;
+}
+
+.t-rings i:nth-child(2) {
+  border-color: var(--bench);
+  animation-delay: 1.2s;
+}
+
+.t-rings i:nth-child(3) {
+  animation-delay: 2.4s;
+}
+
+@keyframes t-ring {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.08);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+.spark {
+  inset: auto auto -10px auto;
+  border-radius: 50%;
+  background: var(--orange-soft);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: t-spark linear infinite;
+}
+
+.spark.blue {
+  background: var(--bench);
+}
+
+@keyframes t-spark {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-105vh) translateX(40px);
+  }
+}
+
+.t-scan {
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 4px);
+}
+
+.t-scan::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 18%;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: t-scanbar 5s linear infinite;
+}
+
+@keyframes t-scanbar {
+  from {
+    transform: translateY(-120%);
+  }
+  to {
+    transform: translateY(620%);
+  }
+}
+
+.t-vignette {
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.75) 100%);
+}
+
+/* Foreground */
+.t-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+}
+
+.t-ball-wrap {
+  position: relative;
+  height: clamp(110px, 22vh, 170px);
+  width: 170px;
+  animation: t-drop 0.9s cubic-bezier(0.5, 0, 0.9, 0.5) both;
+}
+
+.t-ball {
+  position: absolute;
+  inset: 0 auto auto 50%;
+  margin-left: -75px;
+  transform-origin: 50% 100%;
+  will-change: transform;
+  animation: t-bounce 1.15s cubic-bezier(0.3, 0, 0.7, 1) 0.9s infinite;
+}
+
+.t-ball svg {
+  display: block;
+  will-change: transform;
+  animation: t-spin 2.3s linear infinite;
+  width: clamp(90px, 18vh, 150px);
+  height: auto;
+}
+
+.t-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 110px;
+  height: 16px;
+  margin-left: -55px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.7), transparent 70%);
+  animation: t-shadow 1.15s cubic-bezier(0.3, 0, 0.7, 1) 0.9s infinite;
+}
+
+@keyframes t-drop {
+  from {
+    transform: translateY(-80vh);
+  }
+}
+
+@keyframes t-bounce {
+  0%,
+  100% {
+    transform: translateY(calc(100% - 100%)) scale(1.06, 0.88);
+  }
+  12% {
+    transform: translateY(-6%) scale(0.96, 1.05);
+  }
+  50% {
+    transform: translateY(-58%) scale(1, 1);
+  }
+  88% {
+    transform: translateY(-6%) scale(0.98, 1.03);
+  }
+}
+
+@keyframes t-shadow {
+  0%,
+  100% {
+    transform: scaleX(1.1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(0.55);
+    opacity: 0.45;
+  }
+}
+
+@keyframes t-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.t-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  line-height: 0.82;
+  font-size: clamp(64px, 17vmin, 200px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.t-logo .word {
+  display: flex;
+}
+
+.t-logo .word.two {
+  color: var(--orange);
+  font-size: 0.72em;
+  letter-spacing: 0.5em;
+  margin-right: -0.5em;
+}
+
+.ltr {
+  position: relative;
+  display: inline-block;
+  opacity: 0;
+  animation: t-slam 0.7s var(--ease-slam) forwards, t-glitch 6s steps(1) 2.4s infinite;
+  text-shadow:
+    0 6px 0 #05080c,
+    4px 4px 0 var(--blue),
+    -3px -2px 0 rgba(255, 122, 47, 0.9);
+}
+
+.word.two .ltr {
+  text-shadow:
+    0 6px 0 #05080c,
+    4px 4px 0 #fff,
+    -3px -2px 0 var(--blue);
+}
+
+@keyframes t-slam {
+  0% {
+    opacity: 0;
+    transform: translateY(-160px) scale(3.2) rotate(-14deg);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(8px) scale(0.92) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes t-glitch {
+  0%,
+  93%,
+  100% {
+    transform: none;
+  }
+  94% {
+    transform: translate(-6px, 2px) skewX(-8deg);
+  }
+  96% {
+    transform: translate(7px, -2px) skewX(6deg);
+  }
+  98% {
+    transform: translate(-3px, 0);
+  }
+}
+
+.t-sub {
+  margin: 8px 0 0;
+  font-size: clamp(13px, 2.2vmin, 20px);
+  font-weight: 600;
+  letter-spacing: 0.36em;
+  color: var(--bench);
+  opacity: 0;
+  animation: t-rise 0.8s ease-out 1.5s forwards;
+}
+
+.t-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 16px;
+  margin-top: 6px;
+  padding: 8px 22px 8px 14px;
+  background: rgba(10, 16, 24, 0.78);
+  border: 1px solid var(--line-strong);
+  border-left: 6px solid var(--orange);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  opacity: 0;
+  animation: t-rise 0.8s ease-out 1.9s forwards;
+}
+
+.t-p1 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--orange-soft);
+}
+
+.t-card strong {
+  font-size: 26px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.t-lvl {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.t-lvl small {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  padding: 1px 6px;
+  margin-right: 2px;
+  background: var(--blue);
+  border-radius: 3px;
+}
+
+.t-lvl em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+
+.t-meta {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+@keyframes t-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.t-start {
+  margin-top: 18px;
+  padding: 12px 54px 12px 46px;
+  font: inherit;
+  font-size: clamp(28px, 5vmin, 44px);
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: #fff;
+  background: var(--orange);
+  border: 0;
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  cursor: pointer;
+  opacity: 0;
+  will-change: transform;
+  animation:
+    t-rise 0.7s var(--ease-slam) 2.3s forwards,
+    t-pulse 1.2s ease-in-out 3s infinite;
+}
+
+.t-start:hover,
+.t-start:focus-visible {
+  background: var(--orange-soft);
+  outline: none;
+  transform: scale(1.06);
+}
+
+@keyframes t-pulse {
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+.t-hint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0;
+  animation: t-blink 1.4s ease-in-out 3s infinite;
+}
+
+@keyframes t-blink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.t-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.title.leaving .t-flash {
+  animation: t-flash 0.5s ease-out forwards;
+}
+
+.title.leaving .t-stage {
+  animation: t-zoom 0.9s ease-in forwards;
+}
+
+@keyframes t-flash {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes t-zoom {
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@media (max-height: 560px) {
+  .t-ball-wrap {
+    display: none;
+  }
+
+  .t-card {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title *,
+  .title *::before,
+  .title *::after {
+    animation: none !important;
+  }
+
+  .ltr,
+  .t-sub,
+  .t-card,
+  .t-start,
+  .t-hint {
+    opacity: 1;
+  }
+
+  .title.leaving {
+    animation: none;
+    clip-path: circle(0% at 50% 50%);
+  }
+}

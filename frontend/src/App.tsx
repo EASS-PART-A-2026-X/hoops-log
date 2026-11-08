@@ -14,6 +14,14 @@ import ShotForm from './ShotForm'
 import ShotList from './ShotList'
 import ShotMap from './ShotMap'
 import { useShots } from './useShots'
+import GameToasts from './GameToasts'
+import TitleScreen from './TitleScreen'
+import { shouldShowTitle } from './game/titleSeen'
+import { TROPHIES, unlockedIds } from './game/achievements'
+import ScoreBug, { MuteButton } from './ScoreBug'
+import { play, unlockAudio } from './game/audio'
+import { useCelebrations } from './game/useCelebrations'
+import { levelInfo, totalXp } from './game/xp'
 
 /** The drawer covers the page below this width (the layout breakpoint in index.css). */
 const NARROW = '(max-width: 960px)'
@@ -53,6 +61,7 @@ export default function App() {
   async function add(input: ShotInput) {
     const saved = await createShot(input)
     setNotice({ kind: 'ok', text: `Saved shot #${saved.id} for ${saved.player}.` })
+    play(saved.made ? 'swish' : 'rim')
     await refresh()
     // The map shows one player's shots: switch to the saved shot's player so the new shot is visible.
     setShooterChoice(saved.player)
@@ -84,6 +93,21 @@ export default function App() {
     }
     await refresh()
   }
+
+  // Browsers keep sound off until the visitor does something: the first click or key unlocks it.
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio()
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+    window.addEventListener('pointerdown', unlock)
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   // Escape closes the drawer if it is open, otherwise deselects. Only on the log tab: the other
   // tabs show neither.
@@ -213,14 +237,38 @@ export default function App() {
 
   // The drawer shows the same shots as the map: the chosen player's, or everyone's.
   const made = shooterShots?.filter((s) => s.made).length ?? 0
+  const level = useMemo(() => levelInfo(totalXp(shooterShots ?? [])), [shooterShots])
+  const celebrations = useCelebrations(shots)
+  // The title screen: shown once per tab. The app is already loading behind it.
+  const [title, setTitle] = useState(shouldShowTitle)
+  // True from the moment the player presses start, while the wipe is still running.
+  const [started, setStarted] = useState(false)
+  const covered = title && !started
+  const titleStats = useMemo(
+    () =>
+      shooterShots
+        ? {
+            name: shooter,
+            level: level.level,
+            rank: level.title,
+            shots: shooterShots.length,
+            trophies: unlockedIds(shooterShots).length,
+            trophyTotal: TROPHIES.length,
+          }
+        : null,
+    [shooterShots, shooter, level],
+  )
 
   return (
-    <div className="app" ref={appRef}>
+    <>
+    {title && <TitleScreen stats={titleStats} onStart={() => setStarted(true)} onDone={() => setTitle(false)} />}
+    <div className="app" ref={appRef} inert={title}>
       <header className="topbar" ref={topbarRef}>
         <button type="button" className="brand" onClick={() => setTab('log')} aria-label="Hoops Log, go to My log">
           <Logo />
           <span aria-hidden="true">HOOPS LOG</span>
         </button>
+        <ScoreBug armed={!covered} name={shooter} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
         {tab === 'log' && (
           <button
             type="button"
@@ -234,6 +282,7 @@ export default function App() {
             {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
           </button>
         )}
+        <MuteButton />
         <nav className="tabs" aria-label="Pages">
           <button type="button" aria-current={tab === 'log' ? 'page' : undefined} onClick={() => setTab('log')}>
             My log
@@ -258,6 +307,8 @@ export default function App() {
           </p>
         )}
       </div>
+
+      <GameToasts toasts={celebrations.toasts} onDismiss={celebrations.dismiss} />
 
       <main className={tab === 'log' ? 'page fit' : 'page'}>
         {tab === 'players' && (
@@ -293,6 +344,7 @@ export default function App() {
             onSelect={pickFromMap}
             baseline={baseline}
             visible={tab === 'log'}
+            suspended={covered}
           />
 
           {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
@@ -377,5 +429,6 @@ export default function App() {
         </div>
       </main>
     </div>
+    </>
   )
 }

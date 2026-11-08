@@ -181,6 +181,8 @@ export class CourtScene {
 
   private raf = 0
   private visible = true
+  /** True while something covers the whole page (the title screen): no frames are drawn. */
+  private suspended = false
   private disposed = false
   private hoverIndex: number | null = null
   private pendingMove: PointerEvent | null = null
@@ -1029,10 +1031,38 @@ export class CourtScene {
     }
   }
 
+  /**
+   * The court's entrance, for when the title screen opens onto it: the camera swings in from high up
+   * at the side while every shot flies in, one after another. Nothing moves with reduced motion.
+   */
+  playEntrance(): void {
+    if (this.opts.reducedMotion || this.film) return
+    const to = VIEWS.shooter
+    const from = { pos: new THREE.Vector3(-72, 58, -82), target: new THREE.Vector3(0, 0, -22) }
+    this.camera.position.copy(from.pos)
+    this.controls.target.copy(from.target)
+    this.tween = {
+      t0: performance.now(),
+      dur: 3000,
+      fromPos: from.pos,
+      toPos: new THREE.Vector3(...to.pos),
+      fromTarget: from.target,
+      toTarget: new THREE.Vector3(...to.target),
+    }
+    this.replay(3800, 3, 140)
+    this.dirty = true
+  }
+
+  /** Stop or resume drawing, for when the page is covered. */
+  setSuspended(on: boolean): void {
+    this.suspended = on
+    this.dirty = true
+  }
+
   private tick = (now: number): void => {
     if (this.disposed) return
     this.raf = requestAnimationFrame(this.tick)
-    if (!this.visible) return
+    if (!this.visible || this.suspended) return
     if (this.tween) {
       const u = clamp01((now - this.tween.t0) / this.tween.dur)
       const e = easeInOut(u)
