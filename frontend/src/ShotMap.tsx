@@ -437,7 +437,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               <p className="stage-hint" aria-hidden="true">
                 {mode === 'heat' ? 'Drag to orbit · scroll to zoom · hover a hex' : 'Drag to orbit · scroll to zoom · click a shot'}
               </p>
-            {/* Not a choice between options: one action and two on/off switches, so they look different. */}
+            {/* The court's tools: watch, replay and the map style dropdown. */}
             <div className="tools" role="group" aria-label="Tools">
               <button type="button" className="tool film-start" onClick={watch} disabled={!ready || filtered.length === 0}>
                 ▶ {watchLabel}

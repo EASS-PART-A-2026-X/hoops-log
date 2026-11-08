@@ -284,8 +284,21 @@ export default function App() {
           partial={truncated}
           name={shooter}
           picker={shooterPicker}
+          made={made}
+          attempts={shooterShots?.length ?? 0}
+          level={level}
+          pop={celebrations.pop}
           trophyButtonRef={trophyToggleRef}
-          trophies={{ unlocked: trophyCount, total: trophyList.length, open: trophyOpen, onToggle: () => { setDrawerOpen(false); setTrophyOpen((open) => !open) } }} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
+          trophies={{
+            unlocked: trophyCount,
+            total: trophyList.length,
+            open: trophyOpen,
+            onToggle: () => {
+              setDrawerOpen(false)
+              setTrophyOpen((open) => !open)
+            },
+          }}
+        />
         {tab === 'log' && (
           <button
             type="button"

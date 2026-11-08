@@ -133,6 +133,10 @@ describe('App: the two drawers', () => {
 describe('App: a selected shot and Escape', () => {
   const selectedRow = () => document.querySelector('.shot[aria-current]')
 
+  // What these check is the result: one Escape closes one thing. The mechanism that made it fail in a real browser (the
+  // app re-registers its Escape handler while the same key press is still travelling) cannot happen under jsdom, where
+  // script-dispatched events do not run React's updates mid-dispatch: that is pinned by TrophyDrawer.test.tsx
+  // ('Escape stops at the drawer') and was checked in a real browser.
   it('Escape with the trophies open closes only them and keeps the selected shot; the next Escape deselects it', async () => {
     await open()
     const user = userEvent.setup()
