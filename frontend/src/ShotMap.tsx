@@ -9,6 +9,7 @@ import { FilmHud, FilmSummaryCard } from './FilmHud'
 import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneShare, zoneStats } from './court/stats'
 import { lastName } from './court/players'
 import ShooterSelect from './ShooterSelect'
+import { play } from './game/audio'
 import type { HexCell, Typical } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
 
@@ -29,6 +30,8 @@ interface Props {
   onPlayerChange: (player: string) => void
   /** Whether the log tab is showing. ShotMap stays mounted when it is hidden, and the film must not. */
   visible: boolean
+  /** The page is covered (title screen): the 3D court stops drawing. */
+  suspended?: boolean
 }
 
 interface Hover {
@@ -105,7 +108,7 @@ const VIEWS: [ViewName, string][] = [
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible, suspended = false }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
@@ -121,6 +124,23 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const [film, setFilm] = useState<FilmState | null>(null)
   const [filmDone, setFilmDone] = useState<{ summary: FilmSummary; bestZoneName: string | null } | null>(null)
   const filmShots = useRef<Shot[]>([])
+  // The last film moment that made a sound, so a pause or a resume does not repeat it.
+  const filmBeat = useRef('')
+  /** Swish or clang when the ball drops, cheer or groan when the result shows, a buzzer at the end. */
+  function filmSound(state: FilmState) {
+    if (!state.active) {
+      if (state.finished && filmShots.current.length > 1 && filmBeat.current !== 'end') play('buzzer')
+      filmBeat.current = state.finished ? 'end' : ''
+      return
+    }
+    const beat = `${state.k}:${state.phase}`
+    if (beat === filmBeat.current) return
+    filmBeat.current = beat
+    const made = filmShots.current[state.k]?.made
+    if (made === undefined) return
+    if (state.phase === 'drop') play(made ? 'swish' : 'rim')
+    else if (state.phase === 'hold') play(made ? 'cheer' : 'groan')
+  }
   const [filmResults, setFilmResults] = useState<boolean[]>([]) // made or missed, for the strip beside the controls
 
   const hostRef = useRef<HTMLDivElement>(null)
@@ -184,6 +204,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
             onFail: () => fail('lost'),
             onFilm: (state) => {
               setFilm(state.active ? state : null)
+              filmSound(state)
               // A single shot needs no summary; a session gets one.
               if (state.finished && filmShots.current.length > 1) {
                 const summary = summarizeFilm(filmShots.current)
@@ -289,6 +310,16 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   // deselect) does not also fire.
   const filmOpen = film !== null || filmDone !== null
   // Leaving the log tab ends the film: nothing is drawn there and its keys must not be swallowed.
+  // When the cover lifts (the title screen was started), the court makes its entrance in front of the player.
+  const wasSuspended = useRef(suspended)
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setSuspended(suspended)
+    if (wasSuspended.current && !suspended) scene.playEntrance()
+    wasSuspended.current = suspended
+  }, [suspended, ready])
+
   const [wasVisible, setWasVisible] = useState(visible)
   if (wasVisible !== visible) {
     setWasVisible(visible)
