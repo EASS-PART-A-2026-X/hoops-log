@@ -2461,20 +2461,21 @@ h3 {
   position: fixed;
   inset: 0;
   z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
   background: rgba(4, 7, 11, 0.82);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
+/* Centred, and shrunk by --fit (see useFit) when the window is too small for the card and its buttons. */
 .card-dialog-body {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 26px;
-  width: min(400px, 100%);
+  width: min(400px, calc(100% - 32px));
+  transform: translate(-50%, -50%) scale(var(--fit, 1));
 }
 
 .card-dialog-actions {
@@ -2494,16 +2495,23 @@ h3 {
   position: fixed;
   inset: 0;
   z-index: 90;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #0e1828 0%, #04070b 75%);
+  animation: fo-fade 0.3s ease-out;
+}
+
+/* Everything on the screen, centred and shrunk by --fit (see useFit) when the window is too small, so it never scrolls. */
+.fo-fit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* safe: when the content is taller than the window it starts at the top and scrolls, instead of being cut off above. */
-  justify-content: safe center;
   gap: 18px;
+  width: 100%;
   padding: 20px 16px;
-  overflow-y: auto;
-  background: radial-gradient(ellipse at center, #0e1828 0%, #04070b 75%);
-  animation: fo-fade 0.3s ease-out;
+  transform: translate(-50%, -50%) scale(var(--fit, 1));
 }
 
 @keyframes fo-fade {
@@ -2694,31 +2702,6 @@ h3 {
 
   .fo-val {
     font-size: 17px;
-  }
-}
-
-/* Short windows: smaller cards so the cards, the bars and the button all fit */
-@media (max-height: 820px) and (min-width: 761px) {
-  .fo-card .shot-card {
-    font-size: 13.5px;
-  }
-
-  .faceoff {
-    gap: 12px;
-  }
-}
-
-@media (max-height: 760px) and (min-width: 761px) {
-  .fo-card .shot-card {
-    font-size: 10.5px;
-  }
-
-  .fo-verdict {
-    font-size: 22px;
-  }
-
-  .fo-rows {
-    gap: 5px;
   }
 }
 

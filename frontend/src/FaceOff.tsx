@@ -3,6 +3,7 @@ import { tabTarget } from './focusTrap'
 import type { CardProfile } from './court/cardData'
 import { FACE_OFF_MS, faceOffRows, rowWinner } from './court/faceoff'
 import ShotCard from './ShotCard'
+import { useFit } from './useFit'
 
 interface Props {
   you: CardProfile
@@ -21,6 +22,9 @@ const show = (v: number | null, unit: string) => (v === null ? '–' : `${v}${un
  */
 export default function FaceOff({ you, them, verdict, onClose }: Props) {
   const button = useRef<HTMLButtonElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const fitRef = useRef<HTMLDivElement>(null)
+  useFit(boxRef, fitRef)
   const rows = faceOffRows(you, them)
   // The latest onClose, so a parent that passes a new function every render does not restart the
   // timer or the focus handling below.
@@ -57,7 +61,8 @@ export default function FaceOff({ you, them, verdict, onClose }: Props) {
   }, [])
 
   return (
-    <div className="faceoff" role="dialog" aria-modal="true" aria-label={`Face-off: ${you.name} against ${them.name}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="faceoff" ref={boxRef} role="dialog" aria-modal="true" aria-label={`Face-off: ${you.name} against ${them.name}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="fo-fit" ref={fitRef}>
       <div className="fo-stage">
         <div className="fo-card left">
           <ShotCard profile={you} size="versus" tilt={false} />
@@ -93,6 +98,7 @@ export default function FaceOff({ you, them, verdict, onClose }: Props) {
       <button type="button" className="btn primary" ref={button} onClick={onClose}>
         See the full comparison
       </button>
+      </div>
     </div>
   )
 }
