@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ScoreBug from './ScoreBug'
 import Trophies from './Trophies'
 import { trophyStatus } from './game/achievements'
@@ -47,6 +47,30 @@ describe('ScoreBug', () => {
     // Visible text and text for screen readers too: a tooltip alone does not reach touch or keyboard users.
     expect(screen.getByRole('group').querySelector('.bug-partial')?.textContent).toBe('loaded shots only')
     expect(screen.getByRole('group').querySelector('.sr-only')?.textContent).toContain('loaded shots only')
+  })
+})
+
+describe('ScoreBug trophy link', () => {
+  const link = (over = {}) => ({ unlocked: 7, total: 12, open: false, onToggle: vi.fn(), ...over })
+
+  it('has no button when there is no trophy drawer to open', () => {
+    const { container } = render(<ScoreBug picker={<span>p</span>} armed name="Ann" made={1} attempts={1} level={level} pop={null} />)
+    expect(container.querySelector('.bug-level-hit')).toBeNull()
+  })
+
+  it('the level block opens the trophies and says how many are unlocked', () => {
+    const l = link()
+    render(<ScoreBug picker={<span>p</span>} armed name="Ann" made={1} attempts={1} level={level} pop={null} trophies={l} />)
+    const button = screen.getByRole('button', { name: 'Trophies: 7 of 12 unlocked' })
+    expect(button.getAttribute('aria-controls')).toBe('trophy-drawer')
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    button.click()
+    expect(l.onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports an open drawer', () => {
+    render(<ScoreBug picker={<span>p</span>} armed name="Ann" made={1} attempts={1} level={level} pop={null} trophies={link({ open: true })} />)
+    expect(screen.getByRole('button', { name: /Trophies/ }).getAttribute('aria-expanded')).toBe('true')
   })
 })
 

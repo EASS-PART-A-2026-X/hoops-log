@@ -276,7 +276,13 @@ export default function App() {
           <Logo />
           <span aria-hidden="true">HOOPS LOG</span>
         </button>
-        <ScoreBug armed={!covered} partial={truncated} name={shooter} picker={shooterPicker} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
+        <ScoreBug
+          armed={!covered}
+          partial={truncated}
+          name={shooter}
+          picker={shooterPicker}
+          trophyButtonRef={trophyToggleRef}
+          trophies={{ unlocked: trophyCount, total: trophyList.length, open: trophyOpen, onToggle: () => { setDrawerOpen(false); setTrophyOpen((open) => !open) } }} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
         {tab === 'log' && (
           <button
             type="button"
@@ -293,26 +299,6 @@ export default function App() {
             {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
           </button>
         )}
-        <button
-          type="button"
-          ref={trophyToggleRef}
-          className="trophy-toggle"
-          aria-expanded={trophyOpen}
-          aria-controls="trophy-drawer"
-          onClick={() => {
-            setDrawerOpen(false)
-            setTrophyOpen((open) => !open)
-          }}
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 4h10v5a5 5 0 01-10 0V4z" fill="currentColor" />
-            <path d="M7 6H4a3 3 0 003 4M17 6h3a3 3 0 01-3 4M12 14v4M8 20h8" />
-          </svg>
-          Trophies
-          <span className="trophy-count">
-            {trophyCount}/{trophyList.length}
-          </span>
-        </button>
         <MuteButton />
         <nav className="tabs" aria-label="Pages">
           <button type="button" aria-current={tab === 'log' ? 'page' : undefined} onClick={() => setTab('log')}>

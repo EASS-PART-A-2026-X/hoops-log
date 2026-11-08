@@ -4,6 +4,14 @@ import { isMuted, play, setMuted, subscribeMuted } from './game/audio'
 import type { XpPop } from './game/useCelebrations'
 import type { LevelInfo } from './game/xp'
 
+/** The level block doubles as the way into the trophy drawer: no extra button in the bar. */
+export interface TrophyLink {
+  unlocked: number
+  total: number
+  open: boolean
+  onToggle: () => void
+}
+
 interface Props {
   /** The "Shots of" dropdown: it takes the place of the player's name. */
   picker: React.ReactNode
@@ -16,10 +24,13 @@ interface Props {
   attempts: number
   level: LevelInfo
   pop: XpPop | null
+  trophies?: TrophyLink
+  /** The trophy button, so focus can go back to it when the drawer closes. */
+  trophyButtonRef?: React.Ref<HTMLButtonElement>
 }
 
 /** The top bar's TV score bug: whose shots, their field goal percent, and level with an XP bar. */
-export default function ScoreBug({ armed, partial = false, name, picker, made, attempts, level, pop }: Props) {
+export default function ScoreBug({ armed, partial = false, name, picker, trophies, trophyButtonRef, made, attempts, level, pop }: Props) {
   const pct = !armed || attempts === 0 ? 0 : Math.round((made / attempts) * 100)
   const shownPct = useTicker(pct)
   const shownXp = useTicker(armed ? level.into : 0)
@@ -38,7 +49,7 @@ export default function ScoreBug({ armed, partial = false, name, picker, made, a
         {attempts > 0 && <small>%</small>}
         <em>FG</em>
       </span>
-      <span className="bug-level">
+      <span className={trophies ? 'bug-level linked' : 'bug-level'}>
         <span className="bug-lvl">
           <small>LVL</small>
           <b>{level.level}</b>
@@ -56,6 +67,18 @@ export default function ScoreBug({ armed, partial = false, name, picker, made, a
           </span>
           {partial && <span className="sr-only">The log is longer than what is loaded, so this counts the loaded shots only.</span>}
         </span>
+        {trophies && (
+          <button
+            type="button"
+            ref={trophyButtonRef}
+            className="bug-level-hit"
+            aria-expanded={trophies.open}
+            aria-controls="trophy-drawer"
+            aria-label={`Trophies: ${trophies.unlocked} of ${trophies.total} unlocked`}
+            title={`Trophies ${trophies.unlocked}/${trophies.total}`}
+            onClick={trophies.onToggle}
+          />
+        )}
       </span>
     </div>
       {showPop && (

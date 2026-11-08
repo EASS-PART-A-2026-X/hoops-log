@@ -3871,40 +3871,6 @@ h3 {
 }
 
 /* ---------- Trophies: a button in the top bar and a drawer ---------- */
-.trophy-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 6px 16px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  background: transparent;
-  border: 1px solid var(--line-strong);
-  border-radius: 22px;
-  cursor: pointer;
-}
-
-.trophy-toggle:hover,
-.trophy-toggle[aria-expanded='true'] {
-  border-color: var(--orange-soft);
-}
-
-.trophy-toggle svg {
-  color: var(--orange-soft);
-}
-
-.trophy-count {
-  padding: 1px 8px;
-  font-size: 13px;
-  color: var(--orange-soft);
-  background: var(--orange-bg);
-  border-radius: 10px;
-  font-variant-numeric: tabular-nums;
-}
-
 .drawer-title {
   margin: 0 0 0 4px;
   font-family: var(--display);
@@ -3916,12 +3882,28 @@ h3 {
   margin: 0 0 12px;
 }
 
-@media (max-width: 640px) {
-  .trophy-toggle {
-    padding-inline: 12px;
-  }
 
-  .trophy-toggle svg {
-    display: none;
-  }
+/* The level badge and XP bar open the trophies: a button laid over them, so the bar gets no new element. */
+.bug-level-hit {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.bug-level.linked:hover .bug-rank,
+.bug-level.linked:has(.bug-level-hit[aria-expanded='true']) .bug-rank {
+  color: var(--orange-soft);
+}
+
+.bug-level.linked:hover .bug-lvl,
+.bug-level.linked:has(.bug-level-hit[aria-expanded='true']) .bug-lvl {
+  background: var(--orange);
+}
+
+.bug-level-hit:focus-visible {
+  outline: 2px solid var(--orange-soft);
+  outline-offset: -2px;
 }
