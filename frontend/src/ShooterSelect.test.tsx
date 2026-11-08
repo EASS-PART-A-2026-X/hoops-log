@@ -55,4 +55,14 @@ describe('ShooterSelect', () => {
     expect(options).toHaveLength(1)
     expect(options[0]?.textContent).toContain('0 shots')
   })
+
+  it('has a visible "Shots of" label, or in the top bar only a name for screen readers', () => {
+    const { container, rerender } = render(<ShooterSelect shots={shots} value="Yuly" onChange={() => {}} />)
+    expect(container.querySelector('.pp-prefix')?.textContent).toBe('Shots of')
+    expect(container.querySelector('.pp-left')).toBeNull()
+    rerender(<ShooterSelect compact shots={shots} value="Yuly" onChange={() => {}} />)
+    expect(container.querySelector('.pp-prefix')).toBeNull()
+    expect(container.querySelector('.pp-left')).not.toBeNull()
+    expect(screen.getByRole('combobox').getAttribute('aria-label')).toBe('Shots of: Yuly')
+  })
 })

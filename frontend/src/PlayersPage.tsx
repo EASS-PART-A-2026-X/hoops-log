@@ -107,12 +107,11 @@ interface Props {
   partial?: boolean
   /** Whose shots these are ('' = every player's). */
   shooter: string
-  shooterPicker: React.ReactNode
   benchmarkId: number | null
   onCompare: (id: number) => void
 }
 
-export default function PlayersPage({ shots, partial = false, shooter, shooterPicker, benchmarkId, onCompare }: Props) {
+export default function PlayersPage({ shots, partial = false, shooter, benchmarkId, onCompare }: Props) {
   const [team, setTeam] = useState('')
   const [cardOpen, setCardOpen] = useState(false)
   const teamKeys = [...new Set(PLAYERS.map((p) => p.team))]
@@ -136,7 +135,6 @@ export default function PlayersPage({ shots, partial = false, shooter, shooterPi
       <div className="map-head">
         <h2 id="players-title">NBA players</h2>
         <div className="filters">
-          {shooterPicker}
           <div className="chips" role="group" aria-label="Team">
             <button type="button" className="chip" aria-pressed={team === ''} onClick={() => setTeam('')}>
               All teams

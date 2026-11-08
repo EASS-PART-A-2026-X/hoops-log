@@ -16,7 +16,6 @@ import type { HeatGrid, HexBins, HexCell } from './stats'
 import { drawCourt, heatColor, paintHeat } from './textures'
 
 export type MapMode = 'heat' | 'beams' | 'arcs'
-export type ViewName = 'shooter' | 'top' | 'low' | 'side'
 
 export interface ScenePoint {
   x: number // court feet
@@ -79,12 +78,8 @@ const MARKER_PIN_Y = 19 // resting height of the selected-shot pin
 const MARKER_COLUMN_END = MARKER_PIN_Y - 1.5 // the column stops just under the pin
 
 // The camera stands on the half-court side and looks toward the basket (+Z).
-const VIEWS: Record<ViewName, { pos: [number, number, number]; target: [number, number, number] }> = {
-  shooter: { pos: [0, 34, -66], target: [0, 0, -15] },
-  top: { pos: [0, 76, -30], target: [0, 0, -23.5] },
-  low: { pos: [0, 6, -58], target: [0, 3.5, -8] },
-  side: { pos: [-46, 17, -20], target: [0, 0, -18] },
-}
+/** Where the camera starts and returns to: behind the shooter, looking at the hoop. */
+const HOME: { pos: [number, number, number]; target: [number, number, number] } = { pos: [0, 34, -66], target: [0, 0, -15] }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 const easeOutBack = (t: number) => {
@@ -207,7 +202,7 @@ export class CourtScene {
       this.scene.background = new THREE.Color('#0b0f14')
       this.scene.fog = new THREE.FogExp2('#0b0f14', 0.0085)
       this.camera = new THREE.PerspectiveCamera(38, 1, 0.5, 400)
-      this.camera.position.set(...VIEWS.shooter.pos)
+      this.camera.position.set(...HOME.pos)
 
       this.controls = new OrbitControls(this.camera, canvas)
       this.controls.enableDamping = true
@@ -215,8 +210,7 @@ export class CourtScene {
       this.controls.minDistance = 10
       this.controls.maxDistance = 95
       this.controls.maxPolarAngle = Math.PI / 2 - 0.035
-      this.controls.target.set(...VIEWS.shooter.target)
-      this.controls.autoRotateSpeed = 0.9
+      this.controls.target.set(...HOME.target)
       this.controls.listenToKeyEvents(canvas)
 
       this.composer = new EffectComposer(renderer)
@@ -321,36 +315,6 @@ export class CourtScene {
     }
     this.applyMode()
     this.dirty = true
-  }
-
-  setView(name: ViewName): void {
-    const v = VIEWS[name]
-    const toPos = new THREE.Vector3(...v.pos)
-    const toTarget = new THREE.Vector3(...v.target)
-    if (this.opts.reducedMotion) {
-      this.camera.position.copy(toPos)
-      this.controls.target.copy(toTarget)
-      this.controls.update()
-      return
-    }
-    this.tween = {
-      t0: performance.now(),
-      dur: 950,
-      fromPos: this.camera.position.clone(),
-      toPos,
-      fromTarget: this.controls.target.clone(),
-      toTarget,
-    }
-  }
-
-  /** Show or hide the arena around the court. */
-  setArena(on: boolean): void {
-    if (this.arena) this.arena.visible = on
-    this.dirty = true
-  }
-
-  setAutoRotate(on: boolean): void {
-    this.controls.autoRotate = on && !this.opts.reducedMotion
   }
 
   /** Fly every ball from the shooter to the rim, in order, then let the markers settle. */
@@ -1037,7 +1001,7 @@ export class CourtScene {
    */
   playEntrance(): void {
     if (this.opts.reducedMotion || this.film) return
-    const to = VIEWS.shooter
+    const to = HOME
     const from = { pos: new THREE.Vector3(-72, 58, -82), target: new THREE.Vector3(0, 0, -22) }
     this.camera.position.copy(from.pos)
     this.controls.target.copy(from.target)

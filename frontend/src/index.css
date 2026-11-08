@@ -668,24 +668,6 @@ h3 {
 }
 
 /* The little light on a switch: lit orange while it is on */
-.tool-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--line-strong);
-}
-
-.tool[aria-pressed='true'] {
-  color: var(--text);
-  border-style: solid;
-  border-color: var(--orange);
-}
-
-.tool[aria-pressed='true'] .tool-dot {
-  background: var(--orange);
-  box-shadow: 0 0 6px var(--orange);
-}
-
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2753,17 +2735,26 @@ h3 {
 
 .scorebug {
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: stretch;
   gap: 0;
   min-width: 0;
   font-family: var(--display);
   color: #fff;
+  padding-right: 14px;
+}
+
+/* The slanted plate is its own layer: clipping the bar itself would cut off the player list that drops down from it. */
+.scorebug::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: linear-gradient(180deg, #17212e, #0f161f);
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
-  padding-right: 14px;
 }
 
 .scorebug > span {
@@ -2800,15 +2791,24 @@ h3 {
   }
 }
 
-.bug-name {
-  max-width: 190px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.scorebug > .bug-pick {
+  padding: 4px 10px;
+}
+
+/* The same dropdown as everywhere, a little smaller to fit the bar. */
+.bug-pick .pp-button {
+  min-width: 0;
+  min-height: 40px;
+  padding-right: 14px;
+}
+
+.bug-pick .pp-thumb {
+  width: 30px;
+  height: 30px;
+}
+
+.bug-pick .pp-label {
+  max-width: 180px;
 }
 
 .bug-fg {
@@ -3143,7 +3143,6 @@ h3 {
 
 @media (max-width: 960px) {
   .scorebug > .bug-live,
-  .scorebug > .bug-name,
   .scorebug > .bug-fg {
     display: none;
   }
@@ -3790,4 +3789,60 @@ h3 {
   .bug-xpval + .bug-partial::before {
     content: none;
   }
+}
+
+/* ---------- Top bar player list, style dropdown ---------- */
+.topbar {
+  position: relative;
+  z-index: 55;
+}
+
+/* A list that lines up with the left edge of its button (the one in the top bar). */
+.pp-left .pp-list {
+  left: 0;
+  right: auto;
+}
+
+/* A list that opens above its button (the style dropdown at the bottom of the court). */
+.pp-up .pp-list {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.pp-mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--orange-soft);
+  background: var(--orange-bg);
+}
+
+/* In the court's tool bar the dropdown sits level with the other tools. */
+.tools .pp-button {
+  min-width: 0;
+  min-height: 42px;
+  padding: 3px 14px 3px 4px;
+  border-radius: 10px;
+  border-style: dashed;
+  background: transparent;
+}
+
+.tools .pp-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.tools .pp-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tools .pp-sub {
+  display: none;
+}
+
+.tools .pp-list {
+  width: 280px;
 }

@@ -10,12 +10,14 @@ interface Props {
   /** The chosen shooter; '' means every player's shots together. */
   value: string
   onChange: (player: string) => void
+  /** In the top bar: no "Shots of" text before the button, and the list opens to the right. */
+  compact?: boolean
 }
 
 const shotsLabel = (n: number) => `${n} ${n === 1 ? 'shot' : 'shots'}`
 
-/** Whose shots the map, the vs NBA tab and the Players tab use. One choice, shown on all three. */
-export default function ShooterSelect({ shots, value, onChange }: Props) {
+/** Whose shots the map, the vs NBA tab and the Players tab use: one choice, in the top bar where the player's name is. */
+export default function ShooterSelect({ shots, value, onChange, compact = false }: Props) {
   const options = useMemo<PickerOption[]>(() => {
     const counts = new Map<string, number>()
     for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
@@ -42,5 +44,15 @@ export default function ShooterSelect({ shots, value, onChange }: Props) {
       })),
     ]
   }, [shots])
-  return <Picker options={options} value={value} onChange={onChange} ariaLabel="Shots of" prefix="Shots of" />
+  return (
+    <Picker
+      options={options}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Shots of"
+      prefix="Shots of"
+      showPrefix={!compact}
+      align={compact ? 'left' : 'right'}
+    />
+  )
 }

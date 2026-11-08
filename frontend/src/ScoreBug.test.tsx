@@ -11,7 +11,7 @@ const level = levelInfo(150)
 
 describe('ScoreBug', () => {
   it('shows the shooter, field goal percent and level', () => {
-    render(<ScoreBug armed name="Ann" made={5} attempts={10} level={level} pop={null} />)
+    render(<ScoreBug picker={<span>picker</span>} armed name="Ann" made={5} attempts={10} level={level} pop={null} />)
     const group = screen.getByRole('group')
     expect(group.getAttribute('aria-label')).toBe('Ann: level 2 ROOKIE')
     expect(group.textContent).toContain('50')
@@ -19,29 +19,29 @@ describe('ScoreBug', () => {
   })
 
   it('waits at zero until armed', () => {
-    render(<ScoreBug armed={false} name="Ann" made={5} attempts={10} level={level} pop={null} />)
+    render(<ScoreBug picker={<span>picker</span>} armed={false} name="Ann" made={5} attempts={10} level={level} pop={null} />)
     expect((screen.getByRole('progressbar').firstElementChild as HTMLElement).style.width).toBe('0%')
     expect(screen.getByRole('group').querySelector('.bug-fg b')!.textContent).toBe('0')
   })
 
-  it('names everyone when no player is chosen, and shows a dash with no shots', () => {
-    render(<ScoreBug armed name="" made={0} attempts={0} level={levelInfo(0)} pop={null} />)
-    expect(screen.getByRole('group').textContent).toContain('ALL PLAYERS')
+  it('puts the player dropdown where the name was, and shows a dash with no shots', () => {
+    render(<ScoreBug picker={<button>Shots of: Ann</button>} armed name="" made={0} attempts={0} level={levelInfo(0)} pop={null} />)
+    expect(screen.getByRole('group').querySelector('.bug-pick')?.textContent).toBe('Shots of: Ann')
     expect(screen.getByRole('group').querySelector('.bug-fg b')!.textContent).toBe('–')
   })
 
   it('shows the XP pop only for the shown player', () => {
     const pop = { key: 1, amount: 25, player: 'Ann' }
-    const { rerender, container } = render(<ScoreBug armed name="Ann" made={1} attempts={1} level={level} pop={pop} />)
+    const { rerender, container } = render(<ScoreBug picker={<span>picker</span>} armed name="Ann" made={1} attempts={1} level={level} pop={pop} />)
     expect(container.querySelector('.xp-pop')?.textContent).toBe('+25 XP')
-    rerender(<ScoreBug armed name="Bob" made={1} attempts={1} level={level} pop={pop} />)
+    rerender(<ScoreBug picker={<span>picker</span>} armed name="Bob" made={1} attempts={1} level={level} pop={pop} />)
     expect(container.querySelector('.xp-pop')).toBeNull()
-    rerender(<ScoreBug armed name="" made={1} attempts={1} level={level} pop={pop} />)
+    rerender(<ScoreBug picker={<span>picker</span>} armed name="" made={1} attempts={1} level={level} pop={pop} />)
     expect(container.querySelector('.xp-pop')).not.toBeNull()
   })
 
   it('says when the level covers only part of the log', () => {
-    render(<ScoreBug armed partial name="Ann" made={1} attempts={1} level={level} pop={null} />)
+    render(<ScoreBug picker={<span>picker</span>} armed partial name="Ann" made={1} attempts={1} level={level} pop={null} />)
     expect(screen.getByRole('group').getAttribute('title')).toContain('loaded shots only')
     // Visible text and text for screen readers too: a tooltip alone does not reach touch or keyboard users.
     expect(screen.getByRole('group').querySelector('.bug-partial')?.textContent).toBe('loaded shots only')

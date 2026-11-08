@@ -228,7 +228,7 @@ export default function App() {
     }
   }
   const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
-  const shooterPicker = <ShooterSelect shots={shots} value={shooter} onChange={setShooterChoice} />
+  const shooterPicker = <ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
 
   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
   const baseline = useMemo(
@@ -269,7 +269,7 @@ export default function App() {
           <Logo />
           <span aria-hidden="true">HOOPS LOG</span>
         </button>
-        <ScoreBug armed={!covered} partial={truncated} name={shooter} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
+        <ScoreBug armed={!covered} partial={truncated} name={shooter} picker={shooterPicker} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
         {tab === 'log' && (
           <button
             type="button"
@@ -317,7 +317,6 @@ export default function App() {
             shots={shooterShots}
             partial={truncated}
             shooter={shooter}
-            shooterPicker={shooterPicker}
             benchmarkId={benchmarkId}
             onCompare={(id) => {
               setBenchmarkId(id)
@@ -326,7 +325,7 @@ export default function App() {
           />
         )}
         {tab === 'nba' && (
-          <NbaCompare shots={shooterShots} shooter={shooter} shooterPicker={shooterPicker} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId}
+          <NbaCompare shots={shooterShots} shooter={shooter} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId}
             onBrowse={() => setTab('players')}
             faceOffSeen={faceOffSeen}
             onFaceOffSeen={markFaceOffSeen}

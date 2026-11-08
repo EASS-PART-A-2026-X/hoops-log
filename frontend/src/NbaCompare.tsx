@@ -14,7 +14,6 @@ interface Props {
   shots: Shot[] | null
   /** Whose shots these are ('' = every player's). */
   shooter: string
-  shooterPicker: React.ReactNode
   benchmarkId: number | null
   onBenchmark: (id: number | null) => void
   onBrowse: () => void
@@ -68,7 +67,7 @@ function Bars({ mineName, theirName, mine, theirs, side }: { mineName: string; t
   )
 }
 
-export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId, onBenchmark, onBrowse, faceOffSeen, onFaceOffSeen }: Props) {
+export default function NbaCompare({ shots, shooter, benchmarkId, onBenchmark, onBrowse, faceOffSeen, onFaceOffSeen }: Props) {
   const player = PLAYERS.find((p) => p.id === benchmarkId) ?? null
   const bench = useMemo(() => (player ? benchmarkOf(player) : LEAGUE), [player])
   const overall = useMemo(() => compareOverall(shots ?? [], bench), [shots, bench])
@@ -100,7 +99,6 @@ export default function NbaCompare({ shots, shooter, shooterPicker, benchmarkId,
           {mineName} vs {theirName}
         </h2>
         <div className="filters">
-          {shooterPicker}
           <PlayerPicker value={benchmarkId} onChange={onBenchmark} />
           <button type="button" className="chip" onClick={onBrowse}>
             Browse players

@@ -5,6 +5,8 @@ import type { XpPop } from './game/useCelebrations'
 import type { LevelInfo } from './game/xp'
 
 interface Props {
+  /** The "Shots of" dropdown: it takes the place of the player's name. */
+  picker: React.ReactNode
   /** The shot list was cut short, so XP covers only the loaded shots. */
   partial?: boolean
   /** False while the title screen covers the app: the numbers wait at zero, then count up when it starts. */
@@ -17,7 +19,7 @@ interface Props {
 }
 
 /** The top bar's TV score bug: whose shots, their field goal percent, and level with an XP bar. */
-export default function ScoreBug({ armed, partial = false, name, made, attempts, level, pop }: Props) {
+export default function ScoreBug({ armed, partial = false, name, picker, made, attempts, level, pop }: Props) {
   const pct = !armed || attempts === 0 ? 0 : Math.round((made / attempts) * 100)
   const shownPct = useTicker(pct)
   const shownXp = useTicker(armed ? level.into : 0)
@@ -30,7 +32,7 @@ export default function ScoreBug({ armed, partial = false, name, made, attempts,
       <span className="bug-live" aria-hidden="true">
         <i /> LIVE
       </span>
-      <span className="bug-name">{name || 'ALL PLAYERS'}</span>
+      <span className="bug-pick">{picker}</span>
       <span className="bug-fg" title="Field goal percent">
         <b>{attempts === 0 ? '–' : shownPct}</b>
         {attempts > 0 && <small>%</small>}
