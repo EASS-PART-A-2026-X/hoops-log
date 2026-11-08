@@ -37,7 +37,6 @@ const renderCompare = (shots: Shot[] | null, benchmarkId: number | null = null, 
     <NbaCompare
       shots={shots}
       shooter={shooter}
-      shooterPicker={<span>shooter picker</span>}
       benchmarkId={benchmarkId}
       onBenchmark={vi.fn()}
       onBrowse={vi.fn()}

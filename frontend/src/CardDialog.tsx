@@ -3,6 +3,7 @@ import { downloadCard } from './cardImage'
 import type { CardProfile } from './court/cardData'
 import { tabTarget } from './focusTrap'
 import ShotCard from './ShotCard'
+import { useFit } from './useFit'
 
 interface Props {
   profile: CardProfile
@@ -11,7 +12,9 @@ interface Props {
 
 /** The card at full size, tilting with the pointer, with a button to save it as a picture. */
 export default function CardDialog({ profile, onClose }: Props) {
+  const boxRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
+  useFit(boxRef, bodyRef)
   const closeRef = useRef<HTMLButtonElement>(null)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -59,7 +62,7 @@ export default function CardDialog({ profile, onClose }: Props) {
   }
 
   return (
-    <div className="card-dialog" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="card-dialog" ref={boxRef} role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="card-dialog-body" ref={bodyRef} role="dialog" aria-modal="true" aria-label={`Shot card of ${profile.name}`}>
         <ShotCard profile={profile} size="big" />
         <div className="card-dialog-actions">

@@ -8,7 +8,7 @@ import PlayersPage from './PlayersPage'
 afterEach(cleanup)
 
 const shots = Array.from({ length: 12 }, (_, i) => ({ id: i, shooter: 'Yuly', zone: 'restricted_area', made: i % 2 === 0, shot_type: '2PT' })) as unknown as Shot[]
-const page = () => render(<PlayersPage shots={shots} shooter="Yuly" shooterPicker={null} benchmarkId={null} onCompare={() => {}} />)
+const page = () => render(<PlayersPage shots={shots} shooter="Yuly" benchmarkId={null} onCompare={() => {}} />)
 
 describe('your card tile', () => {
   it('is plain readable content with a separate button, not a button around the card', () => {

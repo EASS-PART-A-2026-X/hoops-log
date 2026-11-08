@@ -7,7 +7,6 @@ import { shooterProfile } from './court/cardData'
 import CardDialog from './CardDialog'
 import FallbackImage from './FallbackImage'
 import ShotCard from './ShotCard'
-import Trophies from './Trophies'
 
 interface Mine {
   fg: number | null
@@ -103,16 +102,13 @@ function Card({
 
 interface Props {
   shots: Shot[] | null
-  /** The shot list was cut short (see the truncation notice). */
-  partial?: boolean
   /** Whose shots these are ('' = every player's). */
   shooter: string
-  shooterPicker: React.ReactNode
   benchmarkId: number | null
   onCompare: (id: number) => void
 }
 
-export default function PlayersPage({ shots, partial = false, shooter, shooterPicker, benchmarkId, onCompare }: Props) {
+export default function PlayersPage({ shots, shooter, benchmarkId, onCompare }: Props) {
   const [team, setTeam] = useState('')
   const [cardOpen, setCardOpen] = useState(false)
   const teamKeys = [...new Set(PLAYERS.map((p) => p.team))]
@@ -132,11 +128,9 @@ export default function PlayersPage({ shots, partial = false, shooter, shooterPi
 
   return (
     <section aria-labelledby="players-title">
-      {shots && <Trophies shots={shots} shooter={shooter} partial={partial} />}
       <div className="map-head">
         <h2 id="players-title">NBA players</h2>
         <div className="filters">
-          {shooterPicker}
           <div className="chips" role="group" aria-label="Team">
             <button type="button" className="chip" aria-pressed={team === ''} onClick={() => setTeam('')}>
               All teams

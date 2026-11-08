@@ -55,4 +55,32 @@ describe('ShooterSelect', () => {
     expect(options).toHaveLength(1)
     expect(options[0]?.textContent).toContain('0 shots')
   })
+
+  it('has a visible "Shots of" label, or in the top bar only a name for screen readers', () => {
+    const { container, rerender } = render(<ShooterSelect shots={shots} value="Yuly" onChange={() => {}} />)
+    expect(container.querySelector('.pp-prefix')?.textContent).toBe('Shots of')
+    expect(container.querySelector('.pp-left')).toBeNull()
+    rerender(<ShooterSelect compact shots={shots} value="Yuly" onChange={() => {}} />)
+    expect(container.querySelector('.pp-prefix')).toBeNull()
+    expect(container.querySelector('.pp-left')).not.toBeNull()
+    expect(screen.getByRole('combobox').getAttribute('aria-label')).toBe('Shots of: Yuly')
+  })
+
+  it('in the top bar the closed button is just the name and an arrow, and the open list looks the same as elsewhere', async () => {
+    const user = userEvent.setup()
+    render(<ShooterSelect compact shots={shots} value="Yuly" onChange={() => {}} />)
+    const button = screen.getByRole('combobox')
+    expect(button.textContent).toBe('Yuly▾')
+    expect(button.querySelector('.pp-thumb')).toBeNull()
+    expect(button.querySelector('.pp-sub')).toBeNull()
+    await user.click(button)
+    const first = within(screen.getByRole('listbox')).getAllByRole('option')[0]!
+    expect(first.querySelector('.pp-thumb')).not.toBeNull()
+    expect(first.querySelector('.pp-sub')?.textContent).toBe('4 shots')
+  })
+
+  it('says All players on the closed top-bar button when everyone is chosen', () => {
+    render(<ShooterSelect compact shots={shots} value="" onChange={() => {}} />)
+    expect(screen.getByRole('combobox').textContent).toBe('All players▾')
+  })
 })

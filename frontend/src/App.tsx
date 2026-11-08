@@ -15,6 +15,7 @@ import ShotList from './ShotList'
 import ShotMap from './ShotMap'
 import { useShots } from './useShots'
 import GameToasts from './GameToasts'
+import TrophyDrawer from './TrophyDrawer'
 import TitleScreen from './TitleScreen'
 import { shouldShowTitle } from './game/titleSeen'
 import { TROPHIES } from './game/achievements'
@@ -48,6 +49,10 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
   const toggleRef = useRef<HTMLButtonElement>(null)
+  // The trophy wall: a second drawer, from its own button in the top bar. Only one drawer is open at a time.
+  const [trophyOpen, setTrophyOpen] = useState(false)
+  const trophyToggleRef = useRef<HTMLButtonElement>(null)
+  const closeTrophies = useCallback(() => setTrophyOpen(false), [])
   const drawerRef = useRef<HTMLElement>(null)
   const appRef = useRef<HTMLDivElement>(null)
   const topbarRef = useRef<HTMLElement>(null)
@@ -111,9 +116,10 @@ export default function App() {
   }, [])
 
   // Escape closes the drawer if it is open, otherwise deselects. Only on the log tab: the other
-  // tabs show neither.
+  // tabs show neither. While the trophy drawer is open Escape belongs to it, so one press never
+  // closes the drawer and also deselects a shot.
   useEffect(() => {
-    if (tab !== 'log' || (!drawerOpen && selectedId === null)) return
+    if (tab !== 'log' || trophyOpen || (!drawerOpen && selectedId === null)) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (drawerOpen) setDrawerOpen(false)
@@ -121,7 +127,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, tab, drawerOpen])
+  }, [selectedId, tab, drawerOpen, trophyOpen])
 
   // The toast sits just under the top bar, which is taller when its tabs wrap on a phone.
   useEffect(() => {
@@ -152,13 +158,15 @@ export default function App() {
     return () => query.removeEventListener('change', onChange)
   }, [])
 
-  // Focus moves into the drawer when it opens and back to the "Shots" button when it closes.
+  // Focus moves into the drawer when it opens and back to the "Shots" button when it closes, unless it
+  // closed because the trophy drawer took its place: then focus stays in the trophy drawer. (This effect
+  // runs after the trophy drawer's own, so without the check it would pull focus out of it.)
   const wasOpen = useRef(false)
   useEffect(() => {
     if (drawerOpen) drawerRef.current?.querySelector<HTMLElement>('button')?.focus()
-    else if (wasOpen.current) toggleRef.current?.focus()
+    else if (wasOpen.current && !trophyOpen) toggleRef.current?.focus()
     wasOpen.current = drawerOpen
-  }, [drawerOpen])
+  }, [drawerOpen, trophyOpen])
 
   // While the drawer covers the page, Tab stays inside it, wherever focus is (even on the body,
   // after a click on plain text or after the focused button went away). Only a focusable element
@@ -228,7 +236,7 @@ export default function App() {
     }
   }
   const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
-  const shooterPicker = <ShooterSelect shots={shots} value={shooter} onChange={setShooterChoice} />
+  const shooterPicker = <ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
 
   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
   const baseline = useMemo(
@@ -240,6 +248,8 @@ export default function App() {
   const made = shooterShots?.filter((s) => s.made).length ?? 0
   const level = useMemo(() => levelInfo(xpOf(shooterShots ?? [])), [shooterShots])
   const celebrations = useCelebrations(shots, truncated)
+  const trophyList = useMemo(() => trophiesOf(shooterShots ?? []), [shooterShots])
+  const trophyCount = trophyList.filter((t) => t.unlocked).length
   // The title screen: shown once per tab. The app is already loading behind it.
   const [title, setTitle] = useState(shouldShowTitle)
   // True from the moment the player presses start, while the wipe is still running.
@@ -253,11 +263,11 @@ export default function App() {
             level: level.level,
             rank: level.title,
             shots: shooterShots.length,
-            trophies: trophiesOf(shooterShots).filter((t) => t.unlocked).length,
+            trophies: trophyCount,
             trophyTotal: TROPHIES.length,
           }
         : null,
-    [shooterShots, shooter, level],
+    [shooterShots, shooter, level, trophyCount],
   )
 
   return (
@@ -269,7 +279,26 @@ export default function App() {
           <Logo />
           <span aria-hidden="true">HOOPS LOG</span>
         </button>
-        <ScoreBug armed={!covered} partial={truncated} name={shooter} made={made} attempts={shooterShots?.length ?? 0} level={level} pop={celebrations.pop} />
+        <ScoreBug
+          armed={!covered}
+          partial={truncated}
+          name={shooter}
+          picker={shooterPicker}
+          made={made}
+          attempts={shooterShots?.length ?? 0}
+          level={level}
+          pop={celebrations.pop}
+          trophyButtonRef={trophyToggleRef}
+          trophies={{
+            unlocked: trophyCount,
+            total: trophyList.length,
+            open: trophyOpen,
+            onToggle: () => {
+              setDrawerOpen(false)
+              setTrophyOpen((open) => !open)
+            },
+          }}
+        />
         {tab === 'log' && (
           <button
             type="button"
@@ -277,7 +306,10 @@ export default function App() {
             className="drawer-toggle"
             aria-expanded={drawerOpen}
             aria-controls="shots-drawer"
-            onClick={() => setDrawerOpen((open) => !open)}
+            onClick={() => {
+              setTrophyOpen(false)
+              setDrawerOpen((open) => !open)
+            }}
           >
             Shots
             {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
@@ -309,15 +341,15 @@ export default function App() {
         )}
       </div>
 
+      <TrophyDrawer open={trophyOpen} onClose={closeTrophies} list={trophyList} shooter={shooter} partial={truncated} narrow={narrow} toggleRef={trophyToggleRef} />
+
       <GameToasts toasts={celebrations.toasts} onDismiss={celebrations.dismiss} />
 
       <main className={tab === 'log' ? 'page fit' : 'page'}>
         {tab === 'players' && (
           <PlayersPage
             shots={shooterShots}
-            partial={truncated}
             shooter={shooter}
-            shooterPicker={shooterPicker}
             benchmarkId={benchmarkId}
             onCompare={(id) => {
               setBenchmarkId(id)
@@ -326,7 +358,7 @@ export default function App() {
           />
         )}
         {tab === 'nba' && (
-          <NbaCompare shots={shooterShots} shooter={shooter} shooterPicker={shooterPicker} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId}
+          <NbaCompare shots={shooterShots} shooter={shooter} benchmarkId={benchmarkId} onBenchmark={setBenchmarkId}
             onBrowse={() => setTab('players')}
             faceOffSeen={faceOffSeen}
             onFaceOffSeen={markFaceOffSeen}

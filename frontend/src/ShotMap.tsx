@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BACKEND_URL } from './api'
 import type { Shot } from './api'
-import type { CourtScene, FilmState, MapMode, ViewName } from './court/CourtScene'
+import type { CourtScene, FilmState, MapMode } from './court/CourtScene'
 import { latestIndices, summarizeFilm } from './court/film'
 import type { FilmSummary } from './court/film'
 import { LEAGUE, benchZonePct } from './court/nba'
 import { FilmHud, FilmSummaryCard } from './FilmHud'
 import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneShare, zoneStats } from './court/stats'
 import { lastName } from './court/players'
-import ShooterSelect from './ShooterSelect'
+import StyleSelect from './StyleSelect'
 import { play } from './game/audio'
 import type { HexCell, Typical } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
@@ -94,27 +94,12 @@ const RESULTS: [ResultFilter, string][] = [
   ['made', 'Made'],
   ['missed', 'Missed'],
 ]
-const MODES: [MapMode, string][] = [
-  ['heat', 'Heat map'],
-  ['beams', '3D beams'],
-  ['arcs', 'Flight paths'],
-]
-const VIEWS: [ViewName, string][] = [
-  ['shooter', 'Shooter view'],
-  ['top', 'Top down'],
-  ['low', 'Low angle'],
-  ['side', 'Sideline'],
-]
-
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
 export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible, suspended = false }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
-  const [view, setView] = useState<ViewName>('shooter')
-  const [auto, setAuto] = useState(false)
-  const [arena, setArena] = useState(true)
   const [ready, setReady] = useState(false)
   // Why the 3D view is not running: it never started, or the browser took the context away.
   const [failed, setFailed] = useState<'start' | 'lost' | null>(null)
@@ -252,12 +237,6 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   }, [ready, shots, filtered, zones, hexes])
 
   useEffect(() => sceneRef.current?.setMode(mode), [ready, mode])
-  useEffect(() => sceneRef.current?.setAutoRotate(auto), [ready, auto])
-  useEffect(() => sceneRef.current?.setArena(arena), [ready, arena])
-  useEffect(() => {
-    // The first view is the scene's own default; only move the camera for a real choice.
-    if (view !== 'shooter' || introDone.current) sceneRef.current?.setView(view)
-  }, [ready, view])
   const selectedIndex = useMemo(
     () => (selectedId === null ? -1 : filtered.findIndex((s) => s.id === selectedId)),
     [filtered, selectedId],
@@ -369,7 +348,6 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
         <div className="filters">
           <Chips label="Shot area" short="Area" value={area} options={AREAS} onChange={setArea} disabled={failed !== null} />
           <Chips label="Result" short="Result" value={result} options={RESULTS} onChange={setResult} disabled={failed !== null} />
-          <ShooterSelect shots={shots} value={player} onChange={onPlayerChange} />
         </div>
       </div>
 
@@ -459,7 +437,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               <p className="stage-hint" aria-hidden="true">
                 {mode === 'heat' ? 'Drag to orbit · scroll to zoom · hover a hex' : 'Drag to orbit · scroll to zoom · click a shot'}
               </p>
-            {/* Not a choice between options: one action and two on/off switches, so they look different. */}
+            {/* The court's tools: watch, replay and the map style dropdown. */}
             <div className="tools" role="group" aria-label="Tools">
               <button type="button" className="tool film-start" onClick={watch} disabled={!ready || filtered.length === 0}>
                 ▶ {watchLabel}
@@ -472,14 +450,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               >
                 ▶ Replay
               </button>
-              <button type="button" className="tool" aria-pressed={auto} onClick={() => setAuto(!auto)}>
-                <span className="tool-dot" aria-hidden="true" />
-                Auto-rotate
-              </button>
-              <button type="button" className="tool" aria-pressed={arena} onClick={() => setArena(!arena)}>
-                <span className="tool-dot" aria-hidden="true" />
-                Arena
-              </button>
+              <StyleSelect value={mode} onChange={setMode} />
             </div>
               {film && (
                 <FilmHud
@@ -577,12 +548,6 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
             </div>
           )}
 
-          {!failed && (
-            <div className="toolbar">
-              <Chips label="Map style" short="Style" value={mode} options={MODES} onChange={setMode} />
-              <Chips label="Camera angle" short="Angle" value={view} options={VIEWS} onChange={setView} />
-            </div>
-          )}
         </div>
 
         <aside className="zones" aria-label="Zone breakdown">

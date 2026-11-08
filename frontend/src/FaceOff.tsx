@@ -3,6 +3,7 @@ import { tabTarget } from './focusTrap'
 import type { CardProfile } from './court/cardData'
 import { FACE_OFF_MS, faceOffRows, rowWinner } from './court/faceoff'
 import ShotCard from './ShotCard'
+import { useFit } from './useFit'
 
 interface Props {
   you: CardProfile
@@ -21,6 +22,9 @@ const show = (v: number | null, unit: string) => (v === null ? '–' : `${v}${un
  */
 export default function FaceOff({ you, them, verdict, onClose }: Props) {
   const button = useRef<HTMLButtonElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const fitRef = useRef<HTMLDivElement>(null)
+  useFit(boxRef, fitRef, 0) // .fo-fit has its own padding
   const rows = faceOffRows(you, them)
   // The latest onClose, so a parent that passes a new function every render does not restart the
   // timer or the focus handling below.
@@ -57,42 +61,45 @@ export default function FaceOff({ you, them, verdict, onClose }: Props) {
   }, [])
 
   return (
-    <div className="faceoff" role="dialog" aria-modal="true" aria-label={`Face-off: ${you.name} against ${them.name}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="fo-stage">
-        <div className="fo-card left">
-          <ShotCard profile={you} size="versus" tilt={false} />
+    <div className="faceoff" ref={boxRef} role="dialog" aria-modal="true" aria-label={`Face-off: ${you.name} against ${them.name}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      {/* Clicks on its empty sides (the gap between the cards, the VS, the margins) fall through to the backdrop and close it. */}
+      <div className="fo-fit" ref={fitRef}>
+        <div className="fo-stage">
+          <div className="fo-card left">
+            <ShotCard profile={you} size="versus" tilt={false} />
+          </div>
+          <div className="fo-vs" aria-hidden="true">
+            VS
+          </div>
+          <div className="fo-card right">
+            <ShotCard profile={them} size="versus" tilt={false} />
+          </div>
         </div>
-        <div className="fo-vs" aria-hidden="true">
-          VS
+        <div className="fo-rows">
+          {rows.map((row, i) => {
+            const winner = rowWinner(row)
+            return (
+              <div className="fo-row" key={row.label} style={{ '--i': i } as React.CSSProperties}>
+                <strong className={winner === 'you' ? 'fo-val you win' : 'fo-val you'}>{show(row.you, row.unit)}</strong>
+                <span className={winner === 'you' ? 'fo-bar left win' : 'fo-bar left'} aria-hidden="true">
+                  <span style={{ width: `${row.you === null ? 0 : Math.min(100, (row.you / row.max) * 100)}%` }} />
+                </span>
+                <span className="fo-label">{row.label}</span>
+                <span className={winner === 'them' ? 'fo-bar right win' : 'fo-bar right'} aria-hidden="true">
+                  <span style={{ width: `${row.them === null ? 0 : Math.min(100, (row.them / row.max) * 100)}%` }} />
+                </span>
+                <strong className={winner === 'them' ? 'fo-val them win' : 'fo-val them'}>{show(row.them, row.unit)}</strong>
+              </div>
+            )
+          })}
         </div>
-        <div className="fo-card right">
-          <ShotCard profile={them} size="versus" tilt={false} />
-        </div>
+        <p className="fo-verdict" role="status">
+          {verdict}
+        </p>
+        <button type="button" className="btn primary" ref={button} onClick={onClose}>
+          See the full comparison
+        </button>
       </div>
-      <div className="fo-rows">
-        {rows.map((row, i) => {
-          const winner = rowWinner(row)
-          return (
-            <div className="fo-row" key={row.label} style={{ '--i': i } as React.CSSProperties}>
-              <strong className={winner === 'you' ? 'fo-val you win' : 'fo-val you'}>{show(row.you, row.unit)}</strong>
-              <span className={winner === 'you' ? 'fo-bar left win' : 'fo-bar left'} aria-hidden="true">
-                <span style={{ width: `${row.you === null ? 0 : Math.min(100, (row.you / row.max) * 100)}%` }} />
-              </span>
-              <span className="fo-label">{row.label}</span>
-              <span className={winner === 'them' ? 'fo-bar right win' : 'fo-bar right'} aria-hidden="true">
-                <span style={{ width: `${row.them === null ? 0 : Math.min(100, (row.them / row.max) * 100)}%` }} />
-              </span>
-              <strong className={winner === 'them' ? 'fo-val them win' : 'fo-val them'}>{show(row.them, row.unit)}</strong>
-            </div>
-          )
-        })}
-      </div>
-      <p className="fo-verdict" role="status">
-        {verdict}
-      </p>
-      <button type="button" className="btn primary" ref={button} onClick={onClose}>
-        See the full comparison
-      </button>
     </div>
   )
 }
