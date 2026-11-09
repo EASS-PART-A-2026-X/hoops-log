@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import Odometer from './Odometer'
 import { useTicker } from './game/useTicker'
 import { isMuted, play, setMuted, subscribeMuted } from './game/audio'
 import type { XpPop } from './game/useCelebrations'
@@ -32,7 +33,6 @@ interface Props {
 /** The top bar's TV score bug: whose shots, their field goal percent, and level with an XP bar. */
 export default function ScoreBug({ armed, partial = false, name, picker, trophies, trophyButtonRef, made, attempts, level, pop }: Props) {
   const pct = !armed || attempts === 0 ? 0 : Math.round((made / attempts) * 100)
-  const shownPct = useTicker(pct)
   const shownXp = useTicker(armed ? level.into : 0)
   const fill = level.span === 0 ? 0 : Math.min(100, (shownXp / level.span) * 100)
   const showPop = pop !== null && (name === '' || pop.player === name)
@@ -45,14 +45,16 @@ export default function ScoreBug({ armed, partial = false, name, picker, trophie
       </span>
       <span className="bug-pick">{picker}</span>
       <span className="bug-fg" title="Field goal percent">
-        <b>{attempts === 0 ? '–' : shownPct}</b>
+        <b>{attempts === 0 ? '–' : <Odometer value={pct} />}</b>
         {attempts > 0 && <small>%</small>}
         <em>FG</em>
       </span>
       <span className={trophies ? 'bug-level linked' : 'bug-level'}>
         <span className="bug-lvl">
           <small>LVL</small>
-          <b>{level.level}</b>
+          <b>
+            <Odometer value={level.level} />
+          </b>
         </span>
         <span className="bug-xp">
           <span className="bug-rank">{level.title}</span>

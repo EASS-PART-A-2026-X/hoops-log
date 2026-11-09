@@ -22,7 +22,7 @@ describe('ScoreBug', () => {
   it('waits at zero until armed', () => {
     render(<ScoreBug picker={<span>picker</span>} armed={false} name="Ann" made={5} attempts={10} level={level} pop={null} />)
     expect((screen.getByRole('progressbar').firstElementChild as HTMLElement).style.width).toBe('0%')
-    expect(screen.getByRole('group').querySelector('.bug-fg b')!.textContent).toBe('0')
+    expect(screen.getByRole('group').querySelector('.bug-fg .odo-text')!.textContent).toBe('0')
   })
 
   it('puts the player dropdown where the name was, and shows a dash with no shots', () => {
