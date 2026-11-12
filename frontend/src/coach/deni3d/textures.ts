@@ -116,36 +116,41 @@ export function drawJersey(): HTMLCanvasElement {
   return c
 }
 
-/** A basketball: orange with the black seams. */
+/** The ball's colour: a deep, slightly uneven orange with a fine grain. The seams are separate tubes (see buildDeni). */
 export function drawBall(): HTMLCanvasElement {
   const W = 512
   const H = 256
   const [c, g] = canvasOf(W, H)
-  g.fillStyle = '#d9662b'
+  const fade = g.createLinearGradient(0, 0, 0, H)
+  fade.addColorStop(0, '#bf4f19')
+  fade.addColorStop(0.5, '#d0601f')
+  fade.addColorStop(1, '#b84714')
+  g.fillStyle = fade
   g.fillRect(0, 0, W, H)
-  // A little pebbled grain.
-  for (let i = 0; i < 1400; i++) {
-    g.fillStyle = i % 2 ? 'rgba(0,0,0,0.07)' : 'rgba(255,200,150,0.07)'
-    g.fillRect((i * 97) % W, (i * 57) % H, 2, 2)
+  let seed = 7
+  const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
+  for (let i = 0; i < 2600; i++) {
+    g.fillStyle = rand() > 0.5 ? 'rgba(0,0,0,0.06)' : 'rgba(255,190,130,0.07)'
+    g.fillRect(rand() * W, rand() * H, 1.6, 1.6)
   }
-  g.strokeStyle = '#141210'
-  g.lineWidth = 6
-  g.beginPath()
-  g.moveTo(0, H / 2)
-  g.lineTo(W, H / 2)
-  for (const x of [0, W / 2, W]) {
-    g.moveTo(x, 0)
-    g.lineTo(x, H)
-  }
-  g.stroke()
-  for (const flip of [1, -1]) {
-    g.beginPath()
-    for (let x = 0; x <= W; x += 8) {
-      const y = H / 2 + flip * (H * 0.3) * Math.cos((x / W) * Math.PI * 4)
-      if (x === 0) g.moveTo(x, y)
-      else g.lineTo(x, y)
+  return c
+}
+
+/** The pebbled leather as a bump map: a grid of tiny dimples (lighter = higher). */
+export function drawBallBump(): HTMLCanvasElement {
+  const W = 512
+  const H = 256
+  const [c, g] = canvasOf(W, H)
+  g.fillStyle = '#b4b4b4'
+  g.fillRect(0, 0, W, H)
+  for (let y = 0; y < H; y += 5) {
+    for (let x = 0; x < W; x += 5) {
+      const ox = (y / 5) % 2 ? 2.5 : 0
+      g.fillStyle = '#5a5a5a'
+      g.beginPath()
+      g.arc(x + ox, y, 1.35, 0, Math.PI * 2)
+      g.fill()
     }
-    g.stroke()
   }
   return c
 }

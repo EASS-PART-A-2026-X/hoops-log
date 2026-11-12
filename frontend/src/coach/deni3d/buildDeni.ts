@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three'
 import { BALL_R } from './pose'
-import { KIT, drawBall, drawJersey, drawShadow } from './textures'
+import { KIT, drawBall, drawBallBump, drawJersey, drawShadow } from './textures'
 
 export interface DeniRig {
   root: THREE.Group
@@ -48,10 +48,10 @@ function buildHand(skin: THREE.Material, nail: THREE.Material, inward: 1 | -1, c
   hand.add(palm)
   // Index to little finger, from the thumb side (front) to the back: [z, base length, thickness].
   const fingers: [number, number, number][] = [
-    [0.03, 0.074, 0.0098],
-    [0.011, 0.082, 0.0102],
-    [-0.009, 0.077, 0.0098],
-    [-0.027, 0.062, 0.0088],
+    [0.029, 0.066, 0.0074],
+    [0.0105, 0.073, 0.0078],
+    [-0.0085, 0.069, 0.0074],
+    [-0.0255, 0.055, 0.0066],
   ]
   fingers.forEach(([z, length, r], i) => {
     const base = new THREE.Group()
@@ -83,18 +83,47 @@ function buildHand(skin: THREE.Material, nail: THREE.Material, inward: 1 | -1, c
   const thumb = new THREE.Group()
   thumb.position.set(inward * 0.006, -0.03, 0.036)
   thumb.rotation.set(-0.75 - 0.25 * cup, 0, inward * (0.12 + 0.2 * cup))
-  const t1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0125, 0.03, 4, 8), skin)
-  t1.position.y = -0.026
+  const t1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0098, 0.028, 4, 8), skin)
+  t1.position.y = -0.025
   thumb.add(t1)
   const j2 = new THREE.Group()
-  j2.position.y = -0.052
+  j2.position.y = -0.05
   j2.rotation.z = inward * 0.2
-  const t2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0105, 0.026, 4, 8), skin)
-  t2.position.y = -0.022
+  const t2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0082, 0.024, 4, 8), skin)
+  t2.position.y = -0.021
   j2.add(t2)
   thumb.add(j2)
   hand.add(thumb)
   return hand
+}
+
+/**
+ * The seams of a basketball as thin dark tubes lying on the ball: the equator, a line over the poles, and two
+ * curved seams on each side (bowing out at the middle and meeting the polar line near the top and bottom).
+ */
+function ballSeams(): THREE.Mesh[] {
+  const R = BALL_R + 0.0006
+  const material = new THREE.MeshStandardMaterial({ color: '#15100c', roughness: 0.9 })
+  const onBall = (lat: number, lon: number) => new THREE.Vector3(R * Math.cos(lat) * Math.sin(lon), R * Math.sin(lat), R * Math.cos(lat) * Math.cos(lon))
+  const tube = (points: THREE.Vector3[], closed: boolean) =>
+    new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points, closed), 96, 0.0032, 6, closed), material)
+  const steps = 48
+  const loop = (at: (t: number) => THREE.Vector3) => Array.from({ length: steps }, (_, i) => at((i / steps) * Math.PI * 2))
+  const seams = [
+    tube(loop((t) => onBall(0, t)), true), // the equator
+    tube(loop((t) => onBall(t, 0)), true), // over the poles (this circle also passes the back)
+  ]
+  // A side seam: longitude bows out to 38 degrees at the equator and closes to 0 at the poles.
+  for (const side of [-1, 1]) {
+    for (const back of [0, Math.PI]) {
+      const pts = Array.from({ length: 33 }, (_, i) => {
+        const lat = (-0.5 + i / 32) * Math.PI * 0.94
+        return onBall(lat, back + side * 0.66 * Math.cos(lat))
+      })
+      seams.push(tube(pts, false))
+    }
+  }
+  return seams
 }
 
 export function buildDeni(maxAnisotropy: number): DeniRig {
@@ -277,7 +306,9 @@ export function buildDeni(maxAnisotropy: number): DeniRig {
   // ----- the ball and its shadow -----
   const ballTex = new THREE.CanvasTexture(drawBall())
   ballTex.colorSpace = THREE.SRGBColorSpace
-  const ball = mesh(new THREE.SphereGeometry(BALL_R, 32, 20), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.8 }))
+  const ballBump = new THREE.CanvasTexture(drawBallBump())
+  const ball = mesh(new THREE.SphereGeometry(BALL_R, 48, 32), new THREE.MeshStandardMaterial({ map: ballTex, bumpMap: ballBump, bumpScale: 1.6, roughness: 0.78 }))
+  ball.add(...ballSeams())
   root.add(ball)
   const shadowTex = new THREE.CanvasTexture(drawShadow())
   const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
