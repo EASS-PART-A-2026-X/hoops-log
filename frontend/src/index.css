@@ -3973,3 +3973,232 @@ h3 {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ---------- The coach (Deni): a face in the corner, a caption bubble and a list of questions ---------- */
+.coach {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 28; /* above the page, below the top bar (30), the scrim (35) and the drawers (40) */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(320px, calc(100vw - 32px));
+  pointer-events: none; /* only the parts below take clicks, so the court stays usable around him */
+}
+
+.coach > * {
+  pointer-events: auto;
+}
+
+.coach-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.coach-face {
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--orange);
+  background: radial-gradient(circle at 50% 35%, #3a2417, var(--orange-bg) 70%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.15s ease;
+}
+
+.coach-face:hover {
+  transform: scale(1.05);
+}
+
+.coach-face:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.coach-face.hype {
+  animation: coach-hop 0.5s ease-out 2;
+}
+
+@keyframes coach-hop {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.deni {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.deni-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: deni-blink 5s infinite;
+}
+
+@keyframes deni-blink {
+  0%,
+  94%,
+  100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.1);
+  }
+}
+
+.deni-mouth {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: deni-talk 0.28s ease-in-out infinite alternate;
+}
+
+@keyframes deni-talk {
+  from {
+    transform: scaleY(0.25);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.coach-bubble {
+  position: relative;
+  padding: 10px 30px 10px 12px;
+  border: 1px solid var(--orange);
+  border-radius: 12px 12px 2px 12px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  animation: coach-pop 0.18s ease-out;
+}
+
+.coach-bubble p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.coach-bubble-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+@keyframes coach-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.coach-menu {
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(300px, calc(100vw - 32px));
+  /* Never taller than the room under the top bar: a short window scrolls the list instead of hiding it. */
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.coach-menu-title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--orange-soft);
+}
+
+.coach-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coach-menu li button,
+.coach-voice {
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.coach-menu li button:hover,
+.coach-voice:hover {
+  border-color: var(--orange);
+  background: var(--orange-bg);
+}
+
+.coach-voice[aria-pressed='false'] {
+  color: var(--muted);
+}
+
+.coach-note {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* A side drawer (shots or trophies) would cover him on desktop and hide what he says: he steps left of it and
+   above the notice that moves to the bottom. On small screens the drawer covers the whole page and so him too. */
+@media (min-width: 961px) {
+  .app:has(.drawer.open) .coach {
+    right: calc(460px + 16px);
+    bottom: 76px;
+  }
+}
+
+@media (max-width: 640px) {
+  .coach {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .coach-face {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-face,
+  .coach-bubble {
+    animation: none;
+    transition: none;
+  }
+
+  .deni-eyes,
+  .deni-mouth {
+    animation: none;
+  }
+}

@@ -24,6 +24,9 @@ import ScoreBug, { MuteButton } from './ScoreBug'
 import { play, unlockAudio } from './game/audio'
 import { useCelebrations } from './game/useCelebrations'
 import { levelInfo } from './game/xp'
+import Coach from './coach/Coach'
+import { useCoach } from './coach/useCoach'
+import { useCoachEvents } from './coach/useCoachEvents'
 
 /** The drawer covers the page below this width (the layout breakpoint in index.css). */
 const NARROW = '(max-width: 960px)'
@@ -255,6 +258,18 @@ export default function App() {
   // True from the moment the player presses start, while the wipe is still running.
   const [started, setStarted] = useState(false)
   const covered = title && !started
+  const coach = useCoach()
+  useCoachEvents({
+    coach,
+    shots,
+    truncated,
+    ready: !covered,
+    tab,
+    name: shooter,
+    shotCount: shooterShots?.length ?? 0,
+    rank: level.title,
+    toasts: celebrations.toasts,
+  })
   const titleStats = useMemo(
     () =>
       shooterShots
@@ -462,6 +477,7 @@ export default function App() {
           </aside>
         </div>
       </main>
+      <Coach coach={coach} context={{ shots: shooterShots ?? [], shooter }} />
     </div>
     </>
   )
