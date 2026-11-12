@@ -739,7 +739,8 @@ export class CourtScene {
     // A dark pool under every shot, so a made (orange) or missed (blue) marker never melts into the wood.
     this.shadows = this.instanced(this.shadowGeo, this.shadowMat, n)
     // Drawn first among the transparent layers, so the heat plane (y 0.04) and everything above the floor blends over it.
-    // The shadow sits 0.03 above the floor and 0.01 under the heat plane; at the farthest camera distance the depth buffer still resolves that.
+    // The shadow sits 0.03 above the floor. Only that gap to the opaque floor is depth tested (shadow and heat plane both skip depth writes,
+    // so draw order, not their 0.01 gap, decides how they blend). The orbit controls stop at 95, where the depth buffer resolves about 0.001.
     this.shadows.renderOrder = -1
     for (let i = 0; i < n; i++) {
       const p = this.pts[i]
