@@ -35,6 +35,68 @@ const HEAD = { rx: 0.106, ry: 0.138, rz: 0.118, y: 0.135 }
 /** The hair sits tilted back, so the hairline is high over the forehead and low on the neck. */
 const HAIR_TILT = -0.34
 
+/**
+ * A hand: a palm, four fingers of three joints and a thumb of two, hanging from the wrist (the origin) along -y,
+ * palm toward the body. `inward` is +1 when the body is on the +x side. `cup` spreads and curls the fingers more,
+ * the way a hand rests on a ball.
+ */
+function buildHand(skin: THREE.Material, nail: THREE.Material, inward: 1 | -1, cup: number): THREE.Group {
+  const hand = new THREE.Group()
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), skin)
+  palm.scale.set(0.024, 0.062, 0.05)
+  palm.position.set(0, -0.052, 0)
+  hand.add(palm)
+  // Index to little finger, from the thumb side (front) to the back: [z, base length, thickness].
+  const fingers: [number, number, number][] = [
+    [0.03, 0.074, 0.0098],
+    [0.011, 0.082, 0.0102],
+    [-0.009, 0.077, 0.0098],
+    [-0.027, 0.062, 0.0088],
+  ]
+  fingers.forEach(([z, length, r], i) => {
+    const base = new THREE.Group()
+    base.position.set(0, -0.098, z)
+    base.rotation.x = (i - 1.5) * -0.09 * (0.6 + cup) // spread: the outer fingers lean away from the middle
+    // Three joints, each curling a little more toward the palm than the one before.
+    const curls = [0.22 + 0.35 * cup, 0.38 + 0.5 * cup, 0.26 + 0.4 * cup].map((c) => c * (1 + i * 0.07) * inward)
+    const parts = [0.45, 0.33, 0.22].map((f) => f * length * 2.1)
+    let parent: THREE.Object3D = base
+    parts.forEach((len, j) => {
+      const joint = new THREE.Group()
+      joint.rotation.z = curls[j]!
+      if (j > 0) joint.position.y = -parts[j - 1]!
+      const seg = new THREE.Mesh(new THREE.CapsuleGeometry(r * (1 - j * 0.1), Math.max(0.004, len - 2 * r), 4, 8), skin)
+      seg.position.y = -len / 2
+      joint.add(seg)
+      if (j === 2) {
+        const tip = new THREE.Mesh(new THREE.SphereGeometry(r * 0.62, 8, 6), nail)
+        tip.position.set(inward * -0.003, -len + r * 0.4, 0)
+        tip.scale.set(0.5, 0.9, 1)
+        joint.add(tip)
+      }
+      parent.add(joint)
+      parent = joint
+    })
+    hand.add(base)
+  })
+  // The thumb comes off the front of the palm and points down and forward.
+  const thumb = new THREE.Group()
+  thumb.position.set(inward * 0.006, -0.03, 0.036)
+  thumb.rotation.set(-0.75 - 0.25 * cup, 0, inward * (0.12 + 0.2 * cup))
+  const t1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0125, 0.03, 4, 8), skin)
+  t1.position.y = -0.026
+  thumb.add(t1)
+  const j2 = new THREE.Group()
+  j2.position.y = -0.052
+  j2.rotation.z = inward * 0.2
+  const t2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0105, 0.026, 4, 8), skin)
+  t2.position.y = -0.022
+  j2.add(t2)
+  thumb.add(j2)
+  hand.add(thumb)
+  return hand
+}
+
 export function buildDeni(maxAnisotropy: number): DeniRig {
   const mat = (color: string, roughness = 0.65) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 })
   const skin = mat(KIT.skin, 0.55)
@@ -113,8 +175,10 @@ export function buildDeni(maxAnisotropy: number): DeniRig {
     elbow.position.y = -UPPER_ARM
     elbow.add(mesh(new THREE.SphereGeometry(0.056, 14, 10), skin))
     elbow.add(mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.27, 14), skin, 0, -0.14, 0))
-    const hand = mesh(new THREE.SphereGeometry(0.058, 14, 10), skin, 0, -0.325, 0)
-    hand.scale.set(0.8, 1.15, 0.5)
+    // The dribbling hand (his right) rests cupped on the ball; the other hangs relaxed.
+    const hand = buildHand(skin, skinShade, side === -1 ? 1 : -1, side === -1 ? 0.9 : 0.15)
+    hand.position.y = -0.262
+    hand.scale.setScalar(1.42) // big hands: he is 2.06 m tall
     elbow.add(hand)
     shoulder.add(elbow)
     if ((side === -1) === (SLEEVE_ARM === 'right')) {
