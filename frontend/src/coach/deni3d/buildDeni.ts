@@ -22,6 +22,8 @@ export interface DeniRig {
   ballShadow: THREE.Mesh
 }
 
+/** The arm he wears the black compression sleeve on. Change this one word to move it. */
+export const SLEEVE_ARM: 'right' | 'left' = 'right'
 export const SHOULDER_Y = 1.63
 const UPPER_ARM = 0.34
 
@@ -115,6 +117,14 @@ export function buildDeni(maxAnisotropy: number): DeniRig {
     hand.scale.set(0.8, 1.15, 0.5)
     elbow.add(hand)
     shoulder.add(elbow)
+    if ((side === -1) === (SLEEVE_ARM === 'right')) {
+      // A black compression sleeve from the upper arm to just short of the wrist, with a thin red band at the top.
+      const fabric = mat(KIT.black, 0.92)
+      shoulder.add(mesh(new THREE.CylinderGeometry(0.0655, 0.0655, 0.14, 18), fabric, 0, -UPPER_ARM + 0.07, 0))
+      shoulder.add(mesh(new THREE.CylinderGeometry(0.0675, 0.0675, 0.012, 18), red, 0, -UPPER_ARM + 0.14, 0))
+      elbow.add(mesh(new THREE.SphereGeometry(0.0615, 14, 10), fabric))
+      elbow.add(mesh(new THREE.CylinderGeometry(0.0605, 0.0445, 0.25, 18), fabric, 0, -0.13, 0))
+    }
     body.add(shoulder)
     return { shoulder, elbow }
   }
