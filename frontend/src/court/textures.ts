@@ -68,10 +68,19 @@ function paintWood(g: CanvasRenderingContext2D, w: number, h: number): void {
   }
 }
 
-/** The court surface: smoked-oak boards with the regulation lines. `wood = false` draws the lines alone on a clear
- *  canvas: the floor is lit, which dims its lines, so they are also added as a glow of their own (see CourtScene). Canvas top is half court,
+/** The court surface: smoked-oak boards, a lightly painted lane and the regulation lines. Canvas top is half court,
  *  canvas bottom is the baseline, so it reads like the top-down drawing in the README. */
-export function drawCourt(wood = true): HTMLCanvasElement {
+export function drawCourt(): HTMLCanvasElement {
+  return renderCourt(true)
+}
+
+/** Only the lines, on a clear canvas. The floor is lit, which dims its lines, so the scene adds these as a glow of
+ *  its own (the floor's emissive map). */
+export function drawCourtLines(): HTMLCanvasElement {
+  return renderCourt(false)
+}
+
+function renderCourt(wood: boolean): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = COURT_W * PX
   canvas.height = COURT_L * PX
@@ -80,10 +89,9 @@ export function drawCourt(wood = true): HTMLCanvasElement {
   const X = (x: number) => x * PX
   const Y = (y: number) => (COURT_L - y) * PX
 
-  if (wood) paintWood(g, canvas.width, canvas.height)
-
-  // The lane (key) is lightly painted.
   if (wood) {
+    paintWood(g, canvas.width, canvas.height)
+    // The lane (key) is lightly painted.
     g.fillStyle = 'rgba(255,122,47,0.09)'
     g.fillRect(X(HOOP_X - LANE_HALF_WIDTH), Y(FREE_THROW_Y), X(LANE_HALF_WIDTH * 2), Y(0) - Y(FREE_THROW_Y))
   }

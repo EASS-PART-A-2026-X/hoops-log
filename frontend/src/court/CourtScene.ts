@@ -13,7 +13,7 @@ import { flightPoint, planFlight } from './flight'
 import type { FlightPlan } from './flight'
 import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
 import type { HeatGrid, HexBins, HexCell } from './stats'
-import { drawCourt, heatColor, paintHeat } from './textures'
+import { drawCourt, drawCourtLines, heatColor, paintHeat } from './textures'
 
 export type MapMode = 'heat' | 'beams' | 'arcs'
 
@@ -543,8 +543,10 @@ export class CourtScene {
       if (o.geometry) o.geometry.dispose()
       const m = o.material as THREE.Material | THREE.Material[] | undefined
       for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
-        const map = (mat as THREE.MeshBasicMaterial).map
+        // The court's lines are a second texture, only reachable through emissiveMap.
+        const { map, emissiveMap } = mat as THREE.MeshStandardMaterial
         if (map) map.dispose()
+        if (emissiveMap) emissiveMap.dispose()
         mat.dispose()
       }
       if ((obj as THREE.InstancedMesh).isInstancedMesh) (obj as THREE.InstancedMesh).dispose()
@@ -583,7 +585,7 @@ export class CourtScene {
     courtTex.colorSpace = THREE.SRGBColorSpace
     courtTex.anisotropy = maxAniso
     // The lines are also added as a glow of their own: the lit floor would dim them.
-    const linesTex = new THREE.CanvasTexture(drawCourt(false))
+    const linesTex = new THREE.CanvasTexture(drawCourtLines())
     linesTex.colorSpace = THREE.SRGBColorSpace
     linesTex.anisotropy = maxAniso
     const court = new THREE.Mesh(
@@ -736,6 +738,8 @@ export class CourtScene {
     this.balls = this.instanced(this.ballGeo, this.ballMat, n)
     // A dark pool under every shot, so a made (orange) or missed (blue) marker never melts into the wood.
     this.shadows = this.instanced(this.shadowGeo, this.shadowMat, n)
+    // Drawn first among the transparent layers, so the heat plane (y 0.04) and everything above the floor blends over it.
+    // The shadow sits 0.03 above the floor and 0.01 under the heat plane; at the farthest camera distance the depth buffer still resolves that.
     this.shadows.renderOrder = -1
     for (let i = 0; i < n; i++) {
       const p = this.pts[i]

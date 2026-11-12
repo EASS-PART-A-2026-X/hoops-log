@@ -3907,6 +3907,12 @@ h3 {
   overflow: hidden;
 }
 
+.odo-dot {
+  display: inline-block;
+  height: 1em;
+  line-height: 1;
+}
+
 .odo-strip {
   display: flex;
   flex-direction: column;
@@ -3921,11 +3927,25 @@ h3 {
 }
 
 /* A quick heat glow when the number changes. */
-.odo-hot .odo-digits {
-  animation: odo-heat 0.9s ease-out;
+.odo-hot-a .odo-digits {
+  animation: odo-heat-a 0.9s ease-out;
 }
 
-@keyframes odo-heat {
+.odo-hot-b .odo-digits {
+  animation: odo-heat-b 0.9s ease-out;
+}
+
+/* Two identical keyframes: switching between them restarts the glow when the value changes mid-glow. */
+@keyframes odo-heat-a {
+  0% {
+    filter: drop-shadow(0 0 10px #ffb27a) brightness(1.5);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+@keyframes odo-heat-b {
   0% {
     filter: drop-shadow(0 0 10px #ffb27a) brightness(1.5);
   }
@@ -3939,7 +3959,8 @@ h3 {
     transition: none;
   }
 
-  .odo-hot .odo-digits {
+  .odo-hot-a .odo-digits,
+  .odo-hot-b .odo-digits {
     animation: none;
   }
 }
