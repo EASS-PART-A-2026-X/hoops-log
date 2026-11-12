@@ -26,6 +26,7 @@ import { useCelebrations } from './game/useCelebrations'
 import { levelInfo } from './game/xp'
 import Coach from './coach/Coach'
 import { useCoach } from './coach/useCoach'
+import { useCoachChatter } from './coach/useCoachChatter'
 import { useCoachEvents } from './coach/useCoachEvents'
 
 /** The drawer covers the page below this width (the layout breakpoint in index.css). */
@@ -260,6 +261,17 @@ export default function App() {
   const covered = title && !started
   const coachContext = useMemo(() => ({ shots: shooterShots ?? [], shooter }), [shooterShots, shooter])
   const coach = useCoach()
+  useCoachChatter({
+    coach,
+    ready: !covered && shots !== null,
+    context: () => ({
+      shots: shooterShots ?? [],
+      shooter,
+      now: new Date(),
+      dates: (shooterShots ?? []).map((s) => s.game_date),
+      xpToNext: level.span - level.into,
+    }),
+  })
   // The coach's big 3D view is open: the court behind it stops drawing, so only one 3D picture runs at a time.
   const [coachOpen, setCoachOpen] = useState(false)
   useCoachEvents({

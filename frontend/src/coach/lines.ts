@@ -3,7 +3,7 @@
  * no AI behind it (that is a later step), so the same shots always give the same words. The lines are
  * plain coaching, never quotes from a real person.
  */
-import { MIN_SHOTS_FOR_MATCH, NBA_OVERALL, SMALL_SAMPLE, compareZones, rankPlayers } from '../court/nba'
+import { MIN_SHOTS_FOR_MATCH, NBA_OVERALL, NBA_THREE_SHARE, SMALL_SAMPLE, compareZones, rankPlayers } from '../court/nba'
 import { summarize, zoneLabel } from '../court/stats'
 import type { MapShot } from '../court/stats'
 import { XP_LOG, XP_MAKE, XP_THREE_BONUS } from '../game/xp'
@@ -79,7 +79,7 @@ export interface Question {
   label: string
 }
 
-export type QuestionId = 'add' | 'doing' | 'practise' | 'best' | 'like' | 'map' | 'xp'
+export type QuestionId = 'add' | 'doing' | 'practise' | 'best' | 'like' | 'map' | 'xp' | 'fact'
 
 export const QUESTIONS: readonly Question[] = [
   { id: 'doing', label: 'How am I shooting?' },
@@ -89,12 +89,15 @@ export const QUESTIONS: readonly Question[] = [
   { id: 'add', label: 'How do I add a shot?' },
   { id: 'map', label: 'What am I looking at on the court?' },
   { id: 'xp', label: 'How do XP and levels work?' },
+  { id: 'fact', label: 'Tell me something about Deni' },
 ]
 
 export interface AnswerContext {
-  /** The shots of the player the app is showing. */
+  /** The shots of the player the app is showing, oldest first. */
   shots: MapShot[]
   shooter: string
+  /** Which wording to use when a question has several (a rotating number). */
+  n?: number
 }
 
 const empty: Line = { text: 'There are no shots in this log yet, so I have nothing to go on. Add a few and ask me again.', mood: 'hmm' }
@@ -103,6 +106,8 @@ const empty: Line = { text: 'There are no shots in this log yet, so I have nothi
 export function answer(id: QuestionId, ctx: AnswerContext): Line {
   const { shots } = ctx
   switch (id) {
+    case 'fact':
+      return fact(ctx.n ?? 0)
     case 'add':
       return {
         text: 'Press the Shots button at the top, then Add a shot. Type where you shot from, X across the court and Y from the baseline, say made or missed, and save.',
@@ -160,4 +165,117 @@ export function answer(id: QuestionId, ctx: AnswerContext): Line {
       }
     }
   }
+}
+
+// ---------- Things he says without being asked, and small surprises ----------
+
+/** Shot counts that get a line of their own when a saved shot reaches them. */
+export const MILESTONES = [25, 50, 100, 150, 200, 300, 500, 1000] as const
+
+export function milestone(count: number): Line {
+  return { text: `Shot number ${count} in the log. Most people quit long before this. Keep stacking them.`, mood: 'hype' }
+}
+
+/** Whole days from one calendar date (YYYY-MM-DD) to another; null when either is not a date. */
+export function daysBetween(from: string, to: string): number | null {
+  const a = Date.parse(`${from}T00:00:00Z`)
+  const b = Date.parse(`${to}T00:00:00Z`)
+  if (Number.isNaN(a) || Number.isNaN(b)) return null
+  return Math.round((b - a) / 86_400_000)
+}
+
+/** The greeting for someone who has been away: he says how long, and tells them to ease in. */
+export function welcomeBack(name: string, days: number): Line {
+  const who = name || 'there'
+  return { text: `Welcome back, ${who}. ${days} days since your last shot, so ease in with a few warm-up ones.`, mood: 'happy' }
+}
+
+/** Fun facts that do not change with a season, so they stay true. */
+export const FACTS: readonly string[] = [
+  'Fun fact: Deni Avdija was born on January 3, 2001, in Beit Zera, in Israel.',
+  'Fun fact: Deni was picked 9th overall in the 2020 NBA draft, the highest an Israeli has ever been drafted.',
+  'Fun fact: before the NBA, Deni played for Maccabi Tel Aviv, and he plays for the Israeli national team.',
+]
+
+export function fact(n: number): Line {
+  return { text: pick(FACTS, n), mood: 'happy' }
+}
+
+const POKES = ['Hey, careful, I am dribbling here.', 'Yes? I am right here, coach.', 'That tickles. Focus on your shot.', 'You can keep poking, the ball does not stop.']
+
+export function poke(n: number): Line {
+  return { text: pick(POKES, n), mood: 'happy' }
+}
+
+/** Poking him many times in a row. */
+export const POKE_SPAM: Line = { text: 'Okay, okay, I am awake. Go take some shots.', mood: 'hype' }
+
+/** The old cheat code: up up down down left right left right B A. */
+export const KONAMI_CODE = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a']
+
+export const KONAMI: Line = { text: 'Cheat code accepted. Sadly it adds nothing to your log, so go earn it on the court.', mood: 'hype' }
+
+/** Asked the same question again straight away. */
+export function again(line: Line): Line {
+  return { text: `Same question? Fine, here it is again. ${line.text}`, mood: line.mood }
+}
+
+export interface ChatterContext extends AnswerContext {
+  /** The local date and time, passed in so the lines can be tested. */
+  now: Date
+  /** The shooter's shots with their game dates (YYYY-MM-DD), for "today". */
+  dates: string[]
+  /** XP left to the next level, and the level's rank. */
+  xpToNext: number
+}
+
+/** The local calendar date of `now` as YYYY-MM-DD. */
+export function dayOf(now: Date): string {
+  const p = (v: number) => String(v).padStart(2, '0')
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`
+}
+
+interface Candidate {
+  id: string
+  line: Line | null
+}
+
+/** Everything he could say right now, each tied to something true at this moment. */
+function candidates(ctx: ChatterContext): Candidate[] {
+  const { shots, now } = ctx
+  const out: Candidate[] = []
+  const hour = now.getHours()
+  if (hour >= 23 || hour < 5) out.push({ id: 'night', line: { text: 'It is late. Take one more, then get some sleep. Shooters need it too.', mood: 'idle' } })
+  if (hour >= 5 && hour < 9) out.push({ id: 'morning', line: { text: 'An early session. That habit pays off.', mood: 'happy' } })
+  if (now.getDay() === 5 && hour >= 14) out.push({ id: 'friday', line: { text: 'Friday afternoon, last shots before the weekend. Make them count.', mood: 'happy' } })
+  const today = ctx.dates.filter((d) => d === dayOf(now)).length
+  if (today >= 3) out.push({ id: 'today', line: { text: `${today} shots logged today. That is a real session.`, mood: 'happy' } })
+  if (ctx.xpToNext > 0 && ctx.xpToNext <= 40) out.push({ id: 'xp', line: { text: `Only ${ctx.xpToNext} XP to the next level. One good streak does it.`, mood: 'hype' } })
+  const zones = compareZones(shots).filter((z) => z.attempts >= SMALL_SAMPLE && z.mine !== null)
+  if (zones.length > 0) {
+    const best = zones.reduce((a, b) => (b.mine! > a.mine! ? b : a))
+    out.push({ id: 'best', line: { text: `Quick note: ${zoneLabel(best.zone)} is your best area at ${best.mine}%. Do not forget to use it.`, mood: 'happy' } })
+    const worst = zones.reduce((a, b) => (b.diff! < a.diff! ? b : a))
+    if (worst.diff! < 0) out.push({ id: 'worst', line: { text: `I keep thinking about your ${zoneLabel(worst.zone).toLowerCase()}: ${worst.mine}% against about ${worst.nba}% in the league. A few extra shots there would help.`, mood: 'idle' } })
+  }
+  const s = summarize(shots)
+  if (s.attempts >= 20 && s.threeAttempts / s.attempts < 0.2) {
+    out.push({ id: 'threes', line: { text: `Only ${Math.round((s.threeAttempts / s.attempts) * 100)}% of your shots are threes. The league takes about ${NBA_THREE_SHARE}% from there.`, mood: 'idle' } })
+  }
+  const last3 = shots.slice(-3)
+  if (last3.length === 3 && last3.every((x) => !x.made)) {
+    out.push({ id: 'cold', line: { text: 'Three misses in a row. Breathe, reset, same routine on the next one.', mood: 'hmm' } })
+  }
+  out.push({ id: 'water', line: { text: 'Water break? Staying hydrated is part of the training.', mood: 'idle' } })
+  return out
+}
+
+/**
+ * One thing to say out of the choices that fit right now, avoiding the ones already said (`used`). Null when
+ * none are left, so he stays quiet instead of repeating himself.
+ */
+export function chatter(ctx: ChatterContext, used: ReadonlySet<string>, n: number): { id: string; line: Line } | null {
+  const fresh = candidates(ctx).filter((c): c is { id: string; line: Line } => c.line !== null && !used.has(c.id))
+  if (fresh.length === 0) return null
+  return pick(fresh, n)
 }

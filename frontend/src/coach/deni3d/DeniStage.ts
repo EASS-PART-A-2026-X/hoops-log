@@ -35,6 +35,8 @@ export class DeniStage {
   private resizeObserver: ResizeObserver
   private container: HTMLElement
   private reduced: boolean
+  /** Called when the visitor taps him (a press and release without dragging). */
+  onPoke: (() => void) | null = null
 
   constructor(container: HTMLElement, reducedMotion: boolean) {
     this.container = container
@@ -205,6 +207,8 @@ export class DeniStage {
     this.requestFrame()
   }
   private onUp = (e: PointerEvent): void => {
+    // A tap, not a turn: barely any sideways movement since the press.
+    if (this.drag && e.type === 'pointerup' && Math.abs(e.clientX - this.drag.x) < 5) this.onPoke?.()
     this.drag = null
     if (this.renderer.domElement.hasPointerCapture(e.pointerId)) this.renderer.domElement.releasePointerCapture(e.pointerId)
   }

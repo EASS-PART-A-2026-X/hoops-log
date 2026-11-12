@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { GameToast } from '../game/useCelebrations'
 import { chronological } from '../game/xp'
-import { greet, levelUp, saved, streak, tip, trophy } from './lines'
+import { MILESTONES, daysBetween, dayOf, greet, levelUp, milestone, saved, streak, tip, trophy, welcomeBack } from './lines'
 import type { TabName } from './lines'
 import type { CoachApi } from './useCoach'
 
@@ -39,6 +39,9 @@ export function currentStreak(shots: EventShot[]): number {
 /** A run this long is worth a line of its own. */
 export const STREAK_LINE = 3
 
+/** Days without a shot after which the greeting says so. */
+export const AWAY_DAYS = 3
+
 /** How long to wait for a trophy or level toast before saying the plain "saved" line (the toast line wins). */
 const SETTLE_MS = 80
 
@@ -60,7 +63,11 @@ export function useCoachEvents({ coach, shots, truncated, ready, tab, name, shot
   useEffect(() => {
     if (greeted.current || !ready || shots === null) return
     greeted.current = true
-    say(greet(name, shotCount, rank, variant.current++))
+    // Away for a few days: say so instead of the usual greeting.
+    const dates = shots.filter((x) => x.player === name).map((x) => x.game_date)
+    const last = dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null
+    const away = last === null ? null : daysBetween(last, dayOf(new Date()))
+    say(away !== null && away >= AWAY_DAYS ? welcomeBack(name, away) : greet(name, shotCount, rank, variant.current++))
   }, [ready, shots, name, shotCount, rank, say])
 
   useEffect(() => {
@@ -79,8 +86,14 @@ export function useCoachEvents({ coach, shots, truncated, ready, tab, name, shot
     if (before === null || quiet || maxId <= before || !greeted.current) return
     const latest = shots.find((s) => s.id === maxId)
     if (!latest) return
-    const run = currentStreak(shots.filter((s) => s.player === latest.player))
-    const line = latest.made && run >= STREAK_LINE ? streak(run) : saved(latest.made, variant.current++)
+    const mine = shots.filter((s) => s.player === latest.player)
+    const run = currentStreak(mine)
+    // A round number of shots beats a streak, which beats the plain line.
+    const line = (MILESTONES as readonly number[]).includes(mine.length)
+      ? milestone(mine.length)
+      : latest.made && run >= STREAK_LINE
+        ? streak(run)
+        : saved(latest.made, variant.current++)
     window.clearTimeout(pending.current)
     pending.current = window.setTimeout(() => say(line), SETTLE_MS)
   }, [shots, truncated, say])

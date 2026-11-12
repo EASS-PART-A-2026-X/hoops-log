@@ -1,9 +1,11 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import CoachDialog from './CoachDialog'
 import DeniAvatar from './DeniAvatar'
-import { INTRO } from './lines'
+import { INTRO, KONAMI, KONAMI_CODE } from './lines'
 import type { AnswerContext } from './lines'
 import type { CoachApi } from './useCoach'
+import { play } from '../game/audio'
+
 
 interface Props {
   coach: CoachApi
@@ -29,6 +31,25 @@ export default function Coach({ coach, context, onOpenChange }: Props) {
   )
   const close = useCallback(() => change(false), [change])
   const mood = talking || visible ? (said?.mood ?? 'idle') : 'idle'
+
+  // The cheat code works anywhere, except while typing in a field.
+  useEffect(() => {
+    // The last keys pressed, as many as the code is long: the code is the last ten keys, whatever came before.
+    let recent: string[] = []
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const key = e.key.toLowerCase()
+      recent = [...recent, key].slice(-KONAMI_CODE.length)
+      if (recent.join(' ') === KONAMI_CODE.join(' ')) {
+        recent = []
+        play('levelup')
+        say(KONAMI)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [say])
 
   return (
     <>

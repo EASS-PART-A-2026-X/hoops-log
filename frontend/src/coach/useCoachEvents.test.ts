@@ -134,4 +134,40 @@ describe('useCoachEvents', () => {
     rerender({ shots: first, toasts: [toast] })
     expect(result.current.said!.key).toBe(key)
   })
+
+  it('celebrates a round number of shots, ahead of a streak and a plain save', () => {
+    const first = Array.from({ length: 24 }, () => shot(true))
+    const { result, rerender } = setup({ shots: first })
+    rerender({ shots: [...first, shot(true)] })
+    advance(200)
+    expect(result.current.said?.text).toMatch(/Shot number 25 /)
+    expect(result.current.said?.mood).toBe('hype')
+    // The next one is just a save (or a streak), not another milestone.
+    rerender({ shots: [...first, shot(true), shot(false)] })
+    advance(200)
+    expect(result.current.said?.text).not.toMatch(/Shot number/)
+  })
+
+  it('counts a milestone per player, not across everyone', () => {
+    const others = Array.from({ length: 30 }, () => shot(true, { player: 'B' }))
+    const mine = [shot(false), shot(false)]
+    const { result, rerender } = setup({ shots: [...others, ...mine] })
+    rerender({ shots: [...others, ...mine, shot(false)] })
+    advance(200)
+    expect(result.current.said?.text).not.toMatch(/Shot number/)
+  })
+
+  it('greets someone who has been away for days with how long, and others normally', () => {
+    const old = (daysAgo: number) => {
+      const d = new Date()
+      d.setDate(d.getDate() - daysAgo)
+      const p = (v: number) => String(v).padStart(2, '0')
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+    }
+    const away = setup({ shots: [shot(true, { game_date: old(9) }), shot(true, { game_date: old(10) })] })
+    expect(away.result.current.said?.text).toMatch(/9 days since your last shot/)
+    cleanup()
+    const near = setup({ shots: [shot(true, { game_date: old(1) })] })
+    expect(near.result.current.said?.text).toMatch(/Welcome back, A\. 1 shots logged/)
+  })
 })

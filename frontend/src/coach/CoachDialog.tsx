@@ -1,12 +1,17 @@
 import { Suspense, lazy, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
 import DeniAvatar from './DeniAvatar'
-import { QUESTIONS, answer } from './lines'
+import { POKE_SPAM, QUESTIONS, again, answer, poke } from './lines'
 import type { AnswerContext } from './lines'
+import { isChatterOn, setChatterOn, subscribeChatter } from './prefs'
 import { isVoiceOn, setVoiceOn, speechSupported, subscribeVoice } from './speech'
 import type { CoachApi } from './useCoach'
 import { tabTarget } from '../focusTrap'
 import { isMuted, subscribeMuted } from '../game/audio'
+
+/** Taps on him that count as poking him, and how close together they must be. */
+const POKE_SPAM_COUNT = 6
+const POKE_WINDOW_MS = 5000
 
 // Three.js and the 3D figure are only fetched when this dialog is first opened.
 const Deni3D = lazy(() => import('./Deni3D'))
@@ -30,7 +35,25 @@ export default function CoachDialog({ coach, context, onClose, returnTo }: Props
   const closeRef = useRef<HTMLButtonElement>(null)
   const voiceOn = useSyncExternalStore(subscribeVoice, isVoiceOn, () => true)
   const muted = useSyncExternalStore(subscribeMuted, isMuted, () => false)
+  const chatterOn = useSyncExternalStore(subscribeChatter, isChatterOn, () => true)
   const mood = talking || visible ? (said?.mood ?? 'idle') : 'idle'
+  const lastQuestion = useRef<string | null>(null)
+  const asked = useRef(0)
+  const pokes = useRef<number[]>([])
+
+  function ask(id: (typeof QUESTIONS)[number]['id']) {
+    const line = answer(id, { ...context, n: asked.current++ })
+    // The same question twice in a row gets a remark. (Facts rotate, so they are always new.)
+    say(lastQuestion.current === id && id !== 'fact' ? again(line) : line)
+    lastQuestion.current = id
+  }
+
+  function onPoke() {
+    const now = Date.now()
+    pokes.current = [...pokes.current.filter((t) => now - t < POKE_WINDOW_MS), now]
+    lastQuestion.current = null
+    say(pokes.current.length >= POKE_SPAM_COUNT ? POKE_SPAM : poke(asked.current++))
+  }
 
   useEffect(() => {
     const opener = returnTo.current
@@ -75,7 +98,7 @@ export default function CoachDialog({ coach, context, onClose, returnTo }: Props
               </div>
             }
           >
-            <Deni3D mood={mood} talking={talking} beat={said?.key ?? 0} />
+            <Deni3D mood={mood} talking={talking} beat={said?.key ?? 0} onPoke={onPoke} />
           </Suspense>
           <p className="coach-stage-hint" aria-hidden="true">
             Drag to turn him round
@@ -97,7 +120,7 @@ export default function CoachDialog({ coach, context, onClose, returnTo }: Props
           <ul className="coach-questions" aria-label="Ask Deni">
             {QUESTIONS.map((q) => (
               <li key={q.id}>
-                <button type="button" onClick={() => say(answer(q.id, context))}>
+                <button type="button" onClick={() => ask(q.id)}>
                   {q.label}
                 </button>
               </li>
@@ -109,6 +132,9 @@ export default function CoachDialog({ coach, context, onClose, returnTo }: Props
               {voiceOn && muted ? ' (the sound button is off)' : ''}
             </button>
           )}
+          <button type="button" className="coach-voice" aria-pressed={chatterOn} onClick={() => setChatterOn(!chatterOn)}>
+            Let him chime in: {chatterOn ? 'on' : 'off'}
+          </button>
           <p className="coach-note">
             A fan-made coach inspired by Deni Avdija. Not the real Deni, and no AI: his lines are written in advance and use your own shots.
           </p>
