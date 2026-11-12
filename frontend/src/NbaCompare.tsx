@@ -8,6 +8,7 @@ import { describeTally, gapPts, judge, sideOf, tally } from './court/verdict'
 import type { Side } from './court/verdict'
 import { playerProfile, shooterProfile } from './court/cardData'
 import FaceOff from './FaceOff'
+import Odometer from './Odometer'
 import PlayerPicker from './PlayerPicker'
 
 interface Props {
@@ -22,7 +23,14 @@ interface Props {
   onFaceOffSeen: (key: string) => void
 }
 
-const fmt = (v: number | null) => (v === null ? '–' : `${v}%`)
+const fmt = (v: number | null) =>
+  v === null ? (
+    '–'
+  ) : (
+    <>
+      <Odometer value={v} />%
+    </>
+  )
 
 /** Who leads in a zone; null below the minimum number of shots (see `judge`). */
 const zoneSideOf = (z: ZoneCompare): Side | null => judge(z.mine, z.nba, z.attempts)

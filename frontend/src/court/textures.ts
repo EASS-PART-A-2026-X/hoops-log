@@ -14,9 +14,73 @@ import type { HeatGrid } from './stats'
 
 const PX = 24 // texture pixels per foot
 
-/** The court surface: dark floor with the regulation lines. Canvas top is half court,
+/** Same boards every time (no Math.random), so the floor does not change between visits. */
+function rng(seed: number): () => number {
+  let a = seed
+  return () => {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * Long boards running toward the hoop, a touch different in tone each, with grain and tight seams.
+ * Kept dark and low in colour on purpose: the made shots are orange, so a light or orange floor
+ * would swallow them (see the markers in CourtScene, which also get a dark shadow on the floor).
+ */
+function paintWood(g: CanvasRenderingContext2D, w: number, h: number): void {
+  const rand = rng(1987)
+  const boardW = Math.round(0.42 * PX) // a board is about five inches wide
+  g.fillStyle = '#251b15'
+  g.fillRect(0, 0, w, h)
+  for (let x = 0; x < w; x += boardW) {
+    // Boards are cut to length, so each strip is a few boards end to end.
+    let y = -Math.floor(rand() * 5 * PX)
+    while (y < h) {
+      const len = Math.round((4 + rand() * 6) * PX)
+      const tone = rand()
+      const r = Math.round(44 + tone * 14)
+      const gr = Math.round(32 + tone * 10)
+      const b = Math.round(25 + tone * 7)
+      g.fillStyle = `rgb(${r},${gr},${b})`
+      g.fillRect(x, y, boardW, len)
+      // Grain: thin streaks along the board, a little lighter or darker than it.
+      for (let k = 0; k < 7; k++) {
+        const gx = x + rand() * boardW
+        const light = rand() > 0.5
+        g.strokeStyle = light ? 'rgba(255,225,190,0.045)' : 'rgba(0,0,0,0.16)'
+        g.lineWidth = 0.6 + rand() * 0.9
+        g.beginPath()
+        g.moveTo(gx, y + rand() * len * 0.2)
+        g.bezierCurveTo(gx + (rand() - 0.5) * 3, y + len * 0.35, gx + (rand() - 0.5) * 3, y + len * 0.65, gx + (rand() - 0.5) * 2, y + len)
+        g.stroke()
+      }
+      // The end seam of the board.
+      g.fillStyle = 'rgba(0,0,0,0.5)'
+      g.fillRect(x, y + len - 1, boardW, 1.4)
+      y += len
+    }
+    // The long seam between boards.
+    g.fillStyle = 'rgba(0,0,0,0.55)'
+    g.fillRect(x, 0, 1.3, h)
+  }
+}
+
+/** The court surface: smoked-oak boards, a lightly painted lane and the regulation lines. Canvas top is half court,
  *  canvas bottom is the baseline, so it reads like the top-down drawing in the README. */
 export function drawCourt(): HTMLCanvasElement {
+  return renderCourt(true)
+}
+
+/** Only the lines, on a clear canvas. The floor is lit, which dims its lines, so the scene adds these as a glow of
+ *  its own (the floor's emissive map). */
+export function drawCourtLines(): HTMLCanvasElement {
+  return renderCourt(false)
+}
+
+function renderCourt(wood: boolean): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = COURT_W * PX
   canvas.height = COURT_L * PX
@@ -25,25 +89,12 @@ export function drawCourt(): HTMLCanvasElement {
   const X = (x: number) => x * PX
   const Y = (y: number) => (COURT_L - y) * PX
 
-  const floor = g.createLinearGradient(0, 0, 0, canvas.height)
-  floor.addColorStop(0, '#0e1620')
-  floor.addColorStop(1, '#131d2a')
-  g.fillStyle = floor
-  g.fillRect(0, 0, canvas.width, canvas.height)
-
-  // Faint floorboards, so the surface has scale and the eye can read perspective.
-  g.strokeStyle = 'rgba(120,150,190,0.05)'
-  g.lineWidth = 1
-  for (let x = 0; x <= COURT_W; x += 1.5) {
-    g.beginPath()
-    g.moveTo(X(x), 0)
-    g.lineTo(X(x), canvas.height)
-    g.stroke()
+  if (wood) {
+    paintWood(g, canvas.width, canvas.height)
+    // The lane (key) is lightly painted.
+    g.fillStyle = 'rgba(255,122,47,0.09)'
+    g.fillRect(X(HOOP_X - LANE_HALF_WIDTH), Y(FREE_THROW_Y), X(LANE_HALF_WIDTH * 2), Y(0) - Y(FREE_THROW_Y))
   }
-
-  // The lane (key) is lightly painted.
-  g.fillStyle = 'rgba(255,122,47,0.09)'
-  g.fillRect(X(HOOP_X - LANE_HALF_WIDTH), Y(FREE_THROW_Y), X(LANE_HALF_WIDTH * 2), Y(0) - Y(FREE_THROW_Y))
 
   const line = (width: number, alpha: number) => {
     g.strokeStyle = `rgba(255,170,115,${alpha})`

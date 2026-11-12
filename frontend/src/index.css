@@ -3889,3 +3889,87 @@ h3 {
   outline: 2px solid var(--orange-soft);
   outline-offset: -2px;
 }
+
+/* Odometer: digits roll like an arena scoreboard (see Odometer.tsx). */
+.odo {
+  display: inline-block;
+  position: relative;
+}
+
+.odo-digits {
+  display: inline-flex;
+  line-height: 1;
+}
+
+.odo-col {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+}
+
+.odo-dot {
+  display: inline-block;
+  height: 1em;
+  line-height: 1;
+}
+
+.odo-strip {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.7s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.odo-strip > span {
+  display: block;
+  height: 1em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A quick heat glow when the number changes. */
+.odo-hot-a .odo-digits {
+  animation: odo-heat-a 0.9s ease-out;
+}
+
+.odo-hot-b .odo-digits {
+  animation: odo-heat-b 0.9s ease-out;
+}
+
+/* Two identical keyframes: switching between them restarts the glow when the value changes mid-glow. */
+@keyframes odo-heat-a {
+  0% {
+    filter: drop-shadow(0 0 10px #ffb27a) brightness(1.5);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+@keyframes odo-heat-b {
+  0% {
+    filter: drop-shadow(0 0 10px #ffb27a) brightness(1.5);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odo-strip {
+    transition: none;
+  }
+
+  .odo-hot-a .odo-digits,
+  .odo-hot-b .odo-digits {
+    animation: none;
+  }
+}
+
+.odo-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

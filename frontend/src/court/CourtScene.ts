@@ -13,7 +13,7 @@ import { flightPoint, planFlight } from './flight'
 import type { FlightPlan } from './flight'
 import { BACKBOARD_Y, COURT_L, COURT_W, HOOP_Y, RIM_HEIGHT, toWorld } from './geometry'
 import type { HeatGrid, HexBins, HexCell } from './stats'
-import { drawCourt, heatColor, paintHeat } from './textures'
+import { drawCourt, drawCourtLines, heatColor, paintHeat } from './textures'
 
 export type MapMode = 'heat' | 'beams' | 'arcs'
 
@@ -164,6 +164,9 @@ export class CourtScene {
   private playStart = 0
   private stagger = 0
   private dirty = true
+  private shadows: THREE.InstancedMesh | null = null
+  private shadowGeo = new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2)
+  private shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.55, depthWrite: false })
   private selected: number | null = null
   private tween: {
     t0: number
@@ -540,8 +543,10 @@ export class CourtScene {
       if (o.geometry) o.geometry.dispose()
       const m = o.material as THREE.Material | THREE.Material[] | undefined
       for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
-        const map = (mat as THREE.MeshBasicMaterial).map
+        // The court's lines are a second texture, only reachable through emissiveMap.
+        const { map, emissiveMap } = mat as THREE.MeshStandardMaterial
         if (map) map.dispose()
+        if (emissiveMap) emissiveMap.dispose()
         mat.dispose()
       }
       if ((obj as THREE.InstancedMesh).isInstancedMesh) (obj as THREE.InstancedMesh).dispose()
@@ -579,7 +584,22 @@ export class CourtScene {
     const courtTex = new THREE.CanvasTexture(drawCourt())
     courtTex.colorSpace = THREE.SRGBColorSpace
     courtTex.anisotropy = maxAniso
-    const court = new THREE.Mesh(this.flatPlane(), new THREE.MeshBasicMaterial({ map: courtTex }))
+    // The lines are also added as a glow of their own: the lit floor would dim them.
+    const linesTex = new THREE.CanvasTexture(drawCourtLines())
+    linesTex.colorSpace = THREE.SRGBColorSpace
+    linesTex.anisotropy = maxAniso
+    const court = new THREE.Mesh(
+      this.flatPlane(),
+      new THREE.MeshStandardMaterial({
+        map: courtTex,
+        color: '#ffe9d6', // multiplies the texture: keeps the lit floor as dark as the smoked oak was drawn
+        roughness: 0.8,
+        metalness: 0,
+        emissive: '#ffffff',
+        emissiveMap: linesTex,
+        emissiveIntensity: 0.85,
+      }),
+    )
     this.scene.add(court)
 
     // A slab under the court so it has thickness, and a glowing edge.
@@ -691,13 +711,13 @@ export class CourtScene {
   }
 
   private clearInstanced(): void {
-    for (const m of [this.beams, this.orbs, this.xa, this.xb, this.balls]) {
+    for (const m of [this.beams, this.orbs, this.xa, this.xb, this.balls, this.shadows]) {
       if (m) {
         this.scene.remove(m)
         m.dispose()
       }
     }
-    this.beams = this.orbs = this.xa = this.xb = this.balls = null
+    this.beams = this.orbs = this.xa = this.xb = this.balls = this.shadows = null
   }
 
   private instanced(geo: THREE.BufferGeometry, mat: THREE.Material, n: number): THREE.InstancedMesh {
@@ -716,6 +736,12 @@ export class CourtScene {
     this.xa = this.instanced(this.xGeo, this.solidMat, n)
     this.xb = this.instanced(this.xGeo, this.solidMat, n)
     this.balls = this.instanced(this.ballGeo, this.ballMat, n)
+    // A dark pool under every shot, so a made (orange) or missed (blue) marker never melts into the wood.
+    this.shadows = this.instanced(this.shadowGeo, this.shadowMat, n)
+    // Drawn first among the transparent layers, so the heat plane (y 0.04) and everything above the floor blends over it.
+    // The shadow sits 0.03 above the floor. Only that gap to the opaque floor is depth tested (shadow and heat plane both skip depth writes,
+    // so draw order, not their 0.01 gap, decides how they blend). The orbit controls stop at 95, where the depth buffer resolves about 0.001.
+    this.shadows.renderOrder = -1
     for (let i = 0; i < n; i++) {
       const p = this.pts[i]
       this.color.set(p.made ? (p.three ? MADE_3 : MADE_2) : MISSED)
@@ -930,7 +956,7 @@ export class CourtScene {
 
   private layout(now: number): void {
     const n = this.pts.length
-    if (!this.beams || !this.orbs || !this.xa || !this.xb || !this.balls) return
+    if (!this.beams || !this.orbs || !this.xa || !this.xb || !this.balls || !this.shadows) return
     const d = this.dummy
     const t = now - this.playStart
     const tail = n > 0 ? (n - 1) * this.stagger + FLIGHT_MS + SETTLE_MS : 0
@@ -971,6 +997,12 @@ export class CourtScene {
       d.rotation.set(0, -Math.PI / 4, 0)
       d.updateMatrix()
       this.xb.setMatrixAt(i, d.matrix)
+      // contact shadow under the marker (not in heat mode, where the hexes carry the data)
+      d.rotation.set(0, 0, 0)
+      d.position.set(wx, 0.03, wz)
+      d.scale.setScalar(heatOn ? 0.0001 : Math.max((p.made ? 1.15 : 1.35) * (0.6 + 0.4 * this.density) * shown, 0.0001))
+      d.updateMatrix()
+      this.shadows.setMatrixAt(i, d.matrix)
       // ball in flight: during a replay, or looping along every arc in flight-path mode
       let ballScale = 0.0001
       if (this.playing && local > 0 && local < FLIGHT_MS) {
@@ -987,7 +1019,7 @@ export class CourtScene {
       d.updateMatrix()
       this.balls.setMatrixAt(i, d.matrix)
     }
-    for (const m of [this.beams, this.orbs, this.xa, this.xb, this.balls]) {
+    for (const m of [this.beams, this.orbs, this.xa, this.xb, this.balls, this.shadows]) {
       m.instanceMatrix.needsUpdate = true
       // Picking uses these bounds; they must follow the instances.
       m.boundingSphere = null
