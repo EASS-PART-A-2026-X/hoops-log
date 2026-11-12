@@ -258,7 +258,10 @@ export default function App() {
   // True from the moment the player presses start, while the wipe is still running.
   const [started, setStarted] = useState(false)
   const covered = title && !started
+  const coachContext = useMemo(() => ({ shots: shooterShots ?? [], shooter }), [shooterShots, shooter])
   const coach = useCoach()
+  // The coach's big 3D view is open: the court behind it stops drawing, so only one 3D picture runs at a time.
+  const [coachOpen, setCoachOpen] = useState(false)
   useCoachEvents({
     coach,
     shots,
@@ -394,6 +397,7 @@ export default function App() {
             baseline={baseline}
             visible={tab === 'log'}
             suspended={covered}
+            paused={coachOpen}
           />
 
           {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
@@ -477,7 +481,7 @@ export default function App() {
           </aside>
         </div>
       </main>
-      <Coach coach={coach} context={{ shots: shooterShots ?? [], shooter }} />
+      <Coach coach={coach} context={coachContext} onOpenChange={setCoachOpen} />
     </div>
     </>
   )
