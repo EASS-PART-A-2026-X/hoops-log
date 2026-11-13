@@ -11,6 +11,8 @@ export interface GameToast {
   kind: 'level' | 'trophy'
   title: string
   sub: string
+  /** For a level toast: the new level and its rank, so others (the coach) need not read them out of the text. */
+  level?: { level: number; rank: string }
 }
 export interface XpPop {
   key: number
@@ -63,7 +65,7 @@ export function useCelebrations(shots: Shots | null, truncated = false) {
       const change = diffSnap(before.get(player) ?? EMPTY_SNAP, snap)
       if (change.xpGain > 0) gain = { key: nextId.current++, amount: change.xpGain, player }
       if (change.levelUp !== null) {
-        fresh.push({ id: nextId.current++, kind: 'level', title: `LEVEL ${change.levelUp}`, sub: `${rankTitle(change.levelUp)} · ${player}` })
+        fresh.push({ id: nextId.current++, kind: 'level', title: `LEVEL ${change.levelUp}`, sub: `${rankTitle(change.levelUp)} · ${player}`, level: { level: change.levelUp, rank: rankTitle(change.levelUp) } })
       }
       for (const id of change.newTrophyIds) {
         if (announcedBefore.get(player)?.has(id)) continue

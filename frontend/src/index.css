@@ -3973,3 +3973,387 @@ h3 {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ---------- The coach (Deni): a face in the corner, a caption bubble and a list of questions ---------- */
+.coach {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 28; /* above the page, below the top bar (30), the scrim (35) and the drawers (40) */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(320px, calc(100vw - 32px));
+  pointer-events: none; /* only the parts below take clicks, so the court stays usable around him */
+}
+
+.coach > * {
+  pointer-events: auto;
+}
+
+.coach-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.coach-face {
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--orange);
+  background: radial-gradient(circle at 50% 35%, #3a2417, var(--orange-bg) 70%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.15s ease;
+}
+
+.coach-face:hover {
+  transform: scale(1.05);
+}
+
+.coach-face:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.coach-face.hype {
+  animation: coach-hop 0.5s ease-out 2;
+}
+
+@keyframes coach-hop {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.deni {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.deni-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: deni-blink 5s infinite;
+}
+
+@keyframes deni-blink {
+  0%,
+  94%,
+  100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.1);
+  }
+}
+
+.deni-mouth {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: deni-talk 0.28s ease-in-out infinite alternate;
+}
+
+@keyframes deni-talk {
+  from {
+    transform: scaleY(0.25);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.coach-bubble {
+  position: relative;
+  padding: 10px 30px 10px 12px;
+  border: 1px solid var(--orange);
+  border-radius: 12px 12px 2px 12px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  animation: coach-pop 0.18s ease-out;
+}
+
+.coach-bubble p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.coach-bubble-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+@keyframes coach-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.coach-questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.coach-questions li button,
+.coach-voice {
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.coach-questions li button:hover,
+.coach-voice:hover {
+  border-color: #e03a3e;
+  background: rgba(224, 58, 62, 0.12);
+}
+
+.coach-voice[aria-pressed='false'] {
+  color: var(--muted);
+}
+
+.coach-note {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* The coach's big view: the 3D figure on the left in his team's black, red and white, the questions on the right. */
+.coach-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 7, 11, 0.86);
+}
+
+.coach-dialog-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  width: min(1060px, 100%);
+  height: min(690px, 100%);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+  animation: coach-dialog-in 0.22s ease-out;
+}
+
+@keyframes coach-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* The stage: a spotlight on black, with the kit's sash running behind him. */
+.coach-stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 42%, rgba(255, 240, 225, 0.13), transparent 70%),
+    linear-gradient(118deg, transparent 0 41%, #e03a3e 41% 47.5%, transparent 47.5% 48.6%, #f4f4f2 48.6% 49.8%, transparent 49.8% 50.9%, #e03a3e 50.9% 52.1%, transparent 52.1%),
+    #0b0b0d;
+}
+
+.coach-stage-number {
+  position: absolute;
+  right: 3%;
+  top: -9%;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: min(64vh, 560px);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.055);
+  user-select: none;
+}
+
+.deni-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.deni-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.deni-canvas:active {
+  cursor: grabbing;
+}
+
+.deni-stage-flat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.deni-stage-flat .deni {
+  width: min(240px, 60%);
+  height: auto;
+}
+
+.coach-stage-hint {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+.coach-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  width: min(560px, calc(100% - 36px));
+  margin: 0;
+  padding: 12px 16px;
+  transform: translateX(-50%);
+  border-left: 4px solid #e03a3e;
+  border-radius: 4px 10px 10px 4px;
+  background: rgba(8, 8, 10, 0.86);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  pointer-events: none;
+  animation: coach-caption-in 0.18s ease-out;
+}
+
+@keyframes coach-caption-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+.coach-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 20px 18px;
+  border-left: 1px solid var(--line-strong);
+  overflow-y: auto;
+}
+
+.coach-panel h2 {
+  padding-right: 48px;
+  font-size: 44px;
+  line-height: 0.95;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.coach-panel-sub {
+  margin: 0 0 6px;
+  color: var(--muted);
+}
+
+.coach-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+@media (max-width: 820px) {
+  .coach-dialog {
+    padding: 8px;
+  }
+
+  .coach-dialog-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(240px, 46%) minmax(0, 1fr);
+  }
+
+  .coach-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line-strong);
+  }
+
+  .coach-panel h2 {
+    font-size: 34px;
+  }
+
+  .coach-caption {
+    bottom: 10px;
+    font-size: 0.95rem;
+    padding: 9px 12px;
+  }
+}
+
+/* A side drawer (shots or trophies) would cover him on desktop and hide what he says: he steps left of it and
+   above the notice that moves to the bottom. On small screens the drawer covers the whole page and so him too. */
+@media (min-width: 961px) {
+  .app:has(.drawer.open) .coach {
+    right: calc(460px + 16px);
+    bottom: 76px;
+  }
+}
+
+@media (max-width: 640px) {
+  .coach {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .coach-face {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-face,
+  .coach-bubble,
+  .coach-dialog-body,
+  .coach-caption {
+    animation: none;
+    transition: none;
+  }
+
+  .deni-eyes,
+  .deni-mouth {
+    animation: none;
+  }
+}
