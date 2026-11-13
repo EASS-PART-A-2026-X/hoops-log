@@ -32,6 +32,8 @@ export interface Pose {
   brows: number
   rShoulder: number
   rElbow: number
+  /** The dribbling wrist, bent from the forearm toward the floor (radians). */
+  rWrist: number
   lShoulder: number
   lShoulderOut: number
   lElbow: number
@@ -39,6 +41,17 @@ export interface Pose {
 }
 
 export const BALL_R = 0.12
+/** Arm lengths (metres): shoulder height, shoulder to elbow, elbow to wrist, wrist to palm centre, half the palm's thickness. */
+export const SHOULDER_Y = 1.63
+export const UPPER_ARM = 0.34
+export const FOREARM = 0.262
+export const PALM = 0.074
+export const PALM_HALF = 0.034
+/** Where the ball is dribbled: out to his right and in front of him. */
+export const BALL_X = -0.32
+export const BALL_Z = 0.3
+/** The ball leaves his palm at this height (centre) and comes back to it: the hand follows it down only this far. */
+export const RELEASE_Y = 0.92
 /** The ball's centre at the top of the dribble, and one bounce in seconds. */
 export const DRIBBLE_TOP = 0.98
 export const DRIBBLE_S = 0.64
@@ -50,15 +63,37 @@ const smooth = (v: number) => {
   const c = clamp01(v)
   return c * c * (3 - 2 * c)
 }
+/** A max that rounds the corner, so the hand eases into and out of the ball instead of jerking. */
+const softMax = (a: number, b: number, k: number) => 0.5 * (a + b + Math.sqrt((a - b) * (a - b) + k * k))
 const mix = (a: number, b: number, k: number) => a + (b - a) * k
+
+/**
+ * Joint angles that put the palm flat on top of the ball (fingers over it, wrist snapping down as he pushes):
+ * two-bone arm IK in the vertical plane through his shoulder. Angles are from straight down, forward positive.
+ */
+export function dribbleArm(ballY: number): { shoulder: number; elbow: number; wrist: number } {
+  const handBallY = softMax(ballY, RELEASE_Y, 0.03)
+  // How far the hand has followed the ball down: 0 at the top of the bounce, 1 at the release.
+  const push = clamp01((DRIBBLE_TOP - handBallY) / (DRIBBLE_TOP - RELEASE_Y))
+  // The palm points forward and a little down; the wrist snaps further down while pushing.
+  const tilt = 0.18 + 0.42 * push
+  const wristY = handBallY + BALL_R + PALM_HALF + PALM * Math.sin(tilt)
+  const wristZ = BALL_Z - PALM * Math.cos(tilt)
+  const dy = wristY - SHOULDER_Y
+  const reach = Math.min(UPPER_ARM + FOREARM - 1e-3, Math.max(0.05, Math.hypot(dy, wristZ)))
+  const cosInside = (UPPER_ARM * UPPER_ARM + FOREARM * FOREARM - reach * reach) / (2 * UPPER_ARM * FOREARM)
+  const elbow = Math.PI - Math.acos(Math.min(1, Math.max(-1, cosInside)))
+  const toWrist = Math.atan2(wristZ, -dy)
+  const shoulder = toWrist - Math.atan2(FOREARM * Math.sin(elbow), UPPER_ARM + FOREARM * Math.cos(elbow))
+  return { shoulder, elbow, wrist: Math.PI / 2 - tilt - (shoulder + elbow) }
+}
 
 export function poseAt({ t, talking, mood, moodAge, look, reduced }: PoseInput): Pose {
   // The dribble: the ball leaves the hand, hits the floor and comes back once per period.
   const phase = reduced ? 0 : (t % DRIBBLE_S) / DRIBBLE_S
   const up = reduced ? 1 : Math.pow(Math.cos(phase * Math.PI * 2) * 0.5 + 0.5, 0.6)
   const ballY = BALL_R + (DRIBBLE_TOP - BALL_R) * up
-  // The hand rides the ball only near the top of the bounce.
-  const hand = smooth((ballY - 0.7) / (DRIBBLE_TOP - 0.7))
+  const arm = dribbleArm(ballY)
 
   const hype = mood === 'hype' && !reduced ? clamp01(moodAge / HYPE_S) : mood === 'hype' ? 0.5 : 1
   const jumping = mood === 'hype' && !reduced && moodAge < HYPE_S
@@ -83,7 +118,7 @@ export function poseAt({ t, talking, mood, moodAge, look, reduced }: PoseInput):
   const mouth = talking ? (reduced ? 0.45 : 0.2 + 0.8 * Math.abs(Math.sin(t * 11)) * (0.6 + 0.4 * Math.sin(t * 3.7))) : mood === 'hype' ? 0.7 * cheering : 0
 
   return {
-    rootY: jump + (reduced ? 0 : -0.012 * (1 - up)),
+    rootY: jump,
     lean: reduced ? 0 : 0.015 * Math.sin(t * 0.9),
     breathe: reduced ? 0 : Math.sin(t * 1.6),
     headYaw: clamp01((look.x + 1) / 2) * 1.0 - 0.5,
@@ -92,11 +127,12 @@ export function poseAt({ t, talking, mood, moodAge, look, reduced }: PoseInput):
     mouth: clamp01(mouth),
     eyes: clamp01(eyes),
     brows: mood === 'hype' ? cheering : mood === 'hmm' ? 0.6 * thinking : talking ? 0.2 : 0,
-    rShoulder: 0.25,
-    rElbow: mix(0.19, 0.76, hand),
+    rShoulder: arm.shoulder,
+    rElbow: arm.elbow,
+    rWrist: arm.wrist,
     lShoulder,
     lShoulderOut: lOut,
     lElbow,
-    ball: { x: -0.3, y: ballY, z: 0.34, spin: reduced ? 0 : t * 5 },
+    ball: { x: BALL_X, y: ballY, z: BALL_Z, spin: reduced ? 0 : t * 5 },
   }
 }

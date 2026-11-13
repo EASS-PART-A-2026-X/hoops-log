@@ -4,6 +4,7 @@ import DeniAvatar from './DeniAvatar'
 import { POKE_SPAM, QUESTIONS, again, answer, poke } from './lines'
 import type { AnswerContext } from './lines'
 import { isChatterOn, setChatterOn, subscribeChatter } from './prefs'
+import { hdSnapshot, hdSupported, setHdWanted, subscribeHd } from './hdVoice'
 import { isVoiceOn, setVoiceOn, speechSupported, subscribeVoice } from './speech'
 import type { CoachApi } from './useCoach'
 import { tabTarget } from '../focusTrap'
@@ -34,6 +35,7 @@ export default function CoachDialog({ coach, context, onClose, returnTo }: Props
   const bodyRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const voiceOn = useSyncExternalStore(subscribeVoice, isVoiceOn, () => true)
+  const hd = useSyncExternalStore(subscribeHd, hdSnapshot, hdSnapshot)
   const muted = useSyncExternalStore(subscribeMuted, isMuted, () => false)
   const chatterOn = useSyncExternalStore(subscribeChatter, isChatterOn, () => true)
   const mood = talking || visible ? (said?.mood ?? 'idle') : 'idle'
@@ -130,6 +132,20 @@ export default function CoachDialog({ coach, context, onClose, returnTo }: Props
             <button type="button" className="coach-voice" aria-pressed={voiceOn} onClick={() => setVoiceOn(!voiceOn)}>
               Voice: {voiceOn ? 'on' : 'off'}
               {voiceOn && muted ? ' (the sound button is off)' : ''}
+            </button>
+          )}
+          {hdSupported() && (
+            <button
+              type="button"
+              className="coach-voice"
+              aria-pressed={hd.state === 'ready' || hd.state === 'loading'}
+              onClick={() => setHdWanted(hd.state === 'off' || hd.state === 'failed')}
+              title="A more human voice that runs on your own device. One-time download of about 90 MB; nothing you hear is sent anywhere."
+            >
+              {hd.state === 'off' && 'HD voice: off (one-time 90 MB download)'}
+              {hd.state === 'loading' && `HD voice: downloading ${hd.progress}%`}
+              {hd.state === 'ready' && 'HD voice: on'}
+              {hd.state === 'failed' && 'HD voice: could not load, tap to try again'}
             </button>
           )}
           <button type="button" className="coach-voice" aria-pressed={chatterOn} onClick={() => setChatterOn(!chatterOn)}>

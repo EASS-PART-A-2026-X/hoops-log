@@ -10,6 +10,9 @@ import type { DeniRig } from './buildDeni'
 import { BALL_R, poseAt } from './pose'
 import { KIT, drawFloor } from './textures'
 
+/** The turn that brings his right palm from facing his body to facing the floor. */
+const PALM_DOWN = Math.PI / 2
+
 const FOV = 27
 /** What the camera must keep in view: the figure with the jump and the raised arm, and his reach sideways. */
 const VIEW_H = 3.2
@@ -178,6 +181,8 @@ export class DeniStage {
     r.brows.position.y = 0.008 * p.brows
     r.rShoulder.rotation.set(-p.rShoulder, 0, -0.1)
     r.rElbow.rotation.x = -p.rElbow
+    // The palm turns down onto the ball (roll about the hand's own length first, then the wrist bends).
+    r.rHand.rotation.set(-p.rWrist, PALM_DOWN, 0)
     r.lShoulder.rotation.set(-p.lShoulder, 0, p.lShoulderOut)
     r.lElbow.rotation.x = -p.lElbow
     r.ball.position.set(p.ball.x, p.ball.y, p.ball.z)

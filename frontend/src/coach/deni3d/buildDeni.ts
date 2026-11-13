@@ -4,7 +4,7 @@
  * fan-made figure inspired by Deni Avdija, not a scan of him. Metres, feet on y = 0, facing +Z.
  */
 import * as THREE from 'three'
-import { BALL_R } from './pose'
+import { BALL_R, FOREARM, SHOULDER_Y, UPPER_ARM } from './pose'
 import { KIT, drawBall, drawBallBump, drawJersey, drawShadow } from './textures'
 
 export interface DeniRig {
@@ -16,6 +16,7 @@ export interface DeniRig {
   brows: THREE.Group
   rShoulder: THREE.Group
   rElbow: THREE.Group
+  rHand: THREE.Group
   lShoulder: THREE.Group
   lElbow: THREE.Group
   ball: THREE.Mesh
@@ -24,8 +25,6 @@ export interface DeniRig {
 
 /** The arm he wears the black compression sleeve on. Change this one word to move it. */
 export const SLEEVE_ARM: 'right' | 'left' = 'right'
-export const SHOULDER_Y = 1.63
-const UPPER_ARM = 0.34
 
 /** A point on the head (an ellipsoid), from angles: `theta` down from the crown, `phi` round from his right ear. */
 function onHead(theta: number, phi: number, grow = 1): THREE.Vector3 {
@@ -206,7 +205,7 @@ export function buildDeni(maxAnisotropy: number): DeniRig {
     elbow.add(mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.27, 14), skin, 0, -0.14, 0))
     // The dribbling hand (his right) rests cupped on the ball; the other hangs relaxed.
     const hand = buildHand(skin, skinShade, side === -1 ? 1 : -1, side === -1 ? 0.9 : 0.15)
-    hand.position.y = -0.262
+    hand.position.y = -FOREARM
     hand.scale.setScalar(1.42) // big hands: he is 2.06 m tall
     elbow.add(hand)
     shoulder.add(elbow)
@@ -219,7 +218,7 @@ export function buildDeni(maxAnisotropy: number): DeniRig {
       elbow.add(mesh(new THREE.CylinderGeometry(0.0605, 0.0445, 0.25, 18), fabric, 0, -0.13, 0))
     }
     body.add(shoulder)
-    return { shoulder, elbow }
+    return { shoulder, elbow, hand }
   }
   const right = arm(-1)
   const left = arm(1)
@@ -319,5 +318,5 @@ export function buildDeni(maxAnisotropy: number): DeniRig {
   const ballShadow = mesh(flat, shadowMat.clone(), 0, 0.005, 0)
   root.add(ballShadow)
 
-  return { root, body, head, mouth, eyes, brows, rShoulder: right.shoulder, rElbow: right.elbow, lShoulder: left.shoulder, lElbow: left.elbow, ball, ballShadow }
+  return { root, body, head, mouth, eyes, brows, rShoulder: right.shoulder, rElbow: right.elbow, rHand: right.hand, lShoulder: left.shoulder, lElbow: left.elbow, ball, ballShadow }
 }

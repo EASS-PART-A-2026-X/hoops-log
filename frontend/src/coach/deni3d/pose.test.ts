@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BALL_R, DRIBBLE_S, DRIBBLE_TOP, HYPE_S, poseAt } from './pose'
+import { BALL_R, BALL_Z, DRIBBLE_S, DRIBBLE_TOP, FOREARM, HYPE_S, PALM, PALM_HALF, RELEASE_Y, SHOULDER_Y, UPPER_ARM, dribbleArm, poseAt } from './pose'
 import type { PoseInput } from './pose'
 
 const at = (over: Partial<PoseInput> = {}) => poseAt({ t: 0, talking: false, mood: 'idle', moodAge: 10, look: { x: 0, y: 0 }, reduced: false, ...over })
@@ -18,6 +18,36 @@ describe('poseAt', () => {
 
   it('bends the elbow more when the ball is high (the hand follows the ball)', () => {
     expect(at({ t: 0 }).rElbow).toBeGreaterThan(at({ t: DRIBBLE_S / 2 }).rElbow)
+  })
+
+  it('keeps the palm on top of the ball while it is in the hand, and lets go below the release height', () => {
+    // Forward kinematics of the arm the way the stage poses it, in the vertical plane through the shoulder.
+    const palm = (ballY: number) => {
+      const a = dribbleArm(ballY)
+      const elbowY = SHOULDER_Y - UPPER_ARM * Math.cos(a.shoulder)
+      const elbowZ = UPPER_ARM * Math.sin(a.shoulder)
+      const f = a.shoulder + a.elbow
+      const wristY = elbowY - FOREARM * Math.cos(f)
+      const wristZ = elbowZ + FOREARM * Math.sin(f)
+      const h = f + a.wrist // the hand's angle from straight down: about 90 degrees = pointing forward
+      return { y: wristY - PALM * Math.cos(h) - PALM_HALF, z: wristZ + PALM * Math.sin(h) }
+    }
+    for (let y = RELEASE_Y + 0.02; y <= DRIBBLE_TOP; y += 0.01) {
+      const p = palm(y)
+      expect(Math.abs(p.y - (y + BALL_R))).toBeLessThan(0.012)
+      expect(Math.abs(p.z - BALL_Z)).toBeLessThan(0.012)
+    }
+    // Once the ball is on its way to the floor the hand stays up where it let go.
+    expect(palm(BALL_R).y).toBeCloseTo(palm(RELEASE_Y - 0.3).y, 2)
+  })
+
+  it('bends the wrist so the palm faces down and never lets the arm go past straight', () => {
+    for (let y = BALL_R; y <= DRIBBLE_TOP; y += 0.02) {
+      const a = dribbleArm(y)
+      expect(a.elbow).toBeGreaterThanOrEqual(0)
+      expect(a.elbow).toBeLessThan(Math.PI * 0.8)
+      expect(Math.abs(a.wrist)).toBeLessThan(1.2)
+    }
   })
 
   it('keeps the mouth shut unless he is talking or cheering', () => {

@@ -5,6 +5,7 @@
  * The voice choice is kept in localStorage; the app works when that is blocked.
  */
 import { isMuted } from '../game/audio'
+import { hdReady, resumeHd, speakHd, stopHd } from './hdVoice'
 
 const KEY = 'coach-voice'
 let on = readVoice()
@@ -79,11 +80,28 @@ export function canSpeak(): boolean {
 }
 
 export function stopSpeaking(): void {
+  stopHd()
   if (speechSupported()) window.speechSynthesis.cancel()
 }
 
-/** Speak a line. Returns false when it stays silent (the caption is then all there is). */
+/**
+ * Speak a line. Returns false when it stays silent (the caption is then all there is). With the HD voice ready it
+ * is used (the line starts a moment later, while the model works) and the browser's voice steps in if it fails.
+ */
 export function speak(text: string, handlers: { onStart?: () => void; onEnd?: () => void } = {}): boolean {
+  resumeHd()
+  if (!canSpeak() && !(on && !isMuted() && hdReady() && userHasActed())) return false
+  if (hdReady()) {
+    if (speechSupported()) window.speechSynthesis.cancel()
+    void speakHd(speakable(text), handlers).then((spoken) => {
+      if (!spoken) speakBrowser(text, handlers)
+    })
+    return true
+  }
+  return speakBrowser(text, handlers)
+}
+
+function speakBrowser(text: string, handlers: { onStart?: () => void; onEnd?: () => void }): boolean {
   if (!canSpeak()) return false
   try {
     const synth = window.speechSynthesis
