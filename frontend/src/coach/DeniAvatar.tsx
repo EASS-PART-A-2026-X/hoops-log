@@ -6,59 +6,83 @@ interface Props {
 }
 
 /**
- * A cartoon bust of the coach, drawn here in SVG (no photos, no official art): a fan-made character inspired
- * by Deni Avdija, in the app's colours. Mood changes the brows and the smile; `talking` moves the mouth.
+ * The coach's bust, drawn here in SVG (no photos, no official art) to match the 3D figure in his dialog: the
+ * same light tan skin, heavy brows, tight curly black hair with faded sides, a solid trimmed beard and the
+ * black number 8 kit with the red sash. A fan-made character inspired by Deni Avdija. Mood changes the brows
+ * and the mouth; `talking` moves the mouth.
  */
 export default function DeniAvatar({ mood, talking }: Props) {
-  const skin = '#c68a5d'
-  const shade = '#a9714a'
-  const hair = '#1b130e'
+  const skin = '#dcaa8a'
+  const shade = '#c18f70'
+  const hair = '#1c1512'
+  const fade = '#33271f'
+  const red = '#e03a3e'
+  const kit = '#0c0c0e'
   const brow = (side: -1 | 1) => {
-    // Hmm: the far brow goes up and the near one flattens. Hype: both lift. Otherwise level.
-    const lift = mood === 'hype' ? -5 : mood === 'hmm' && side === 1 ? -6 : 0
-    const x = side === -1 ? 41 : 66
-    return <path d={`M${x} ${40 + lift} q7 ${mood === 'hmm' && side === -1 ? 1 : -3} 13 0`} fill="none" stroke={hair} strokeWidth="3" strokeLinecap="round" />
+    // Hype: both brows lift. Hmm: the far brow goes up. Otherwise they slant down toward the nose, heavy and serious.
+    const lift = mood === 'hype' ? -4 : mood === 'hmm' && side === 1 ? -5 : 0
+    const outer = 40 + lift
+    const inner = 45.5 + (mood === 'hype' ? lift : 0)
+    const [x1, x2] = side === -1 ? [41, 56] : [79, 64]
+    return <path d={`M${x1} ${outer} L${x2} ${inner}`} fill="none" stroke={hair} strokeWidth="4.4" strokeLinecap="round" />
   }
+  const curls = [
+    [41, 38, 6],
+    [46, 30, 7],
+    [53, 25, 7.5],
+    [61, 23, 7.5],
+    [69, 25, 7.5],
+    [75, 30, 7],
+    [79, 38, 6],
+    [50, 33, 7],
+    [60, 31, 7.5],
+    [70, 33, 7],
+  ]
   return (
     <svg className={`deni deni-${mood}${talking ? ' talking' : ''}`} viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-      {/* Shoulders in a dark jersey with an orange collar. */}
-      <path d="M6 120 Q10 92 42 86 H78 Q110 92 114 120 Z" fill="#17233b" />
-      <path d="M44 86 Q60 104 76 86 L72 84 Q60 96 48 84 Z" fill="#ff7a2f" />
-      <rect x="51" y="74" width="18" height="16" rx="6" fill={shade} />
-      {/* Ears, head, hair. */}
-      <circle cx="36" cy="54" r="5" fill={shade} />
-      <circle cx="84" cy="54" r="5" fill={shade} />
-      <ellipse cx="60" cy="52" rx="24" ry="28" fill={skin} />
+      {/* Shoulders in the black kit: the red sash across the chest with a white stripe, a red V at the neck. */}
+      <path d="M4 120 Q8 94 38 88 H82 Q112 94 116 120 Z" fill={kit} />
+      <path d="M82 89 L22 120 H42 L84 99 Z" fill={red} />
+      <path d="M84 99 L42 120 H47 L85 104 Z" fill="#f4f4f2" />
+      {/* A long neck. */}
+      <path d="M50 68 H70 V92 Q60 100 50 92 Z" fill={shade} />
+      <path d="M44 88 L60 104 L76 88" fill="none" stroke={red} strokeWidth="2.6" strokeLinejoin="round" />
+      {/* Ears and the head: narrow, with a square jaw. */}
+      <ellipse cx="38.5" cy="52" rx="3.2" ry="5.4" fill={shade} />
+      <ellipse cx="81.5" cy="52" rx="3.2" ry="5.4" fill={shade} />
+      <path d="M39 44 Q39 24 60 24 Q81 24 81 44 V56 Q81 76 60 80 Q39 76 39 56 Z" fill={skin} />
+      {/* Hair: faded sides, then a tight cap of curls pushed up and forward. */}
+      <path d="M39 50 Q37 30 48 25 L47 44 Z" fill={fade} />
+      <path d="M81 50 Q83 30 72 25 L73 44 Z" fill={fade} />
       <g fill={hair}>
-        <circle cx="42" cy="30" r="9" />
-        <circle cx="52" cy="24" r="10" />
-        <circle cx="64" cy="23" r="10" />
-        <circle cx="75" cy="29" r="9" />
-        <circle cx="37" cy="40" r="6" />
-        <circle cx="83" cy="40" r="6" />
-        <ellipse cx="60" cy="34" rx="22" ry="9" />
+        <ellipse cx="60" cy="33" rx="21" ry="9" />
+        {curls.map(([cx, cy, r]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+        ))}
       </g>
-      {/* Stubble along the jaw. */}
-      <path d="M37 56 Q40 80 60 81 Q80 80 83 56 Q78 70 60 71 Q42 70 37 56Z" fill={hair} opacity="0.55" />
-      {/* Eyes blink together. */}
+      {/* The nose, then the beard: solid over the jaw, with a moustache and the lips open between them. */}
+      <ellipse cx="60" cy="56" rx="4.2" ry="5.6" fill="#d39a78" />
+      <path d="M39 57 Q42 63 49 65 Q60 67 71 65 Q78 63 81 57 V56 Q81 76 60 80 Q39 76 39 56 Z" fill="#241a15" />
+      <ellipse cx="60" cy="62" rx="8" ry="2.6" fill="#241a15" />
+      {/* Eyes blink together: small, under the heavy brows. */}
       <g className="deni-eyes">
-        <ellipse cx="48" cy="50" rx="4.5" ry="5" fill="#fff" />
-        <ellipse cx="72" cy="50" rx="4.5" ry="5" fill="#fff" />
-        <circle cx="49" cy="51" r="2.6" fill={hair} />
-        <circle cx="73" cy="51" r="2.6" fill={hair} />
+        <ellipse cx="50" cy="49" rx="3" ry="2.8" fill="#f6f1ea" />
+        <ellipse cx="70" cy="49" rx="3" ry="2.8" fill="#f6f1ea" />
+        <circle cx="50.6" cy="49.4" r="1.7" fill="#2b1c12" />
+        <circle cx="70.6" cy="49.4" r="1.7" fill="#2b1c12" />
       </g>
       {brow(-1)}
       {brow(1)}
-      <path d="M60 54 q-3 8 0 10 q3 1 4 -1" fill="none" stroke={shade} strokeWidth="2" strokeLinecap="round" />
-      {/* Mouth: open and moving while talking, otherwise by mood. */}
+      {/* Mouth: lips between moustache and beard; open and moving while talking, otherwise by mood. */}
+      <ellipse cx="60" cy="66.5" rx="6" ry="2" fill="#a8695a" />
       {talking ? (
-        <ellipse className="deni-mouth" cx="60" cy="72" rx="7" ry="5" fill="#4a1f1a" />
+        <ellipse className="deni-mouth" cx="60" cy="67" rx="5" ry="3.6" fill="#2a0f0d" />
       ) : mood === 'hype' ? (
-        <path d="M49 67 Q60 82 71 67 Z" fill="#4a1f1a" stroke={hair} strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M54 65.5 Q60 74 66 65.5 Z" fill="#2a0f0d" />
       ) : mood === 'hmm' ? (
-        <path d="M52 72 Q60 70 68 73" fill="none" stroke={hair} strokeWidth="3" strokeLinecap="round" />
+        <path d="M55 67 Q60 65.5 65 67.5" fill="none" stroke="#2a0f0d" strokeWidth="1.4" strokeLinecap="round" />
       ) : (
-        <path d="M50 69 Q60 77 70 69" fill="none" stroke={hair} strokeWidth="3" strokeLinecap="round" />
+        <path d="M54.5 66.4 Q60 69 65.5 66.4" fill="none" stroke="#2a0f0d" strokeWidth="1.2" strokeLinecap="round" />
       )}
     </svg>
   )
