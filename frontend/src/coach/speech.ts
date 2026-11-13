@@ -42,15 +42,30 @@ export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined'
 }
 
-/** Voices the browser has, preferring a male English one (Deni), then any English one. */
+/** The neural voices browsers ship (Edge "Natural"/"Online", Chrome "Google", Apple "Premium"/"Enhanced") sound far less robotic. */
+const NEURAL = /natural|online|google|premium|enhanced/i
+
+/** Voices the browser has, preferring a neural, male, US English one (Deni), then any English one. */
 export function pickVoice(voices: readonly SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   const english = voices.filter((v) => v.lang.toLowerCase().startsWith('en'))
   if (english.length === 0) return null
-  const male = /\b(male|guy|david|mark|daniel|james|alex|ryan|george|fred|ralph)\b/i
-  const female = /female|woman|samantha|zira|susan|hazel|karen|moira|tessa|victoria|fiona|serena|aria|jenny/i
-  // Lower is better: a male-sounding voice first, a female-sounding one last, US English before other English.
-  const rank = (v: SpeechSynthesisVoice) => (female.test(v.name) ? 4 : male.test(v.name) ? 0 : 2) + (v.lang.toLowerCase() === 'en-us' ? 0 : 1)
+  const male = /\b(male|guy|davis|andrew|brian|christopher|eric|roger|steffan|david|mark|daniel|james|alex|ryan|george|fred|ralph)\b/i
+  const female = /female|woman|samantha|zira|susan|hazel|karen|moira|tessa|victoria|fiona|serena|aria|jenny|ava|emma|michelle|sonia/i
+  // Lower is better: a neural voice first, then a male-sounding one, a female-sounding one last, US English before other English.
+  const rank = (v: SpeechSynthesisVoice) =>
+    (NEURAL.test(v.name) ? 0 : 6) + (female.test(v.name) ? 4 : male.test(v.name) ? 0 : 2) + (v.lang.toLowerCase() === 'en-us' ? 0 : 1)
   return [...english].sort((a, b) => rank(a) - rank(b))[0] ?? null
+}
+
+/** Strip what a speech engine reads out badly (emoji, markdown marks) and add a breath after a lone colon or dash. */
+export function speakable(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/\u200d|\ufe0f/g, '')
+    .replace(/[*_`#]/g, '')
+    .replace(/\s+[-–—]\s+/g, ', ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 
 /** Whether the visitor has done something on the page yet. Where the browser cannot tell, assume so. */
@@ -73,7 +88,7 @@ export function speak(text: string, handlers: { onStart?: () => void; onEnd?: ()
   try {
     const synth = window.speechSynthesis
     synth.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
+    const utterance = new SpeechSynthesisUtterance(speakable(text))
     const voice = pickVoice(synth.getVoices())
     if (voice) {
       utterance.voice = voice
@@ -81,8 +96,10 @@ export function speak(text: string, handlers: { onStart?: () => void; onEnd?: ()
     } else {
       utterance.lang = 'en-US'
     }
-    utterance.rate = 1
-    utterance.pitch = 0.9
+    // A neural voice is already natural: leave its pitch alone. Only the old built-in ones get a lower pitch.
+    const neural = voice !== null && NEURAL.test(voice.name)
+    utterance.rate = neural ? 1 : 0.95
+    utterance.pitch = neural ? 1 : 0.9
     utterance.onstart = () => handlers.onStart?.()
     utterance.onend = () => handlers.onEnd?.()
     utterance.onerror = () => handlers.onEnd?.()

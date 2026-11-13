@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setMuted } from '../game/audio'
-import { canSpeak, pickVoice, setVoiceOn, speak } from './speech'
+import { canSpeak, pickVoice, setVoiceOn, speak, speakable } from './speech'
 
 const voice = (name: string, lang: string) => ({ name, lang }) as SpeechSynthesisVoice
 
@@ -17,6 +17,19 @@ describe('pickVoice', () => {
 
   it('ranks a female-sounding voice last, even though "Female" contains "male"', () => {
     expect(pickVoice([voice('Female One', 'en-US'), voice('Plain', 'en-US')])!.name).toBe('Plain')
+  })
+})
+
+describe('pickVoice neural', () => {
+  it('prefers a neural voice over the old built-in ones', () => {
+    const list = [voice('Microsoft David - English (United States)', 'en-US'), voice('Microsoft Guy Online (Natural) - English (United States)', 'en-US')]
+    expect(pickVoice(list)!.name).toContain('Guy Online')
+  })
+})
+
+describe('speakable', () => {
+  it('drops emoji and markdown marks and turns a spaced dash into a pause', () => {
+    expect(speakable('Nice shot 🔥 — **keep** it up')).toBe('Nice shot, keep it up')
   })
 })
 
