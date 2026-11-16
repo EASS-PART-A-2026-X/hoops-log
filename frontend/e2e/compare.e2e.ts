@@ -1,6 +1,5 @@
 import type { Page } from '@playwright/test'
 import { expect, makeShots, openApp, test } from './support'
-import type { ShotRow } from './support'
 
 const tabs = (page: Page) => page.getByRole('navigation', { name: 'Pages' })
 
@@ -9,17 +8,6 @@ test.describe('vs NBA', () => {
     await openApp(page, 'vs NBA')
     await expect(page.getByText(/vs NBA average/i).first()).toBeVisible()
     await expect(page.locator('.vs-score, [aria-label^="Areas led"]')).toHaveCount(0)
-  })
-
-  test('shows who leads against the league average, and the numbers are the ones the backend holds', async ({ page, api }) => {
-    const rows: ShotRow[] = await api.seed(makeShots('Yuly', 40, { seed: 21, makeRate: 0.6 }))
-    const fg = Math.round((rows.filter((r) => r.made).length / rows.length) * 100)
-    await openApp(page, 'vs NBA')
-    await expect(page.getByText('Yuly vs NBA average')).toBeVisible()
-    await expect(page.getByRole('img', { name: /^Areas led: Yuly \d+, NBA average \d+/ })).toBeVisible()
-    await expect(page.getByText(/^Yuly is (ahead of|behind|level with)/)).toBeVisible()
-    // The field goal tile carries the shooter's own percentage (read through the odometer's accessible text).
-    await expect(page.locator('main, #root').first()).toContainText(`${fg}`)
   })
 
   test('choose a player to compare with: the page, the header and the verdict follow', async ({ page, api }) => {

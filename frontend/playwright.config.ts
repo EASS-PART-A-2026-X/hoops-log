@@ -27,6 +27,12 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',
+  // Two sizes of the same suite. "fast" is what every pull request runs (a few minutes); "full" is everything, with the
+  // long monkey runs, and runs after a merge and at night. `npm run e2e:fast` and `npm run e2e` pick one each.
+  projects: [
+    { name: 'fast', testMatch: ['**/smoke.e2e.ts', '**/api.e2e.ts', '**/log-journey.e2e.ts', '**/monkey.e2e.ts'] },
+    { name: 'full', testMatch: '**/*.e2e.ts' },
+  ],
   use: {
     baseURL: BASE_URL,
     channel: process.env.E2E_CHANNEL || undefined,

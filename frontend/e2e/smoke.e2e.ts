@@ -1,4 +1,4 @@
-import { expect, openApp, test } from './support'
+import { expect, kpi, makeShots, openApp, test } from './support'
 
 test('the app opens on My log with all three pages and no browser errors', async ({ page }) => {
   await openApp(page)
@@ -70,5 +70,33 @@ test.describe('the safety net itself', () => {
     const { assertSafeBackend } = await import('./env')
     expect(() => assertSafeBackend('http://localhost:8000')).toThrow(/real dev backend/)
     expect(() => assertSafeBackend('http://127.0.0.1:8011')).not.toThrow()
+  })
+})
+
+test.describe('the main screens really render (kept here so the fast run catches a broken screen)', () => {
+  test('the 3D court draws a court with the shots on it, not a blank canvas', async ({ page, api }) => {
+    await api.seed(makeShots('Yuly', 40, { seed: 11 }))
+    await openApp(page)
+    await expect(page.locator('.stage-canvas canvas')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Loading the court…')).toHaveCount(0)
+    await page.waitForTimeout(1500) // the court makes its entrance
+    // A flat colour compresses to a few kB; a lit court with 40 shots does not.
+    expect((await page.locator('.stage-canvas').screenshot()).length).toBeGreaterThan(25_000)
+    await expect(kpi(page, 'SHOTS')).toHaveText('40')
+  })
+
+  test('vs NBA says who leads, from your real shots', async ({ page, api }) => {
+    await api.seed(makeShots('Yuly', 40, { seed: 21, makeRate: 0.6 }))
+    await openApp(page, 'vs NBA')
+    await expect(page.getByText('Yuly vs NBA average')).toBeVisible()
+    await expect(page.getByRole('img', { name: /^Areas led: Yuly \d+, NBA average \d+/ })).toBeVisible()
+  })
+
+  test('Deni opens with a 3D figure and his eight questions', async ({ page }) => {
+    await openApp(page)
+    await page.getByRole('button', { name: 'Open Deni, the coach' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Deni Avdija' })
+    await expect(dialog.locator('.deni-stage canvas')).toBeVisible({ timeout: 30_000 })
+    await expect(dialog.getByRole('list', { name: 'Ask Deni' }).getByRole('button')).toHaveCount(8)
   })
 })

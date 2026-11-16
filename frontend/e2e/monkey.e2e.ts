@@ -11,6 +11,8 @@ import { expect, kpi, makeShots, openApp, openDrawer, rng, test } from './suppor
  */
 const SEEDS = (process.env.E2E_MONKEY_SEEDS ?? '1,2,3,4').split(',').map(Number)
 const STEPS = Number(process.env.E2E_MONKEY_STEPS ?? 70)
+/** The fast project (every pull request) runs one seed, and a shorter one. */
+const FAST_STEPS = 25
 
 const CLICKABLE = 'button, [role=option], [role=combobox], [role=radio], input[type=radio], input[type=checkbox], summary, a[href^="/"], .player-you, li.player-you'
 const TYPEABLE = 'input:not([type=radio]):not([type=checkbox]):not([type=hidden]), textarea'
@@ -65,8 +67,11 @@ async function usable(page: Page, selector: string): Promise<number[]> {
 const pickFrom = <T>(next: () => number, list: T[]): T | undefined => list[Math.floor(next() * list.length)]
 
 for (const seed of SEEDS) {
-  test(`monkey, seed ${seed}: ${STEPS} random actions and the app is still standing and still right`, async ({ page, api, guard }) => {
+  test(`monkey, seed ${seed}: ${STEPS} random actions and the app is still standing and still right`, async ({ page, api, guard }, testInfo) => {
     test.setTimeout(240_000)
+    const fast = testInfo.project.name === 'fast'
+    test.skip(fast && seed !== SEEDS[0], 'the fast run does one seed; the full run does them all')
+    const steps = fast ? FAST_STEPS : STEPS
     // Bad input legitimately comes back as 4xx and the browser logs that; a 5xx or a script error is never fine.
     guard.allow(/Failed to load resource: the server responded with a status of 4\d\d/)
     page.on('dialog', (d) => void d.dismiss().catch(() => {}))
@@ -156,7 +161,7 @@ for (const seed of SEEDS) {
     }
 
     const report = (i: number) => `seed ${seed}, after step ${i}. Last actions:\n${log.slice(-14).join('\n')}`
-    for (let i = 0; i < STEPS; i++) {
+    for (let i = 0; i < steps; i++) {
       await step(i)
       const bad = guard.unexpected()
       if (bad.length > 0) throw new Error(`the browser reported a problem: ${bad.join(' | ')}\n${report(i)}`)

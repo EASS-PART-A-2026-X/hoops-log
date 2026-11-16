@@ -23,16 +23,6 @@ function expected(rows: ShotRow[]) {
 }
 
 test.describe('the 3D court', () => {
-  test('draws a court with the shots on it (not a blank canvas)', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 40, { seed: 11 }))
-    await openApp(page)
-    await waitForCourt(page)
-    await page.waitForTimeout(1500) // the court makes its entrance
-    const png = await stage(page).screenshot()
-    // A flat colour compresses to a few kB; a lit court with 40 shots does not.
-    expect(png.length).toBeGreaterThan(25_000)
-  })
-
   test('the stat tiles match what the backend holds', async ({ page, api }) => {
     const rows = await api.seed(makeShots('Yuly', 37, { seed: 12, makeRate: 0.55 }))
     const want = expected(rows)
