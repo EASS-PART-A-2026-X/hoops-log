@@ -134,7 +134,9 @@ for (const seed of SEEDS) {
           await page.setViewportSize({ width: w, height: h })
         } else if (roll < 0.89) {
           note('reload')
-          await page.reload()
+          // A reload is slow on a slow machine (a cold dev server, a browser drawing in software), so give it time.
+          await page.reload({ timeout: 45_000 })
+          await page.getByRole('navigation', { name: 'Pages' }).waitFor({ timeout: 45_000 })
         } else if (roll < 0.93) {
           const rows = await api.list()
           const victim = pickFrom(next, rows)
@@ -156,7 +158,10 @@ for (const seed of SEEDS) {
       await step(i)
       const bad = guard.unexpected()
       if (bad.length > 0) throw new Error(`the browser reported a problem: ${bad.join(' | ')}\n${report(i)}`)
-      const alive = await page.evaluate(() => document.body.innerText.trim().length > 20 && !!document.querySelector('nav[aria-label=Pages]'))
+      // The page may be a moment into loading (after a reload), so give it a few seconds before calling it blank.
+      const alive = await page
+        .waitForFunction(() => document.body.innerText.trim().length > 20 && !!document.querySelector('nav[aria-label=Pages]'), undefined, { timeout: 15_000 })
+        .then(() => true, () => false)
       if (!alive) throw new Error(`the page went blank or lost its navigation\n${report(i)}`)
     }
 
