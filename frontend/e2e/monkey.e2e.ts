@@ -67,6 +67,9 @@ async function usable(page: Page, selector: string): Promise<number[]> {
   }, selector)
 }
 
+/** A failure of the backend itself during the monkey's own calls: never excused as the monkey's bad luck. */
+class Hard extends Error {}
+
 const pickFrom = <T>(next: () => number, list: T[]): T | undefined => list[Math.floor(next() * list.length)]
 
 for (const seed of SEEDS) {
@@ -81,6 +84,7 @@ for (const seed of SEEDS) {
 
     const next = rng(seed)
     const log: string[] = []
+    let skipped = 0
     await api.seed([...makeShots('Yuly', 24, { seed: seed * 7 + 1 }), ...makeShots('Noam', 9, { seed: seed * 7 + 2 })])
     await openApp(page)
     // Quick timeouts for the random actions only: a click that cannot happen should be given up on fast. Loading the page is
@@ -152,18 +156,27 @@ for (const seed of SEEDS) {
           const victim = pickFrom(next, rows)
           if (!victim) return note('delete behind the page: nothing to delete')
           note(`someone else deletes shot #${victim.id}`)
-          await api.remove(victim.id)
+          await api.remove(victim.id).catch((error: Error) => {
+            throw new Hard(error.message)
+          })
         } else {
           note('someone else adds a shot')
-          await api.add({ player: next() < 0.5 ? 'Yuly' : 'Maya', x: Math.round(next() * 50), y: Math.round(next() * 47), made: next() < 0.5 })
+          await api.add({ player: next() < 0.5 ? 'Yuly' : 'Maya', x: Math.round(next() * 50), y: Math.round(next() * 47), made: next() < 0.5 }).catch((error: Error) => {
+            throw new Hard(error.message)
+          })
         }
       } catch (error) {
-        // A click that lost a race with a re-render is the monkey's problem, not the app's.
+        // A failed call to the backend itself is a real failure, not the monkey's bad luck.
+        if (error instanceof Hard) throw error
+        // A click that lost a race with a re-render is the monkey's problem, not the app's. It is counted, though: an action
+        // that was only attempted does not count as something the monkey did.
+        skipped += 1
         note(`  (skipped: ${(error as Error).message.split('\n')[0]!.slice(0, 90)})`)
       }
     }
 
-    const real = () => log.filter((line) => !/nothing to|no Shots button|no canvas|skipped:/.test(line)).length
+    // Steps that did something: not "nothing to click" and the like, and not the ones that were attempted and given up on.
+    const real = () => steps - log.filter((line) => /: nothing to|no Shots button|no canvas|nothing to delete/.test(line)).length - skipped
     const report = (i: number) => `seed ${seed}, after step ${i}. Last actions:\n${log.slice(-14).join('\n')}`
     for (let i = 0; i < steps; i++) {
       await step(i)

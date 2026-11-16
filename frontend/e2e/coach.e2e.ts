@@ -218,7 +218,8 @@ test.describe('Deni’s big view', () => {
     // ...and the code did not fire. (The same keys outside a field do fire it: see the test above.)
     await page.waitForTimeout(600)
     await expect(caption(page)).not.toContainText('Cheat code accepted')
-    expect(await caption(page).innerText()).toBe(before)
+    // Still his greeting, or it has timed out and hidden itself (that happens after about ten seconds).
+    expect([before, '']).toContain(await caption(page).innerText())
   })
 
   test('works with reduced motion', async ({ page }) => {

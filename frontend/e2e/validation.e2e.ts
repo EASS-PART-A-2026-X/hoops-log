@@ -182,7 +182,8 @@ test.describe('odd but valid text is stored as typed and drawn as text, never ru
   test('KNOWN GAP: names that differ only in capital letters are listed as two people in the picker', async ({ page, api }) => {
     // The backend's player filter ignores case, so "yuly" and "YULY" should be one person. The picker still lists them
     // separately. This test pins today's behaviour so that fixing the gap fails it on purpose: when the picker shows one
-    // person, change the 3 below to 2 and rename the test.
+    // person, the list below becomes two entries (Every player and the one person), the count at the end 2, and the test
+    // loses its KNOWN GAP name.
     await api.seed([
       { player: 'yuly', x: 25, y: 8, made: true },
       { player: 'YULY', x: 20, y: 20, made: false },

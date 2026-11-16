@@ -162,7 +162,6 @@ test('XP grows with each saved shot', async ({ page }) => {
     // Each saved shot adds XP (a few points for logging it, more for a make), and three of them stay in level 1.
     await expect.poll(async () => Number(await xp.getAttribute('aria-valuenow'))).toBeGreaterThan(before)
     before = Number(await xp.getAttribute('aria-valuenow'))
-    // Wait for the notice to go before the next one (it is replaced by the next save).
   }
   expect(await level()).toMatch(/level 1 rookie/i)
 })

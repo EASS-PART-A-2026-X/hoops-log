@@ -129,6 +129,16 @@ const isLocal = (url: string): boolean => {
   }
 }
 
+/** An address that is this machine or the local network, in any spelling (not "localhost" or 127.0.0.1, which are handled apart). */
+const isPrivateHost = (url: string): boolean => {
+  try {
+    const host = new URL(url).hostname
+    return /^(127\.|0\.0\.0\.0$|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1?\]$|\[?f[cd][0-9a-f]{2}:|\[?fe80:)/i.test(host) || host.endsWith('.local') || host.endsWith('.internal')
+  } catch {
+    return false
+  }
+}
+
 /** The only two servers the browser may talk to: the throwaway frontend and the throwaway backend. */
 const ALLOWED_ORIGINS = new Set([new URL(BASE_URL).origin, new URL(BACKEND_URL).origin])
 const isAllowedOrigin = (url: string): boolean => {
@@ -246,8 +256,18 @@ export const test = base.extend<Fixtures>({
     // Hermetic: nothing leaves the machine (NBA photos fall back to drawn initials, no model downloads), and the
     // browser may only talk to the two throwaway servers. A request to anything else on this machine (the real backend
     // on port 8000 above all) is stopped and fails the test.
-    await page.route((url) => !isLocal(url.toString()), (route) => route.abort())
-    await page.route(
+    // The routes are on the browser context, not on the page, so a popup or a second tab the app opens is covered too.
+    const context = page.context()
+    await context.route(
+      (url) => !isLocal(url.toString()),
+      (route) => {
+        // A photo or a font from outside is simply blocked. An address on this machine or the local network that is not
+        // "localhost" or 127.0.0.1 (127.0.0.2, 0.0.0.0, [::1], 192.168.x.x) is someone else's server: that fails the test.
+        if (isPrivateHost(route.request().url())) guard.seen.push(`blocked: the page asked for ${route.request().url()}, which is not one of the throwaway servers`)
+        return route.abort()
+      },
+    )
+    await context.route(
       (url) => isLocal(url.toString()) && !isAllowedOrigin(url.toString()),
       (route) => {
         guard.seen.push(`blocked: the page asked for ${route.request().url()}, which is not one of the throwaway servers`)
@@ -256,7 +276,7 @@ export const test = base.extend<Fixtures>({
     )
     // The throwaway backend does not list this page's address in its CORS allow-list (it is not on 5173), so the answers
     // get the headers here. The backend's real CORS rules are checked over plain HTTP in api.e2e.ts, not in the browser.
-    await page.route(`${BACKEND_URL}/**`, async (route) => {
+    await context.route(`${BACKEND_URL}/**`, async (route) => {
       const cors = {
         'access-control-allow-origin': '*',
         'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',

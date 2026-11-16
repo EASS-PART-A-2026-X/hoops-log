@@ -2,9 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { defineConfig } from '@playwright/test'
-import { BACKEND_PORT, BACKEND_URL, BASE_URL, FRONTEND_PORT, assertSafeBackend, assertSafeFrontend } from './e2e/env'
+import { BACKEND_PORT, BACKEND_URL, BASE_URL, FRONTEND_PORT, assertSafeBackend, assertSafeFrontend, assertSafePorts } from './e2e/env'
 
 // Before anything is started: a backend URL or port that points at the real one stops the run here.
+assertSafePorts()
 assertSafeBackend()
 assertSafeFrontend()
 

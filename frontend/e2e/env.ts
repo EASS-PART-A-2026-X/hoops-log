@@ -6,7 +6,7 @@ export const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${FRONTEND
 
 /** The usual dev servers. Your own shots live behind them, so the tests never touch them. */
 export const FORBIDDEN_PORTS = ['8000', '5173']
-const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]'])
+const LOOPBACK = new Set(['127.0.0.1', 'localhost'])
 
 /**
  * The backend the tests write to (and `Api.clear()` empties before every test) must be a throwaway one: this machine
@@ -29,6 +29,15 @@ export function assertSafeBackend(url: string = BACKEND_URL): void {
   }
   if (FORBIDDEN_PORTS.includes(parsed.port)) {
     throw new Error(`Refusing to run the e2e tests against ${url}: that is the real dev backend (port ${parsed.port}).`)
+  }
+}
+
+/** The ports can be set on their own (E2E_BACKEND_PORT, E2E_FRONTEND_PORT), so they are checked on their own too. */
+export function assertSafePorts(): void {
+  for (const [name, port] of [['E2E_BACKEND_PORT', BACKEND_PORT], ['E2E_FRONTEND_PORT', FRONTEND_PORT]] as const) {
+    if (!Number.isInteger(port) || port < 1024 || FORBIDDEN_PORTS.includes(String(port))) {
+      throw new Error(`Refusing to run the e2e tests: ${name}=${port} is not a safe throwaway port (not 8000 or 5173, and 1024 or higher).`)
+    }
   }
 }
 
