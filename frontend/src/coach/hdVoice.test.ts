@@ -59,4 +59,49 @@ describe('HD voice', () => {
     expect(await first).toBe(true)
     expect(start).not.toHaveBeenCalled()
   })
+
+  it('stays off when it is turned off while the download is still running', async () => {
+    let finish: (v: unknown) => void = () => {}
+    fromPretrained.mockImplementation(() => new Promise((r) => (finish = r)))
+    const hd = await fresh()
+    hd.setHdWanted(true)
+    expect(hd.hdSnapshot().state).toBe('loading')
+    hd.setHdWanted(false)
+    await vi.waitFor(() => expect(fromPretrained).toHaveBeenCalled())
+    finish({ generate })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(hd.hdSnapshot().state).toBe('off')
+    expect(hd.hdReady()).toBe(false)
+    // Turning it on again uses the model that already arrived, without a second download.
+    hd.setHdWanted(true)
+    expect(hd.hdSnapshot().state).toBe('ready')
+    expect(fromPretrained).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells the caller the line ended when it is cut off while playing', async () => {
+    const stop = vi.fn()
+    class FakeAudioContext {
+      state = 'running'
+      destination = {}
+      resume = async () => {}
+      createBuffer = () => ({ copyToChannel: () => {} })
+      createBufferSource = () => ({ buffer: null, connect: () => {}, start: () => {}, stop, onended: null })
+    }
+    vi.stubGlobal('AudioContext', FakeAudioContext)
+    fromPretrained.mockResolvedValue({ generate })
+    generate.mockResolvedValue({ audio: new Float32Array(10), sampling_rate: 24000 })
+    const hd = await fresh()
+    const start = vi.fn()
+    const end = vi.fn()
+    expect(await hd.speakHd('one', { onStart: start, onEnd: end })).toBe(true)
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(end).not.toHaveBeenCalled()
+    hd.stopHd()
+    expect(stop).toHaveBeenCalled()
+    expect(end).toHaveBeenCalledTimes(1)
+    // Stopping again does not end it twice.
+    hd.stopHd()
+    expect(end).toHaveBeenCalledTimes(1)
+    vi.unstubAllGlobals()
+  })
 })

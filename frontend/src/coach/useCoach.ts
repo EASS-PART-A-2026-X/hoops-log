@@ -32,14 +32,17 @@ export function useCoach() {
     setSaid({ ...line, key: key.current })
     setVisible(true)
     setTalking(false)
-    const spoke = speak(line.text, {
-      onStart: () => setTalking(true),
-      onEnd: () => setTalking(false),
-    })
-    if (!spoke) {
+    // With no voice, the mouth still moves for as long as the line would take to read.
+    const moveMouth = () => {
       setTalking(true)
       talkTimer.current = window.setTimeout(() => setTalking(false), talkMs(line.text))
     }
+    const spoke = speak(line.text, {
+      onStart: () => setTalking(true),
+      onEnd: () => setTalking(false),
+      onSilent: moveMouth,
+    })
+    if (!spoke) moveMouth()
     hideTimer.current = window.setTimeout(() => setVisible(false), bubbleMs(line.text))
   }, [])
 

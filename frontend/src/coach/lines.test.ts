@@ -73,6 +73,9 @@ describe('reactions', () => {
     expect(greet('Yuly', 0, 'Rookie').text).toMatch(/empty/)
     expect(greet('Yuly', 12, 'Rookie').text).toContain('12')
     expect(greet('', 12, 'Rookie').text).toContain('there')
+    // One shot is "1 shot", never "1 shots".
+    for (const n of [0, 1, 2]) expect(greet('Yuly', 1, 'Rookie', n).text).not.toMatch(/\b1 shots\b/)
+    expect(greet('Yuly', 1, 'Rookie').text).toMatch(/\b1 shot\b/)
   })
 
   it('has a hint for every page', () => {

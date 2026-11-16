@@ -30,16 +30,30 @@ export default function Deni3D({ mood, talking, beat, onPoke }: Props) {
     if (!el) return
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     let made: DeniStage | null = null
-    try {
-      made = new DeniStage(el, reduced)
-      stage.current = made
-      made.onPoke = () => poke.current?.()
-    } catch {
-      // No WebGL here (or it is switched off). Set from the effect on purpose: only trying tells.
-      // oxlint-disable-next-line react-hooks/set-state-in-effect
-      setFailed(true)
+    const gone = { value: false }
+    const make = () => {
+      if (gone.value) return
+      try {
+        made = new DeniStage(el, reduced)
+        stage.current = made
+        made.onPoke = () => poke.current?.()
+      } catch {
+        // No WebGL here (or it is switched off). Set from the effect on purpose: only trying tells.
+        // oxlint-disable-next-line react-hooks/set-state-in-effect
+        setFailed(true)
+      }
+    }
+    // The jersey text is painted once onto a canvas, so the kit's font must be loaded first or the fallback font is baked in.
+    const fonts = typeof document !== 'undefined' ? document.fonts : undefined
+    if (fonts?.load) {
+      void Promise.all([fonts.load('italic 800 40px "Barlow Condensed"'), fonts.load('800 46px "Barlow Condensed"')])
+        .catch(() => {})
+        .then(make)
+    } else {
+      make()
     }
     return () => {
+      gone.value = true
       made?.dispose()
       stage.current = null
     }

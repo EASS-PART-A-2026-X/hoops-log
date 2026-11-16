@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatterContext } from './lines'
 import { setChatterOn } from './prefs'
 import { useCoach } from './useCoach'
-import { FIRST_MS, GAP_MS, MAX_REMARKS, useCoachChatter } from './useCoachChatter'
+import { FIRST_SILENT_MS, GAP_MS, MAX_REMARKS, useCoachChatter } from './useCoachChatter'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -31,7 +31,7 @@ const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms))
 describe('useCoachChatter', () => {
   it('stays quiet for the first minute, then speaks up once', () => {
     const { result } = setup()
-    advance(FIRST_MS - 6000)
+    advance(FIRST_SILENT_MS - 6000)
     expect(result.current.said).toBeNull()
     advance(7000)
     expect(result.current.said?.text).toMatch(/Water break/)
@@ -39,7 +39,7 @@ describe('useCoachChatter', () => {
 
   it('waits for the title screen and the loading to be over', () => {
     const { result, rerender } = setup(false)
-    advance(FIRST_MS * 3)
+    advance(FIRST_SILENT_MS * 3)
     expect(result.current.said).toBeNull()
     rerender({ ready: true })
     advance(CHECK_PAD)
@@ -49,7 +49,7 @@ describe('useCoachChatter', () => {
   it('does nothing when the visitor turned it off', () => {
     setChatterOn(false)
     const { result } = setup()
-    advance(FIRST_MS * 3)
+    advance(FIRST_SILENT_MS * 3)
     expect(result.current.said).toBeNull()
   })
 
@@ -59,7 +59,7 @@ describe('useCoachChatter', () => {
       hits++
       return context(25)
     })
-    advance(FIRST_MS + 6000)
+    advance(FIRST_SILENT_MS + 6000)
     const first = result.current.said!.key
     advance(GAP_MS - 20_000)
     expect(result.current.said!.key).toBe(first)
@@ -74,6 +74,16 @@ describe('useCoachChatter', () => {
 
   it('never says more than the limit in one visit', () => {
     expect(MAX_REMARKS).toBeLessThanOrEqual(6)
+    // Two things are true (the water break and the next level), but with a limit of one only one is ever said.
+    const { result } = renderHook(() => {
+      const coach = useCoach()
+      useCoachChatter({ coach, ready: true, context: () => context(25), maxRemarks: 1 })
+      return coach
+    })
+    advance(FIRST_SILENT_MS + 6000)
+    const first = result.current.said!.key
+    advance(GAP_MS * 4)
+    expect(result.current.said!.key).toBe(first)
   })
 })
 

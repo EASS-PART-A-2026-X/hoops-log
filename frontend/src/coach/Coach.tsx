@@ -59,9 +59,10 @@ export default function Coach({ coach, context, onOpenChange }: Props) {
           {visible && said ? said.text : ''}
         </div>
         {visible && said && !open && (
-          <div className={`coach-bubble mood-${said.mood}`} key={said.key} aria-hidden="true">
-            <p>{said.text}</p>
-            <button type="button" className="coach-bubble-close" tabIndex={-1} onClick={hide}>
+          <div className={`coach-bubble mood-${said.mood}`} key={said.key}>
+            {/* The live region above already reads the line, so the text is hidden here; the button stays reachable. */}
+            <p aria-hidden="true">{said.text}</p>
+            <button type="button" className="coach-bubble-close" aria-label="Dismiss" onClick={hide}>
               ✕
             </button>
           </div>

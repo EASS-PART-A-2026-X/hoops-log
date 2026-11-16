@@ -1,8 +1,11 @@
 /**
  * The optional HD voice: Kokoro, a small open-source (Apache-2.0) speech model that runs on the visitor's own
- * device through WebAssembly. Nothing the coach says is sent anywhere. It costs a one-time download of about
- * 90 MB (kept by the browser afterwards), so it is off until the visitor asks for it, the library is only
- * loaded then, and the browser's own voice speaks until the model is ready (and whenever it fails).
+ * device through WebAssembly. What the coach says is never sent anywhere: the speech is made on the device. The
+ * model files (about 90 MB) come once from Hugging Face's `main` branch (kokoro-js has no option to pin a
+ * revision) and the WebAssembly runtime from a public CDN (the transformers.js default); the browser keeps them
+ * afterwards. So it is off until the
+ * visitor asks for it, the library is only loaded then, and the browser's own voice speaks until the model is
+ * ready (and whenever it fails).
  */
 
 const KEY = 'coach-hd-voice'
@@ -16,7 +19,10 @@ interface Engine {
   generate(text: string, options: { voice: typeof VOICE }): Promise<{ audio: Float32Array; sampling_rate: number }>
 }
 
-let state: HdState = readWanted() ? 'loading' : 'off'
+/** Whether the visitor wants the HD voice right now (a download that finishes after they turned it off must not turn it on). */
+let wanted = readWanted()
+let loaded = false
+let state: HdState = wanted ? 'loading' : 'off'
 let progress = 0
 let engine: Promise<Engine> | null = null
 const listeners = new Set<() => void>()
@@ -52,7 +58,7 @@ export function hdSupported(): boolean {
 
 function load(): Promise<Engine> {
   if (!engine) {
-    set('loading', 0)
+    if (wanted) set('loading', 0)
     engine = import('kokoro-js')
       .then(({ KokoroTTS }) =>
         KokoroTTS.from_pretrained(MODEL, {
@@ -60,17 +66,18 @@ function load(): Promise<Engine> {
           device: 'wasm',
           progress_callback: (info: { status?: string; progress?: number; file?: string }) => {
             // Several files download; the big model file is the one that moves the bar.
-            if (info.status === 'progress' && typeof info.progress === 'number' && info.file?.endsWith('.onnx')) set('loading', Math.round(info.progress))
+            if (info.status === 'progress' && typeof info.progress === 'number' && info.file?.endsWith('.onnx') && wanted) set('loading', Math.round(info.progress))
           },
         }),
       )
       .then((tts) => {
-        set('ready', 100)
+        loaded = true
+        if (wanted) set('ready', 100)
         return tts as unknown as Engine
       })
       .catch((error: unknown) => {
         engine = null
-        set('failed', 0)
+        if (wanted) set('failed', 0)
         throw error
       })
     // The caller handles the failure; this only keeps an unhandled-rejection warning away.
@@ -80,7 +87,8 @@ function load(): Promise<Engine> {
 }
 
 /** Turn the HD voice on (starting the download) or off. */
-export function setHdWanted(wanted: boolean): void {
+export function setHdWanted(want: boolean): void {
+  wanted = want
   try {
     window.localStorage.setItem(KEY, wanted ? '1' : '0')
   } catch {
@@ -91,6 +99,11 @@ export function setHdWanted(wanted: boolean): void {
     set('off', 0)
     return
   }
+  if (loaded) {
+    set('ready', 100)
+    return
+  }
+  set('loading', progress)
   void load().catch(() => {})
 }
 
@@ -101,16 +114,21 @@ export function resumeHd(): void {
 
 let ctx: AudioContext | null = null
 let playing: AudioBufferSourceNode | null = null
+/** Tells the caller that the line playing now has ended, also when it is cut off (so the mouth stops). */
+let playingEnd: (() => void) | null = null
 let token = 0
 
 export function stopHd(): void {
   token += 1
+  const end = playingEnd
+  playingEnd = null
   try {
     playing?.stop()
   } catch {
     /* it had already ended */
   }
   playing = null
+  end?.()
 }
 
 export function hdReady(): boolean {
@@ -137,10 +155,14 @@ export async function speakHd(text: string, handlers: { onStart?: () => void; on
     source.buffer = buffer
     source.connect(ctx.destination)
     source.onended = () => {
-      if (playing === source) playing = null
+      if (playing === source) {
+        playing = null
+        playingEnd = null
+      }
       if (mine === token) handlers.onEnd?.()
     }
     playing = source
+    playingEnd = () => handlers.onEnd?.()
     handlers.onStart?.()
     source.start()
     return true

@@ -34,7 +34,7 @@ export class DeniStage {
   private look = { x: 0, y: 0 }
   private lookNow = { x: 0, y: 0 }
   private yaw = 0
-  private drag: { x: number; yaw: number } | null = null
+  private drag: { x: number; y: number; yaw: number } | null = null
   private resizeObserver: ResizeObserver
   private container: HTMLElement
   private reduced: boolean
@@ -115,8 +115,10 @@ export class DeniStage {
       if (o.geometry) o.geometry.dispose()
       const m = o.material as THREE.Material | THREE.Material[] | undefined
       for (const material of Array.isArray(m) ? m : m ? [m] : []) {
-        const map = (material as THREE.MeshStandardMaterial).map
-        if (map) map.dispose()
+        // Every texture the material holds (colour map, bump map, ...), not only the colour map.
+        for (const value of Object.values(material)) {
+          if (value instanceof THREE.Texture) value.dispose()
+        }
         material.dispose()
       }
       if ((obj as THREE.InstancedMesh).isInstancedMesh) (obj as THREE.InstancedMesh).dispose()
@@ -198,7 +200,7 @@ export class DeniStage {
 
   // Drag turns him round (to see the name and number on his back); moving without a button makes him look at the pointer.
   private onDown = (e: PointerEvent): void => {
-    this.drag = { x: e.clientX, yaw: this.yaw }
+    this.drag = { x: e.clientX, y: e.clientY, yaw: this.yaw }
     this.renderer.domElement.setPointerCapture(e.pointerId)
   }
   private onMove = (e: PointerEvent): void => {
@@ -212,8 +214,8 @@ export class DeniStage {
     this.requestFrame()
   }
   private onUp = (e: PointerEvent): void => {
-    // A tap, not a turn: barely any sideways movement since the press.
-    if (this.drag && e.type === 'pointerup' && Math.abs(e.clientX - this.drag.x) < 5) this.onPoke?.()
+    // A tap, not a turn or a scroll: barely any movement, in any direction, since the press.
+    if (this.drag && e.type === 'pointerup' && Math.hypot(e.clientX - this.drag.x, e.clientY - this.drag.y) < 5) this.onPoke?.()
     this.drag = null
     if (this.renderer.domElement.hasPointerCapture(e.pointerId)) this.renderer.domElement.releasePointerCapture(e.pointerId)
   }

@@ -138,14 +138,24 @@ describe('useCoachEvents', () => {
   it('celebrates a round number of shots, ahead of a streak and a plain save', () => {
     const first = Array.from({ length: 24 }, () => shot(true))
     const { result, rerender } = setup({ shots: first })
-    rerender({ shots: [...first, shot(true)] })
+    const twentyFifth = shot(true)
+    rerender({ shots: [...first, twentyFifth] })
     advance(200)
     expect(result.current.said?.text).toMatch(/Shot number 25 /)
     expect(result.current.said?.mood).toBe('hype')
     // The next one is just a save (or a streak), not another milestone.
-    rerender({ shots: [...first, shot(true), shot(false)] })
+    rerender({ shots: [...first, twentyFifth, shot(false)] })
     advance(200)
     expect(result.current.said?.text).not.toMatch(/Shot number/)
+  })
+
+  it('still celebrates a round number that a batch of shots jumped over', () => {
+    const first = Array.from({ length: 23 }, () => shot(true))
+    const { result, rerender } = setup({ shots: first })
+    // Three shots arrive at once: the log goes from 23 to 26 and passes 25 on the way.
+    rerender({ shots: [...first, shot(true), shot(true), shot(false)] })
+    advance(200)
+    expect(result.current.said?.text).toMatch(/Shot number 25 /)
   })
 
   it('counts a milestone per player, not across everyone', () => {
@@ -168,6 +178,6 @@ describe('useCoachEvents', () => {
     expect(away.result.current.said?.text).toMatch(/9 days since your last shot/)
     cleanup()
     const near = setup({ shots: [shot(true, { game_date: old(1) })] })
-    expect(near.result.current.said?.text).toMatch(/Welcome back, A\. 1 shots logged/)
+    expect(near.result.current.said?.text).toMatch(/Welcome back, A\. 1 shot logged/)
   })
 })

@@ -128,19 +128,19 @@ export default function CoachDialog({ coach, context, onClose, returnTo }: Props
               </li>
             ))}
           </ul>
-          {speechSupported() && (
+          {(speechSupported() || hdSupported()) && (
             <button type="button" className="coach-voice" aria-pressed={voiceOn} onClick={() => setVoiceOn(!voiceOn)}>
               Voice: {voiceOn ? 'on' : 'off'}
               {voiceOn && muted ? ' (the sound button is off)' : ''}
             </button>
           )}
-          {hdSupported() && (
+          {hdSupported() && voiceOn && (
             <button
               type="button"
               className="coach-voice"
               aria-pressed={hd.state === 'ready' || hd.state === 'loading'}
               onClick={() => setHdWanted(hd.state === 'off' || hd.state === 'failed')}
-              title="A more human voice that runs on your own device. One-time download of about 90 MB; nothing you hear is sent anywhere."
+              title="A more human voice made on your own device. One-time download of about 90 MB (model from Hugging Face, runtime from a public CDN); what he says is never sent anywhere."
             >
               {hd.state === 'off' && 'HD voice: off (one-time 90 MB download)'}
               {hd.state === 'loading' && `HD voice: downloading ${hd.progress}%`}

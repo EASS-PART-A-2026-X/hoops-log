@@ -88,9 +88,13 @@ export function useCoachEvents({ coach, shots, truncated, ready, tab, name, shot
     if (!latest) return
     const mine = shots.filter((s) => s.player === latest.player)
     const run = currentStreak(mine)
+    // A batch can jump over a round number, so look at every number it passed, not only where it ended.
+    const added = shots.filter((s) => s.id > before && s.player === latest.player).length
+    const passed = (MILESTONES as readonly number[]).filter((m) => mine.length - added < m && m <= mine.length)
+    const reached = passed[passed.length - 1]
     // A round number of shots beats a streak, which beats the plain line.
-    const line = (MILESTONES as readonly number[]).includes(mine.length)
-      ? milestone(mine.length)
+    const line = reached !== undefined
+      ? milestone(reached)
       : latest.made && run >= STREAK_LINE
         ? streak(run)
         : saved(latest.made, variant.current++)

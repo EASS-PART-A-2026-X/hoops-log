@@ -1,5 +1,6 @@
 /**
- * The coach's voice: the browser's own text to speech (free, nothing is sent anywhere). It stays quiet when
+ * The coach's voice: the browser's own text to speech (free, nothing is sent anywhere; an optional HD voice is in
+ * hdVoice.ts). It stays quiet when
  * the sound button is off, when the visitor turned the voice off, when the browser has no speech, or before the
  * visitor has clicked anything (browsers block speech until then, and the caption still shows).
  * The voice choice is kept in localStorage; the app works when that is blocked.
@@ -88,20 +89,28 @@ export function stopSpeaking(): void {
  * Speak a line. Returns false when it stays silent (the caption is then all there is). With the HD voice ready it
  * is used (the line starts a moment later, while the model works) and the browser's voice steps in if it fails.
  */
-export function speak(text: string, handlers: { onStart?: () => void; onEnd?: () => void } = {}): boolean {
+export function speak(text: string, handlers: SpeakHandlers = {}): boolean {
   resumeHd()
-  if (!canSpeak() && !(on && !isMuted() && hdReady() && userHasActed())) return false
+  if (!on || isMuted() || !userHasActed()) return false
   if (hdReady()) {
     if (speechSupported()) window.speechSynthesis.cancel()
     void speakHd(speakable(text), handlers).then((spoken) => {
-      if (!spoken) speakBrowser(text, handlers)
+      // The model failed and the browser voice cannot say it either: let the caller animate the mouth for the caption.
+      if (!spoken && !speakBrowser(text, handlers)) handlers.onSilent?.()
     })
     return true
   }
   return speakBrowser(text, handlers)
 }
 
-function speakBrowser(text: string, handlers: { onStart?: () => void; onEnd?: () => void }): boolean {
+export interface SpeakHandlers {
+  onStart?: () => void
+  onEnd?: () => void
+  /** Called when a line that was accepted ends up with no voice at all (only the caption is left). */
+  onSilent?: () => void
+}
+
+function speakBrowser(text: string, handlers: SpeakHandlers): boolean {
   if (!canSpeak()) return false
   try {
     const synth = window.speechSynthesis

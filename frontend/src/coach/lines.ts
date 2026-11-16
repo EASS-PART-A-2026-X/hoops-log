@@ -25,6 +25,11 @@ export const INTRO: Line = {
   mood: 'happy',
 }
 
+/** "1 shot", "2 shots". */
+function shotsOf(n: number): string {
+  return `${n} shot${n === 1 ? '' : 's'}`
+}
+
 export function greet(name: string, shots: number, rank: string, n = 0): Line {
   if (shots === 0) {
     return { text: 'Welcome. Your log is empty, so open the Shots button and add your first shot. I will be here.', mood: 'happy' }
@@ -33,8 +38,8 @@ export function greet(name: string, shots: number, rank: string, n = 0): Line {
   return {
     text: pick(
       [
-        `Welcome back, ${who}. ${shots} shots logged, rank ${rank}. Let us add some more.`,
-        `Good to see you, ${who}. You have ${shots} shots in the log and you are a ${rank}. Ready when you are.`,
+        `Welcome back, ${who}. ${shotsOf(shots)} logged, rank ${rank}. Let us add some more.`,
+        `Good to see you, ${who}. You have ${shotsOf(shots)} in the log and you are a ${rank}. Ready when you are.`,
       ],
       n,
     ),
@@ -127,7 +132,7 @@ export function answer(id: QuestionId, ctx: AnswerContext): Line {
       if (shots.length === 0) return empty
       const s = summarize(shots)
       const parts = [`You have made ${s.made} of ${s.attempts}, which is ${s.fg}%. The NBA average is about ${NBA_OVERALL.fg}%.`]
-      if (s.threeAttempts > 0) parts.push(`From three you are at ${s.three}% on ${s.threeAttempts} shots, against about ${NBA_OVERALL.three}%.`)
+      if (s.threeAttempts > 0) parts.push(`From three you are at ${s.three}% on ${shotsOf(s.threeAttempts)}, against about ${NBA_OVERALL.three}%.`)
       else parts.push('You have not logged a three yet.')
       if (s.attempts < SMALL_SAMPLE * 2) parts.push('It is a small sample, so do not read too much into it.')
       return { text: parts.join(' '), mood: s.fg !== null && s.fg >= NBA_OVERALL.fg ? 'happy' : 'idle' }
@@ -249,7 +254,7 @@ function candidates(ctx: ChatterContext): Candidate[] {
   if (hour >= 5 && hour < 9) out.push({ id: 'morning', line: { text: 'An early session. That habit pays off.', mood: 'happy' } })
   if (now.getDay() === 5 && hour >= 14) out.push({ id: 'friday', line: { text: 'Friday afternoon, last shots before the weekend. Make them count.', mood: 'happy' } })
   const today = ctx.dates.filter((d) => d === dayOf(now)).length
-  if (today >= 3) out.push({ id: 'today', line: { text: `${today} shots logged today. That is a real session.`, mood: 'happy' } })
+  if (today >= 3) out.push({ id: 'today', line: { text: `${shotsOf(today)} logged today. That is a real session.`, mood: 'happy' } })
   if (ctx.xpToNext > 0 && ctx.xpToNext <= 40) out.push({ id: 'xp', line: { text: `Only ${ctx.xpToNext} XP to the next level. One good streak does it.`, mood: 'hype' } })
   const zones = compareZones(shots).filter((z) => z.attempts >= SMALL_SAMPLE && z.mine !== null)
   if (zones.length > 0) {
