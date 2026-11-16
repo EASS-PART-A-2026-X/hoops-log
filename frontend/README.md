@@ -54,7 +54,7 @@ Run these from `frontend/`:
 
 ```bash
 npm run lint          # oxlint
-npm test              # Vitest + Testing Library, runs once, needs no browser or backend
+npm test              # Vitest + Testing Library, runs once, needs no browser or backend (the browser tests are `npm run e2e`, below)
 npm run build         # type-checks with tsc, then bundles into dist/
 npm run preview       # serves the built bundle (http://localhost:4173)
 ```
@@ -65,6 +65,48 @@ From the repo root, `scripts/ci.sh` runs the backend checks (ruff, pytest and a 
 - `scripts/ci.sh --fast` skips the mutation score and only lints the frontend, and only if `frontend/node_modules` already exists (otherwise it prints a SKIP line).
 - `scripts/ci.sh --docker` adds the Docker persistence test and needs Docker.
 - Without npm the frontend steps are skipped on your machine (and fail on GitHub, where `CI=true`).
+
+## End-to-end tests (a real browser)
+
+`npm run e2e` opens a real browser, starts the real backend and the real frontend, and uses the app the way a person would: it logs, edits and deletes shots, opens every page, plays the film, downloads the shot card, talks to Deni, uses the keyboard and a phone-sized screen, and breaks things on purpose (backend down, slow, 500s, bad input, HTML in names).
+
+```bash
+cd frontend
+npx playwright install chromium     # once: the browser the tests use
+npm run e2e                         # everything (several minutes)
+npx playwright test log-journey     # one file
+npx playwright test --ui            # watch it run, step by step
+```
+
+**It never touches your own data.** The tests start their own backend on port **8011** with a fresh temporary database, and their own frontend on port **5199**. They do not use the usual 8000 and 5173, they never reuse a server that is already running, and they refuse to run against port 8000 at all. Nothing leaves the machine either: the NBA photos and the HD voice download are blocked, so the tests also check what the app does without them.
+
+What is in `frontend/e2e/`:
+
+| File | What it checks |
+|---|---|
+| `smoke` | the app opens, the PRESS START screen, and the test safety net itself |
+| `log-journey` | add, edit and delete shots through the form; zone and type come from the backend; the numbers on screen match the backend; XP |
+| `validation` | the browser's checks, the backend's 422 messages, Hebrew, emoji, HTML and SQL in names, trimming, dates |
+| `map` | the 3D court draws, the filters and styles, replay and the shot film, the flat chart without WebGL |
+| `compare` | vs NBA, the face-off, the Players ranking and team filter, the shot card as a real PNG, trophies |
+| `coach` | Deni's greetings, answers with your real numbers, the 3D figure, voice, HD voice failing gracefully, the cheat code |
+| `layout` | a desktop window with no page scroll, a short window, a phone, keyboard-only use |
+| `resilience` | backend down, slow, or returning 500; data deleted behind the page's back; 300 shots |
+| `api` | the backend over plain HTTP: CORS, 422s, paging, ids never reused, `/chart.svg` |
+| `monkey` | a seeded monkey: random clicks, typing, keys, drags, resizes, reloads and form fuzzing, checked after every step |
+
+**The monkey** is repeatable: it uses a seeded random generator, so a failure prints its seed and its last actions, and the same seed does the same thing again.
+
+```bash
+E2E_MONKEY_SEEDS=7,8,9 E2E_MONKEY_STEPS=200 npx playwright test monkey
+E2E_MONKEY_VERBOSE=1 E2E_MONKEY_SEEDS=7 npx playwright test monkey    # print every action
+```
+
+**Every test fails on any browser error** (a script error, `console.error`, a failed local request, a 5xx). A test that causes one on purpose says so with `guard.allow(...)`.
+
+**A test marked `test.fail`** documents a known gap: it is expected to fail until the gap is fixed, and Playwright reports it loudly when it starts passing, so the mark can be removed.
+
+Settings (environment variables): `E2E_CHANNEL=msedge` (or `chrome`) uses an installed browser instead of Playwright's Chromium; `E2E_EXTERNAL=1` skips starting the servers (start the backend on 8011 and the frontend on 5199 yourself, with `VITE_BACKEND_URL` pointing at the backend); `E2E_BACKEND_PORT`, `E2E_FRONTEND_PORT`, `E2E_BASE_URL` and `E2E_BACKEND_URL` change where they live. `npm run e2e:types` type-checks the test files. On GitHub the tests run in their own workflow, `e2e`, on pull requests that touch `frontend/` or `backend/`.
 
 ## If something goes wrong
 
