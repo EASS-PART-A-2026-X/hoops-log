@@ -69,13 +69,15 @@ for (const seed of SEEDS) {
     test.setTimeout(240_000)
     // Bad input legitimately comes back as 4xx and the browser logs that; a 5xx or a script error is never fine.
     guard.allow(/Failed to load resource: the server responded with a status of 4\d\d/)
-    page.setDefaultTimeout(2500)
     page.on('dialog', (d) => void d.dismiss().catch(() => {}))
 
     const next = rng(seed)
     const log: string[] = []
     await api.seed([...makeShots('Yuly', 24, { seed: seed * 7 + 1 }), ...makeShots('Noam', 9, { seed: seed * 7 + 2 })])
     await openApp(page)
+    // Quick timeouts for the random actions only: a click that cannot happen should be given up on fast. Loading the page is
+    // slow on a slow machine and keeps the normal timeouts.
+    page.setDefaultTimeout(2500)
 
     const step = async (i: number): Promise<void> => {
       const roll = next()
@@ -165,7 +167,8 @@ for (const seed of SEEDS) {
       if (!alive) throw new Error(`the page went blank or lost its navigation\n${report(i)}`)
     }
 
-    // The screen and the backend agree once everything has settled.
+    // The screen and the backend agree once everything has settled (patient again: this is a full page load).
+    page.setDefaultTimeout(30_000)
     await page.setViewportSize({ width: 1366, height: 800 })
     await page.goto('/')
     await expect(page.getByRole('navigation', { name: 'Pages' })).toBeVisible()
