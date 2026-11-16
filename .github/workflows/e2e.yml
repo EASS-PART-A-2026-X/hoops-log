@@ -1,0 +1,78 @@
+name: e2e
+# Browser tests: a real Chromium drives the real frontend against the real backend (see frontend/README.md).
+#
+#   pull request          the FAST set (smoke, API, the log journey, one short monkey): a few minutes, so it can gate a merge
+#   push to frontend/main the FULL suite (everything, all monkey seeds): about 20 minutes, runs after the merge
+#   every night, by hand  the FULL suite as well (a schedule only runs from the default branch)
+#
+# Separate from ci.yml so a slow browser never hides the fast checks, and so it can be re-run on its own.
+#
+# A scheduled run only starts from the default branch, so the nightly begins to run once this workflow is on main.
+# GitHub emails a failed scheduled run to whoever last edited its cron line, and everyone can see it on the Actions tab.
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [frontend, main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - ".github/workflows/e2e.yml"
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+# This job only reads the repository.
+permissions:
+  contents: read
+
+# A new push to a pull request cancels that pull request's older run. A post-merge or nightly full run is never
+# cancelled by another one (each kind of event has its own group).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      # The fast set on pull requests, everything otherwise.
+      SUITE: ${{ github.event_name == 'pull_request' && 'e2e:fast' || 'e2e' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: Remember the browser between runs
+        id: browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      # working-directory (not npx --prefix) so the Playwright from the lock file is the one that runs.
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+        if: steps.browser.outputs.cache-hit != 'true'
+      - run: npx playwright install-deps chromium
+        working-directory: frontend
+        if: steps.browser.outputs.cache-hit == 'true'
+      - run: npm run "$SUITE"
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
