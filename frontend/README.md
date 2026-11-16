@@ -32,10 +32,10 @@ On a fresh backend database the app starts with three demo shots. The backend st
 The frontend calls `http://localhost:8000` by default. To use another backend, set `VITE_BACKEND_URL` when you start the dev server (it is read at build time, and the address must work from your browser, not only from the machine the server runs on):
 
 ```bash
-VITE_BACKEND_URL=http://localhost:8001 npm run dev
+VITE_BACKEND_URL=http://localhost:9000 npm run dev
 ```
 
-If you change the backend's port, also check that its CORS list still contains the page's address.
+The backend's CORS list names the address of the page (the frontend, :5173), not the backend's own port, so a different backend port needs no CORS change. Only if you serve the frontend from another address or port must that address be added to `FRONTEND_ORIGINS` in `backend/app/main.py`.
 
 ## What is in it
 
@@ -54,19 +54,24 @@ Run these from `frontend/`:
 
 ```bash
 npm run lint          # oxlint
-npm test              # Vitest + Testing Library, runs once (about 400 tests, no browser or backend needed)
+npm test              # Vitest + Testing Library, runs once, needs no browser or backend
 npm run build         # type-checks with tsc, then bundles into dist/
 npm run preview       # serves the built bundle (http://localhost:4173)
 ```
 
-From the repo root, `scripts/ci.sh` runs the backend checks and then the frontend's `npm ci`, lint, tests and build (`--fast` only lints the frontend).
+From the repo root, `scripts/ci.sh` runs the backend checks (ruff, pytest and a mutation score, which takes about a minute) and then the frontend's `npm ci`, lint, tests and build. Things to know before you run it:
+
+- `npm ci` deletes and reinstalls `frontend/node_modules`, so stop `npm run dev` first.
+- `scripts/ci.sh --fast` skips the mutation score and only lints the frontend, and only if `frontend/node_modules` already exists (otherwise it prints a SKIP line).
+- `scripts/ci.sh --docker` adds the Docker persistence test and needs Docker.
+- Without npm the frontend steps are skipped on your machine (and fail on GitHub, where `CI=true`).
 
 ## If something goes wrong
 
 - **"Can't reach the backend at http://localhost:8000. Is it running?":** the backend is not running, or it is on another port. Start it (step 1) or set `VITE_BACKEND_URL`.
 - **A blank page and `504 Outdated Optimize Dep` in the browser console:** the dev server has a stale dependency cache (this happens after `npm install` adds a package). Stop `npm run dev` (Ctrl+C) and start it again.
 - **The 3D court or Deni's 3D figure does not show:** the browser has no WebGL. The map falls back to the backend's flat chart, and Deni to a drawn face (see "Without WebGL" below).
-- **Deni does not speak:** browsers block speech until you have clicked something on the page, and the sound button (top bar) and his Voice switch must be on.
+- **Deni does not speak:** browsers block speech until you have clicked something on the page, and the sound button (top bar) and his Voice switch must be on. A browser with no text to speech at all stays silent (the caption still shows); the HD voice button can still give him a voice there if the browser supports WebAssembly and AudioContext.
 
 ## Court orientation (shot map)
 
