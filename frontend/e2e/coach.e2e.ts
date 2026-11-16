@@ -192,7 +192,9 @@ test.describe('Deni’s big view', () => {
       await page.mouse.up()
     }
     await page.waitForTimeout(600)
-    expect(await caption(page).innerText()).toBe(before)
+    // No poke reaction: the caption is still his greeting, or it has timed out and hidden itself (a slow machine takes
+    // long enough over the drags for that). A poke would put a new line there.
+    expect([before, '']).toContain(await caption(page).innerText())
   })
 
   test('the cheat code works anywhere on the page', async ({ page }) => {
