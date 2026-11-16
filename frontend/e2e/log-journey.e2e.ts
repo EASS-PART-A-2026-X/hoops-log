@@ -149,13 +149,20 @@ test('"Show on map" closes the drawer and selects the shot; clearing the selecti
   await expect(page.locator('.stage-clear')).toHaveCount(0)
 })
 
-test('XP grows with each shot and the level badge follows', async ({ page }) => {
+test('XP grows with each saved shot', async ({ page }) => {
   await openApp(page)
-  const bug = page.getByRole('group', { name: /level \d+/ })
-  await expect(bug).toHaveAttribute('aria-label', /level 1 rookie/i)
+  const xp = page.getByRole('progressbar', { name: 'XP to next level' })
+  const level = () => page.getByRole('group', { name: /: level \d+/ }).getAttribute('aria-label')
+  await expect(page.getByRole('group', { name: /level 1 rookie/i })).toBeVisible()
+  let before = Number(await xp.getAttribute('aria-valuenow'))
+  expect(before).toBe(0)
   for (let i = 0; i < 3; i++) {
     await addShotViaForm(page, { player: 'Yuly', x: 25, y: 6 + i, made: true })
-    await expect(notice(page)).toContainText('Saved shot')
+    await expect(notice(page)).toContainText(`Saved shot`)
+    // Each saved shot adds XP (a few points for logging it, more for a make), and three of them stay in level 1.
+    await expect.poll(async () => Number(await xp.getAttribute('aria-valuenow'))).toBeGreaterThan(before)
+    before = Number(await xp.getAttribute('aria-valuenow'))
+    // Wait for the notice to go before the next one (it is replaced by the next save).
   }
-  await expect(page.getByRole('progressbar', { name: 'XP to next level' })).toHaveAttribute('aria-valuenow', /^[1-9]\d*$/)
+  expect(await level()).toMatch(/level 1 rookie/i)
 })

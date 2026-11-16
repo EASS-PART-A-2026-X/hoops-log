@@ -10,17 +10,23 @@ test.describe('the API contract the frontend relies on', () => {
     expect(await res.json()).toEqual({ status: 'ok' })
   })
 
-  test('a browser on the frontend origin may call it, and another origin may not', async ({ request }) => {
-    const ask = (origin: string) =>
+  test('the frontend origins in the allow-list may call it, and other origins and methods may not', async ({ request }) => {
+    const ask = (origin: string, method = 'POST') =>
       request.fetch(`${BACKEND_URL}/shots`, {
         method: 'OPTIONS',
-        headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' },
+        headers: { Origin: origin, 'Access-Control-Request-Method': method, 'Access-Control-Request-Headers': 'content-type' },
       })
-    const ok = await ask('http://localhost:5173')
-    expect(ok.status()).toBe(200)
-    expect(ok.headers()['access-control-allow-origin']).toBe('http://localhost:5173')
-    const bad = await ask('https://evil.example')
-    expect(bad.headers()['access-control-allow-origin']).toBeUndefined()
+    for (const origin of ['http://localhost:5173', 'http://127.0.0.1:5173']) {
+      const ok = await ask(origin)
+      expect(ok.status(), origin).toBe(200)
+      expect(ok.headers()['access-control-allow-origin'], origin).toBe(origin)
+    }
+    // This is the one thing the browser tests cannot show: they run from another port, with the headers added by the test.
+    for (const origin of ['https://evil.example', 'http://localhost:5199', 'http://localhost:5174']) {
+      expect((await ask(origin)).headers()['access-control-allow-origin'], origin).toBeUndefined()
+    }
+    const odd = await ask('http://localhost:5173', 'PUT')
+    expect(odd.status()).toBe(400)
   })
 
   test('create, read, change and delete one shot; ids are never reused', async ({ api, request }) => {
@@ -74,16 +80,25 @@ test.describe('the API contract the frontend relies on', () => {
     expect(await (await request.get(`${BACKEND_URL}/shots?offset=5000`)).json()).toEqual([])
   })
 
-  test('/chart.svg is a valid SVG, can be filtered by player, and an unknown player gets an empty chart', async ({ api, request }) => {
-    await api.seed([...makeShots('Yuly', 5, { seed: 42 }), ...makeShots('Noam', 3, { seed: 43 })])
-    const all = await request.get(`${BACKEND_URL}/chart.svg`)
-    expect(all.status()).toBe(200)
-    expect(all.headers()['content-type']).toContain('image/svg+xml')
-    expect(await all.text()).toMatch(/^<svg[\s\S]*<\/svg>\s*$/)
-    const yuly = await (await request.get(`${BACKEND_URL}/chart.svg?player=yuly`)).text()
-    const noam = await (await request.get(`${BACKEND_URL}/chart.svg?player=Noam`)).text()
-    expect(yuly).not.toBe(noam)
-    expect((await request.get(`${BACKEND_URL}/chart.svg?player=Nobody`)).status()).toBe(200)
+  test('/chart.svg is a valid SVG with one mark per shot, can be filtered by player (any capitals), and an unknown player gets an empty chart', async ({ api, request }) => {
+    await api.seed([
+      ...[true, true, true, true, false].map((made, i) => ({ player: 'Yuly', x: 10 + i * 6, y: 12 + i, made })),
+      ...[true, true, false].map((made, i) => ({ player: 'Noam', x: 40 - i * 5, y: 20 + i, made })),
+    ])
+    const marks = (svg: string) => ({ made: (svg.match(/fill="#1a7f37"/g) ?? []).length, missed: (svg.match(/stroke="#cf222e"/g) ?? []).length })
+    const chart = async (query = '') => {
+      const res = await request.get(`${BACKEND_URL}/chart.svg${query}`)
+      expect(res.status()).toBe(200)
+      expect(res.headers()['content-type']).toContain('image/svg+xml')
+      const text = await res.text()
+      expect(text).toMatch(/^<svg[\s\S]*<\/svg>\s*$/)
+      return marks(text)
+    }
+    expect(await chart()).toEqual({ made: 6, missed: 2 })
+    expect(await chart('?player=Yuly')).toEqual({ made: 4, missed: 1 })
+    expect(await chart('?player=yuly')).toEqual({ made: 4, missed: 1 })
+    expect(await chart('?player=NOAM')).toEqual({ made: 2, missed: 1 })
+    expect(await chart('?player=Nobody')).toEqual({ made: 0, missed: 0 })
     expect((await request.get(`${BACKEND_URL}/chart.svg?player=${'x'.repeat(51)}`)).status()).toBe(422)
   })
 

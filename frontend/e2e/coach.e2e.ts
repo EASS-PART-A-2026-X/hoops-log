@@ -207,9 +207,17 @@ test.describe('Deni’s big view', () => {
     await openApp(page)
     await drawerToggle(page).click()
     await page.getByRole('button', { name: /Add a shot/ }).click()
-    await page.locator('#shots-drawer').getByLabel('Note (optional)').focus()
+    const note = page.locator('#shots-drawer').getByLabel('Note (optional)')
+    await note.fill('x')
+    await note.focus()
     const before = await caption(page).innerText()
     for (const key of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']) await page.keyboard.press(key)
+    // The keys went into the field (the b and the a were typed after the x; the arrows only moved the cursor)...
+    await expect(note).toHaveValue(/b/)
+    await expect(note).toHaveValue(/a/)
+    // ...and the code did not fire. (The same keys outside a field do fire it: see the test above.)
+    await page.waitForTimeout(600)
+    await expect(caption(page)).not.toContainText('Cheat code accepted')
     expect(await caption(page).innerText()).toBe(before)
   })
 
@@ -265,16 +273,22 @@ test.describe('Deni’s voice', () => {
     await expect(dialog(page).getByRole('button', { name: /^Voice:/ })).toContainText('off')
   })
 
-  test('the sound button in the top bar silences him too', async ({ page }) => {
+  test('the sound button in the top bar silences him too: with the sound on he speaks, with it off he does not', async ({ page }) => {
     await stubSpeech(page)
     await openApp(page)
-    // The sound button sits outside his dialog (a click out there would close it), so mute first.
+    await face(page).click()
+    // Positive control: with the sound on, a question is spoken.
+    await ask(page, 'How do XP and levels work?')
+    await expect.poll(async () => (await spoken(page)).filter((t) => /XP/.test(t)).length).toBeGreaterThanOrEqual(1)
+    // The sound button sits outside his dialog (a click out there would close it), so close it first.
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Sound is on, turn it off' }).click()
     await expect(page.getByRole('button', { name: 'Sound is off, turn it on' })).toBeVisible()
     await face(page).click()
     const count = (await spoken(page)).length
-    await ask(page, 'How do XP and levels work?')
-    await page.waitForTimeout(500)
+    await ask(page, 'Tell me something about Deni')
+    await expect(caption(page)).not.toHaveText('') // he still answers, in writing
+    await page.waitForTimeout(600)
     expect((await spoken(page)).length).toBe(count)
   })
 
@@ -288,6 +302,7 @@ test.describe('Deni’s voice', () => {
   })
 
   test('the HD voice offers a download, and when the model cannot be fetched he says so and keeps talking with the browser voice', async ({ page }) => {
+    test.setTimeout(120_000)
     await stubSpeech(page)
     await openApp(page)
     await face(page).click()
@@ -295,8 +310,7 @@ test.describe('Deni’s voice', () => {
     await expect(hd).toContainText('off (one-time 90 MB download)')
     await expect(hd).toHaveAttribute('aria-pressed', 'false')
     await hd.click()
-    await expect(hd).toContainText(/could not load, tap to try again|downloading/, { timeout: 30_000 })
-    await expect(hd).toContainText('could not load, tap to try again', { timeout: 60_000 })
+    await expect(hd).toContainText('could not load, tap to try again', { timeout: 90_000 })
     await ask(page, 'How do XP and levels work?')
     await expect.poll(async () => (await spoken(page)).some((t) => /XP/.test(t))).toBe(true)
   })

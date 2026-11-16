@@ -6,8 +6,8 @@ const tabs = (page: Page) => page.getByRole('navigation', { name: 'Pages' })
 test.describe('vs NBA', () => {
   test('with no shots it asks for some instead of inventing a result', async ({ page }) => {
     await openApp(page, 'vs NBA')
-    await expect(page.getByText(/vs NBA average/i).first()).toBeVisible()
-    await expect(page.locator('.vs-score, [aria-label^="Areas led"]')).toHaveCount(0)
+    await expect(page.getByText('No shots yet. Log some on the My log tab and they show up here.')).toBeVisible()
+    await expect(page.getByRole('img', { name: /^Areas led:/ })).toHaveCount(0)
   })
 
   test('choose a player to compare with: the page, the header and the verdict follow', async ({ page, api }) => {
@@ -100,7 +100,7 @@ test.describe('Players', () => {
     const dialog = page.getByRole('dialog', { name: 'Shot card of Yuly' })
     await expect(dialog).toBeVisible()
     const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Download card' }).click()])
-    expect(download.suggestedFilename()).toMatch(/\.png$/i)
+    expect(download.suggestedFilename()).toBe('hoops-log-card-yuly.png')
     const path = await download.path()
     const { readFile } = await import('node:fs/promises')
     const bytes = await readFile(path)
@@ -127,8 +127,8 @@ test.describe('Players', () => {
     await openApp(page, 'Players')
     await page.locator('li.player-you').click()
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download card' }).click()])
-    expect(download.suggestedFilename()).toMatch(/\.png$/i)
-    expect(download.suggestedFilename().length).toBeGreaterThan(5)
+    // Letters of any alphabet are kept in the name; only punctuation and spaces become dashes.
+    expect(download.suggestedFilename()).toBe('hoops-log-card-יולי.png')
   })
 })
 

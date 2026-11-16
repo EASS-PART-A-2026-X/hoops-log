@@ -1,26 +1,65 @@
 import { addShotViaForm, dayString, drawer, expect, fillShotForm, kpi, notice, openApp, openDrawer, shotRow, test } from './support'
 
+/** Press Add shot and wait for the backend's answer, so what is checked next is not read before the request is done. */
+async function submitAndExpectStatus(page: import('@playwright/test').Page, form: import('@playwright/test').Locator, status: number): Promise<void> {
+  const [response] = await Promise.all([
+    page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/shots')),
+    form.getByRole('button', { name: 'Add shot' }).click(),
+  ])
+  expect(response.status()).toBe(status)
+}
+
 /** The browser's own checks (min, max, required) stop most bad input before it is sent; turn them off to meet the backend's. */
 async function skipBrowserChecks(page: import('@playwright/test').Page): Promise<void> {
   await page.locator('form.shot-form').first().evaluate((form) => form.setAttribute('novalidate', ''))
 }
 
 test.describe('the browser stops bad input before anything is sent', () => {
-  test('numbers outside the court, an empty player and a missing result cannot be submitted', async ({ page, api }) => {
+  test('an empty form, numbers outside the court and a missing player each stop at the form, and nothing is sent', async ({ page, api }) => {
+    let posts = 0
+    page.on('request', (r) => {
+      if (r.method() === 'POST' && r.url().endsWith('/shots')) posts += 1
+    })
     await openApp(page)
     await openDrawer(page, 'add')
     const form = drawer(page).locator('form.shot-form').first()
-    // Empty everything: nothing is sent.
-    await form.getByRole('button', { name: 'Add shot' }).click()
-    // Out of range.
-    await fillShotForm(form, { player: 'Yuly', x: 51, y: 10 })
-    await form.getByRole('button', { name: 'Add shot' }).click()
-    await fillShotForm(form, { player: 'Yuly', x: 10, y: 48 })
-    await form.getByRole('button', { name: 'Add shot' }).click()
-    await fillShotForm(form, { player: 'Yuly', x: -1, y: 10 })
-    await form.getByRole('button', { name: 'Add shot' }).click()
+    const submit = async () => {
+      await form.getByRole('button', { name: 'Add shot' }).click()
+      expect(await form.evaluate((f: HTMLFormElement) => f.checkValidity()), 'the form should be invalid').toBe(false)
+    }
+    const x = form.getByLabel(/^X \(/)
+    const y = form.getByLabel(/^Y \(/)
+    const player = form.getByLabel('Player')
+    // Nothing filled in.
+    await player.fill('')
+    await submit()
+    expect(await player.evaluate((el: HTMLInputElement) => el.validity.valueMissing)).toBe(true)
+    // A name but no position.
+    await fillShotForm(form, { player: 'Yuly', x: '', y: '' })
+    await submit()
+    expect(await x.evaluate((el: HTMLInputElement) => el.validity.valueMissing)).toBe(true)
+    // Outside the court, each way.
+    for (const [bad, field, flag] of [
+      [{ x: 51, y: 10 }, x, 'rangeOverflow'],
+      [{ x: 10, y: 48 }, y, 'rangeOverflow'],
+      [{ x: -1, y: 10 }, x, 'rangeUnderflow'],
+      [{ x: 10, y: -3 }, y, 'rangeUnderflow'],
+    ] as const) {
+      await fillShotForm(form, { player: 'Yuly', ...bad })
+      await submit()
+      expect(await field.evaluate((el: HTMLInputElement, f) => el.validity[f as 'rangeOverflow'], flag), `${JSON.stringify(bad)} ${flag}`).toBe(true)
+    }
+    expect(posts).toBe(0)
     expect(await api.list()).toEqual([])
-    expect(await form.getByLabel(/^X \(/).evaluate((el: HTMLInputElement) => el.validity.rangeUnderflow)).toBe(true)
+  })
+
+  test('the result is always one of Made or Missed (Made is chosen from the start, so it cannot be left out)', async ({ page }) => {
+    await openApp(page)
+    await openDrawer(page, 'add')
+    const form = drawer(page).locator('form.shot-form').first()
+    await expect(form.getByRole('radio', { name: 'Made' })).toBeChecked()
+    await form.getByRole('radio', { name: 'Missed' }).check()
+    await expect(form.getByRole('radio', { name: 'Made' })).not.toBeChecked()
   })
 
   test('the player name stops at 50 characters', async ({ page }) => {
@@ -34,13 +73,13 @@ test.describe('the browser stops bad input before anything is sent', () => {
 
 test.describe('the backend has the last word, and the form says what it said', () => {
   test('numbers outside the court come back as a plain sentence, and what you typed stays', async ({ page, api, guard }) => {
-    guard.allow(/422/)
+    guard.allow(/^http 422 POST \S+\/shots$/)
     await openApp(page)
     await openDrawer(page, 'add')
     await skipBrowserChecks(page)
     const form = drawer(page).locator('form.shot-form').first()
     await fillShotForm(form, { player: 'Yuly', x: 60, y: 10, note: 'keep me' })
-    await form.getByRole('button', { name: 'Add shot' }).click()
+    await submitAndExpectStatus(page, form, 422)
     const alert = form.getByRole('alert')
     await expect(alert).toBeVisible()
     await expect(alert).not.toContainText('{')
@@ -56,19 +95,19 @@ test.describe('the backend has the last word, and the form says what it said', (
   })
 
   test('a game date in the future is refused', async ({ page, api, guard }) => {
-    guard.allow(/422/)
+    guard.allow(/^http 422 POST \S+\/shots$/)
     await openApp(page)
     await openDrawer(page, 'add')
     await skipBrowserChecks(page)
     const form = drawer(page).locator('form.shot-form').first()
     await fillShotForm(form, { player: 'Yuly', date: '2999-01-01', x: 20, y: 20 })
-    await form.getByRole('button', { name: 'Add shot' }).click()
+    await submitAndExpectStatus(page, form, 422)
     await expect(form.getByRole('alert')).toContainText(/future/i)
     expect(await api.list()).toEqual([])
   })
 
   test('a note longer than 200 characters is refused by the backend, not cut silently', async ({ page, api, guard }) => {
-    guard.allow(/422/)
+    guard.allow(/^http 422 POST \S+\/shots$/)
     await openApp(page)
     await openDrawer(page, 'add')
     await skipBrowserChecks(page)
@@ -79,7 +118,7 @@ test.describe('the backend has the last word, and the form says what it said', (
       el.removeAttribute('maxlength')
     })
     await form.getByLabel('Note (optional)').fill('n'.repeat(201))
-    await form.getByRole('button', { name: 'Add shot' }).click()
+    await submitAndExpectStatus(page, form, 422)
     await expect(form.getByRole('alert')).toBeVisible()
     expect(await api.list()).toEqual([])
   })
@@ -127,31 +166,33 @@ test.describe('odd but valid text is stored as typed and drawn as text, never ru
   })
 
   test('spaces around the name are trimmed, and a name of only spaces is refused', async ({ page, api, guard }) => {
-    guard.allow(/422/)
+    guard.allow(/^http 422 POST \S+\/shots$/)
     await openApp(page)
     await addShotViaForm(page, { player: '   Yuly   ', x: 25, y: 8, made: true })
     await expect(notice(page)).toContainText('for Yuly.')
     expect((await api.list())[0]!.player).toBe('Yuly')
-    await addShotViaForm(page, { player: '     ', x: 25, y: 8, made: true })
-    await expect(drawer(page).locator('form.shot-form').first().getByRole('alert')).toBeVisible()
+    await openDrawer(page, 'add')
+    const form = drawer(page).locator('form.shot-form').first()
+    await fillShotForm(form, { player: '     ', x: 25, y: 8, made: true })
+    await submitAndExpectStatus(page, form, 422)
+    await expect(form.getByRole('alert')).toBeVisible()
     expect(await api.list()).toHaveLength(1)
   })
 
-  test('two players whose names differ only in capitals are one person in the picker', async ({ page, api }) => {
-    // KNOWN GAP (see PROGRESS.md, "case-insensitive names everywhere"): the backend's player filter ignores case
-    // but the picker lists "yuly" and "YULY" as two people. This test is expected to fail until that is fixed;
-    // when it starts passing Playwright reports it, and the line below should be deleted.
-    test.fail(true, 'the picker is still case-sensitive')
+  test('KNOWN GAP: names that differ only in capital letters are listed as two people in the picker', async ({ page, api }) => {
+    // The backend's player filter ignores case, so "yuly" and "YULY" should be one person. The picker still lists them
+    // separately. This test pins today's behaviour so that fixing the gap fails it on purpose: when the picker shows one
+    // person, change the 3 below to 2 and rename the test.
     await api.seed([
       { player: 'yuly', x: 25, y: 8, made: true },
       { player: 'YULY', x: 20, y: 20, made: false },
     ])
     await openApp(page)
     await page.getByRole('combobox', { name: /^Shots of:/ }).click()
-    // "Every player" plus one person, not two.
-    await expect(page.getByRole('option')).toHaveCount(2)
+    await expect(page.getByRole('option')).toHaveText([/Every player/, /yuly/i, /yuly/i])
     await page.keyboard.press('Escape')
-    await expect(kpi(page, 'SHOTS')).toHaveText('2')
+    // The same gap shows in the numbers: each spelling counts as its own person (1 shot each), not 2 shots for one.
+    await expect(kpi(page, 'SHOTS')).toHaveText('1')
   })
 })
 

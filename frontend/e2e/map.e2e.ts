@@ -29,7 +29,9 @@ test.describe('the 3D court', () => {
     await openApp(page)
     await expect(kpi(page, 'SHOTS')).toHaveText(String(want.attempts))
     await expect(kpi(page, 'FIELD GOAL')).toHaveText(`${want.fg}%`)
-    if (want.three !== null) await expect(kpi(page, 'THREE POINT')).toHaveText(`${want.three}%`)
+    // The data set has threes (checked, so a change to makeShots cannot turn this into a silent no-op).
+    expect(want.three).not.toBeNull()
+    await expect(kpi(page, 'THREE POINT')).toHaveText(`${want.three}%`)
   })
 
   test('the zone list adds up to the shots on the court', async ({ page, api }) => {

@@ -1,13 +1,16 @@
 import type { Locator, Page } from '@playwright/test'
-import { BACKEND_URL } from './env'
 import { expect, kpi, makeShots, openApp, openDrawer, rng, test } from './support'
 
 /**
- * A monkey: it does random things to the page, fast, with a seeded random generator, so a run that finds a
- * problem can be replayed exactly (same seed, same actions). After every action the browser must not have
- * reported an error, and at the end the screen must agree with the backend.
+ * A monkey: it does random things to the page, fast, with a seeded random generator. After every action the browser
+ * must not have reported an error, most steps must have been real actions (an inert monkey fails), and at the end the
+ * screen must agree with the backend.
  *
- *   E2E_MONKEY_SEEDS=7,8,9 E2E_MONKEY_STEPS=200 npx playwright test monkey
+ * The seed makes a run start the same way, but it is not a guaranteed replay: what can be clicked depends on timing (a
+ * court still loading, an action that timed out), and a different count of random numbers drawn changes everything after
+ * it. So a failure prints the actions it really did (the log), and the log is what to reproduce from.
+ *
+ *   E2E_MONKEY_SEEDS=7,8,9 E2E_MONKEY_STEPS=200 npx playwright test --project=full monkey
  */
 const SEEDS = (process.env.E2E_MONKEY_SEEDS ?? '1,2,3,4').split(',').map(Number)
 const STEPS = Number(process.env.E2E_MONKEY_STEPS ?? 70)
@@ -67,14 +70,14 @@ async function usable(page: Page, selector: string): Promise<number[]> {
 const pickFrom = <T>(next: () => number, list: T[]): T | undefined => list[Math.floor(next() * list.length)]
 
 for (const seed of SEEDS) {
-  test(`monkey, seed ${seed}: ${STEPS} random actions and the app is still standing and still right`, async ({ page, api, guard }, testInfo) => {
+  test(`monkey, seed ${seed}: random actions, then the app is still standing and still right`, async ({ page, api, guard }, testInfo) => {
     test.setTimeout(240_000)
-    const fast = testInfo.project.name === 'fast'
-    test.skip(fast && seed !== SEEDS[0], 'the fast run does one seed; the full run does them all')
-    const steps = fast ? FAST_STEPS : STEPS
-    // Bad input legitimately comes back as 4xx and the browser logs that; a 5xx or a script error is never fine.
-    guard.allow(/Failed to load resource: the server responded with a status of 4\d\d/)
-    page.on('dialog', (d) => void d.dismiss().catch(() => {}))
+    // The fast project only runs the first seed (see its grepInvert in the config), and a shorter one.
+    const steps = testInfo.project.name === 'fast' ? FAST_STEPS : STEPS
+    // Bad input legitimately comes back as 422, and a shot the monkey deleted behind the page's back is a 404 when the page
+    // edits or deletes it. Only those, only for writes to /shots: a 404 on a script or the chart, or any 5xx, still fails.
+    guard.allow(/^http (422|404) (POST|PATCH|DELETE) \S+\/shots(\/\d+)?$/)
+    // (An alert, confirm or prompt also fails the run: the page fixture records every dialog.)
 
     const next = rng(seed)
     const log: string[] = []
@@ -149,7 +152,7 @@ for (const seed of SEEDS) {
           const victim = pickFrom(next, rows)
           if (!victim) return note('delete behind the page: nothing to delete')
           note(`someone else deletes shot #${victim.id}`)
-          await page.request.delete(`${BACKEND_URL}/shots/${victim.id}`)
+          await api.remove(victim.id)
         } else {
           note('someone else adds a shot')
           await api.add({ player: next() < 0.5 ? 'Yuly' : 'Maya', x: Math.round(next() * 50), y: Math.round(next() * 47), made: next() < 0.5 })
@@ -160,6 +163,7 @@ for (const seed of SEEDS) {
       }
     }
 
+    const real = () => log.filter((line) => !/nothing to|no Shots button|no canvas|skipped:/.test(line)).length
     const report = (i: number) => `seed ${seed}, after step ${i}. Last actions:\n${log.slice(-14).join('\n')}`
     for (let i = 0; i < steps; i++) {
       await step(i)
@@ -167,10 +171,14 @@ for (const seed of SEEDS) {
       if (bad.length > 0) throw new Error(`the browser reported a problem: ${bad.join(' | ')}\n${report(i)}`)
       // The page may be a moment into loading (after a reload), so give it a few seconds before calling it blank.
       const alive = await page
-        .waitForFunction(() => document.body.innerText.trim().length > 20 && !!document.querySelector('nav[aria-label=Pages]'), undefined, { timeout: 15_000 })
+        .waitForFunction(() => document.body.innerText.trim().length > 100 && !!document.querySelector('nav[aria-label=Pages]') && !!document.querySelector('h2'), undefined, { timeout: 15_000 })
         .then(() => true, () => false)
       if (!alive) throw new Error(`the page went blank or lost its navigation\n${report(i)}`)
     }
+
+    // A monkey that could not do anything (every click skipped) would pass the checks above for the wrong reason, so most of
+    // its steps must have been real actions.
+    expect(real(), `only ${real()} of ${steps} steps did something\n${log.join('\n')}`).toBeGreaterThanOrEqual(Math.floor(steps * 0.35))
 
     // The screen and the backend agree once everything has settled (patient again: this is a full page load).
     page.setDefaultTimeout(30_000)

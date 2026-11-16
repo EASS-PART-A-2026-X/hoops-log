@@ -4,11 +4,38 @@ export const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 5199)
 export const BACKEND_URL = process.env.E2E_BACKEND_URL ?? `http://127.0.0.1:${BACKEND_PORT}`
 export const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${FRONTEND_PORT}`
 
-/** The usual dev backend. Your own shots live there, so the tests refuse to write to it. */
-export const FORBIDDEN_PORT = '8000'
+/** The usual dev servers. Your own shots live behind them, so the tests never touch them. */
+export const FORBIDDEN_PORTS = ['8000', '5173']
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
+/**
+ * The backend the tests write to (and `Api.clear()` empties before every test) must be a throwaway one: this machine
+ * only, an explicit port, and not the usual dev port. It is checked for the API helper, in the Playwright config
+ * (before anything is started) and for every request the browser makes (see `support.ts`), so a wrong URL stops the
+ * run instead of wiping real data.
+ */
 export function assertSafeBackend(url: string = BACKEND_URL): void {
-  if (new URL(url).port === FORBIDDEN_PORT) {
-    throw new Error(`Refusing to run the e2e tests against ${url}: that is the real dev backend (port ${FORBIDDEN_PORT}).`)
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error(`Refusing to run the e2e tests: "${url}" is not a URL.`)
+  }
+  if (!LOOPBACK.has(parsed.hostname)) {
+    throw new Error(`Refusing to run the e2e tests against ${url}: only this machine (127.0.0.1 or localhost) is allowed, because the tests delete every shot.`)
+  }
+  if (parsed.port === '') {
+    throw new Error(`Refusing to run the e2e tests against ${url}: give the throwaway backend an explicit port (the default is ${BACKEND_PORT}).`)
+  }
+  if (FORBIDDEN_PORTS.includes(parsed.port)) {
+    throw new Error(`Refusing to run the e2e tests against ${url}: that is the real dev backend (port ${parsed.port}).`)
+  }
+}
+
+/** The page the tests open must not be the usual dev frontend either: it is wired to the real backend. */
+export function assertSafeFrontend(url: string = BASE_URL): void {
+  const parsed = new URL(url)
+  if (!LOOPBACK.has(parsed.hostname) || parsed.port === '' || FORBIDDEN_PORTS.includes(parsed.port)) {
+    throw new Error(`Refusing to run the e2e tests against the frontend at ${url}: use a throwaway one on this machine with its own port (the default is ${FRONTEND_PORT}).`)
   }
 }

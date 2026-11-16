@@ -1,6 +1,6 @@
 import { expect, test as base } from '@playwright/test'
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
-import { BACKEND_URL, assertSafeBackend } from './env'
+import { BACKEND_URL, BASE_URL, assertSafeBackend, assertSafeFrontend } from './env'
 
 // ---------------------------------------------------------------------------------------------
 // Data: talk to the backend directly, the way a script or another client would.
@@ -49,10 +49,14 @@ export class Api {
     return rows
   }
 
+  async remove(id: number): Promise<void> {
+    const res = await this.request.delete(`${BACKEND_URL}/shots/${id}`)
+    expect(res.status(), `deleting shot #${id}`).toBe(204)
+  }
+
   async clear(): Promise<void> {
     for (const shot of await this.list()) {
-      const res = await this.request.delete(`${BACKEND_URL}/shots/${shot.id}`)
-      expect(res.status()).toBe(204)
+      await this.remove(shot.id)
     }
   }
 }
@@ -115,10 +119,22 @@ export function makeShots(player: string, count: number, opts: { seed?: number; 
 // throwaway backend (which does not know this page's origin, so the page route adds the CORS headers).
 // ---------------------------------------------------------------------------------------------
 
+/** This machine (or a data:/blob:/about: URL, which never leaves the page). */
 const isLocal = (url: string): boolean => {
   try {
     const u = new URL(url)
     return !/^https?:$/.test(u.protocol) || u.hostname === '127.0.0.1' || u.hostname === 'localhost'
+  } catch {
+    return true
+  }
+}
+
+/** The only two servers the browser may talk to: the throwaway frontend and the throwaway backend. */
+const ALLOWED_ORIGINS = new Set([new URL(BASE_URL).origin, new URL(BACKEND_URL).origin])
+const isAllowedOrigin = (url: string): boolean => {
+  try {
+    const u = new URL(url)
+    return !/^https?:$/.test(u.protocol) || ALLOWED_ORIGINS.has(u.origin)
   } catch {
     return true
   }
@@ -169,6 +185,7 @@ export const test = base.extend<Fixtures>({
 
   page: async ({ page, guard, seenTitle, quiet }, provide) => {
     assertSafeBackend()
+    assertSafeFrontend()
     await page.addInitScript(
       ({ seenTitle, quiet }) => {
         try {
@@ -185,23 +202,60 @@ export const test = base.extend<Fixtures>({
       { seenTitle, quiet },
     )
 
+    let lastNavigation = 0
+    let closing = false
+    const navigating = () => {
+      lastNavigation = Date.now()
+    }
+    // The browser reports the requests a navigation cancels *before* it reports the navigation itself, so the time is taken
+    // when the test asks for the navigation (and again when one is reported, for navigations the page makes itself).
+    for (const name of ['goto', 'reload', 'goBack', 'goForward'] as const) {
+      const original = page[name].bind(page) as (...args: unknown[]) => Promise<unknown>
+      ;(page as unknown as Record<string, unknown>)[name] = (...args: unknown[]) => {
+        navigating()
+        return original(...args)
+      }
+    }
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) navigating()
+    })
     page.on('pageerror', (error) => guard.seen.push(`pageerror: ${error.message}`))
     page.on('console', (msg) => {
       if (msg.type() !== 'error') return
-      const url = msg.location().url
-      if (url && !isLocal(url)) return // a blocked outside image or font is not the app's fault
+      // "Failed to load resource" has no address in it: the response and requestfailed listeners below report those with
+      // the address, so they are not counted twice. Any other console error counts, wherever it comes from.
+      if (/^Failed to load resource/.test(msg.text())) return
       guard.seen.push(`console.error: ${msg.text()}`)
     })
     page.on('requestfailed', (request) => {
-      // ERR_ABORTED is the browser dropping a request on purpose (a reload, a page change), not a failure.
-      if (isLocal(request.url()) && request.failure()?.errorText !== 'net::ERR_ABORTED') guard.seen.push(`request failed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`)
+      if (!isLocal(request.url())) return // a blocked outside image or font is not the app's fault
+      const text = request.failure()?.errorText ?? ''
+      // ERR_ABORTED is the browser dropping a request because the page navigated (a reload) or is closing.
+      if (text === 'net::ERR_ABORTED' && (closing || Date.now() - lastNavigation < 5000)) return
+      guard.seen.push(`request failed: ${request.method()} ${request.url()} ${text}`)
     })
     page.on('response', (response) => {
-      if (isLocal(response.url()) && response.status() >= 500) guard.seen.push(`server error: ${response.status()} ${response.url()}`)
+      if (isLocal(response.url()) && response.status() >= 400) guard.seen.push(`http ${response.status()} ${response.request().method()} ${response.url()}`)
+    })
+    // An alert, confirm or prompt is never expected: if one opens (an executed script, say) the test fails.
+    page.on('dialog', (dialog) => {
+      guard.seen.push(`dialog: ${dialog.type()} "${dialog.message()}"`)
+      void dialog.dismiss().catch(() => {})
     })
 
-    // Hermetic: nothing leaves the machine (NBA photos fall back to drawn initials, no model downloads).
+    // Hermetic: nothing leaves the machine (NBA photos fall back to drawn initials, no model downloads), and the
+    // browser may only talk to the two throwaway servers. A request to anything else on this machine (the real backend
+    // on port 8000 above all) is stopped and fails the test.
     await page.route((url) => !isLocal(url.toString()), (route) => route.abort())
+    await page.route(
+      (url) => isLocal(url.toString()) && !isAllowedOrigin(url.toString()),
+      (route) => {
+        guard.seen.push(`blocked: the page asked for ${route.request().url()}, which is not one of the throwaway servers`)
+        return route.abort()
+      },
+    )
+    // The throwaway backend does not list this page's address in its CORS allow-list (it is not on 5173), so the answers
+    // get the headers here. The backend's real CORS rules are checked over plain HTTP in api.e2e.ts, not in the browser.
     await page.route(`${BACKEND_URL}/**`, async (route) => {
       const cors = {
         'access-control-allow-origin': '*',
@@ -213,6 +267,7 @@ export const test = base.extend<Fixtures>({
       return route.fulfill({ response, headers: { ...response.headers(), ...cors } })
     })
     await provide(page)
+    closing = true
   },
 })
 

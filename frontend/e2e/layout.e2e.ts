@@ -17,12 +17,23 @@ test.describe('a desktop window', () => {
     expect(court!.height).toBeGreaterThan(250)
   })
 
-  test('a short window still fits (compact mode)', async ({ page, api }) => {
+  test('a short window (680 high) still fits with no page scroll: compact mode', async ({ page, api }) => {
     await api.seed(makeShots('Yuly', 30, { seed: 72 }))
+    await page.setViewportSize({ width: 1280, height: 680 })
+    await openApp(page)
+    await expect(kpi(page, 'SHOTS')).toBeVisible()
+    expect(await noPageScroll(page)).toBe(true)
+    expect(await noSideScroll(page)).toBe(true)
+  })
+
+  test('a very short window (600 high) falls back to a normal scrolling page, never sideways', async ({ page, api }) => {
+    await api.seed(makeShots('Yuly', 30, { seed: 78 }))
     await page.setViewportSize({ width: 1280, height: 600 })
     await openApp(page)
     await expect(kpi(page, 'SHOTS')).toBeVisible()
     expect(await noSideScroll(page)).toBe(true)
+    // It scrolls down to the rest of the page instead of squeezing everything in.
+    expect(await noPageScroll(page)).toBe(false)
   })
 
   test('the shot list drawer slides over the page and closes with Escape and with its button', async ({ page, api }) => {
