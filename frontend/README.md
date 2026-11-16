@@ -1,22 +1,77 @@
 # Hoops Log frontend
 
-React + Vite + TypeScript. It runs in the browser and calls the backend directly, so the backend must allow this origin (CORS, `backend/app/main.py`).
+The browser app for Hoops Log: a 3D shot map, your shots compared with NBA players, a coach (Deni), XP and trophies. React 19, Vite, TypeScript and Three.js. It runs in the browser and calls the backend directly, so the backend must allow this origin (CORS, `backend/app/main.py`, which allows `http://localhost:5173` and `http://127.0.0.1:5173`).
 
-## Run
+## Run it
 
-Needs Node 24 or newer. Start the backend first (see the root README), then from `frontend/`:
+You need two programs running at once: the backend (API on port 8000) and this frontend (page on port 5173).
+
+**Requirements:** Node 24 or newer (with npm), [uv](https://docs.astral.sh/uv/) for the backend, and a browser with WebGL (any recent Chrome, Edge, Firefox or Safari).
+
+1. **Start the backend** in one terminal (details in the root README):
+
+   ```bash
+   cd backend
+   uv run fastapi dev        # http://localhost:8000
+   ```
+
+2. **Start the frontend** in a second terminal:
+
+   ```bash
+   cd frontend
+   npm install               # first time, and after the dependencies change
+   npm run dev               # http://localhost:5173
+   ```
+
+3. **Open http://localhost:5173** (use `localhost` or `127.0.0.1`, other addresses are blocked by the backend's CORS list). The first time in a tab you see a PRESS START screen; press it to enter. Add `?title` to the address to see it again.
+
+On a fresh backend database the app starts with three demo shots. The backend stores shots in SQLite, so they are still there after a restart.
+
+### Where the backend is
+
+The frontend calls `http://localhost:8000` by default. To use another backend, set `VITE_BACKEND_URL` when you start the dev server (it is read at build time, and the address must work from your browser, not only from the machine the server runs on):
 
 ```bash
-npm install
-npm run dev        # http://localhost:5173
+VITE_BACKEND_URL=http://localhost:9000 npm run dev
 ```
 
-## Check
+The backend's CORS list names the address of the page (the frontend, :5173), not the backend's own port, so a different backend port needs no CORS change. Only if you serve the frontend from another address or port must that address be added to `FRONTEND_ORIGINS` in `backend/app/main.py`.
+
+## What is in it
+
+- **My log**: the 3D court (heat map, 3D beams or flight paths), the shot list and the add-shot form in a drawer opened by the **Shots** button, "Watch shot" / "Watch session" replays, and a player dropdown in the top bar ("Shots of").
+- **vs NBA**: you against the league average or a chosen player, with a verdict and a face-off intro.
+- **Players**: a ranking of NBA players closest to your style, your shot card (downloadable as a PNG), and the "Compare my shots" baseline.
+- **XP, levels and trophies**: shown in the top bar; click the level badge for the trophy drawer.
+- **Deni, the coach**: the face in the bottom-right corner. Click it for the big view with a 3D figure and questions. He is a fan-made, scripted coach: his lines are written in advance and use your own shots, there is no AI. His voice uses your browser's text to speech.
+- **Optional HD voice**: a button in Deni's dialog. Off by default. When you switch it on, the browser downloads a speech model once (about 90 MB, from Hugging Face; the runtime comes from a public CDN) and makes the voice on your own device; what he says is never sent anywhere. Until it is ready, and if it fails, the browser's voice is used.
+
+The NBA player numbers are typed in by hand and rounded, and the player zone tiles are estimates, not real zone data.
+
+## Check it
+
+Run these from `frontend/`:
 
 ```bash
-npm run lint
-npm run build      # type-checks, then bundles
+npm run lint          # oxlint
+npm test              # Vitest + Testing Library, runs once, needs no browser or backend
+npm run build         # type-checks with tsc, then bundles into dist/
+npm run preview       # serves the built bundle (http://localhost:4173)
 ```
+
+From the repo root, `scripts/ci.sh` runs the backend checks (ruff, pytest and a mutation score, which takes about a minute) and then the frontend's `npm ci`, lint, tests and build. Things to know before you run it:
+
+- `npm ci` deletes and reinstalls `frontend/node_modules`, so stop `npm run dev` first.
+- `scripts/ci.sh --fast` skips the mutation score and only lints the frontend, and only if `frontend/node_modules` already exists (otherwise it prints a SKIP line).
+- `scripts/ci.sh --docker` adds the Docker persistence test and needs Docker.
+- Without npm the frontend steps are skipped on your machine (and fail on GitHub, where `CI=true`).
+
+## If something goes wrong
+
+- **"Can't reach the backend at http://localhost:8000. Is it running?":** the backend is not running, or it is on another port. Start it (step 1) or set `VITE_BACKEND_URL`.
+- **A blank page and `504 Outdated Optimize Dep` in the browser console:** the dev server has a stale dependency cache (this happens after `npm install` adds a package). Stop `npm run dev` (Ctrl+C) and start it again.
+- **The 3D court or Deni's 3D figure does not show:** the browser has no WebGL. The map falls back to the backend's flat chart, and Deni to a drawn face (see "Without WebGL" below).
+- **Deni does not speak:** browsers block speech until you have clicked something on the page, and the sound button (top bar) and his Voice switch must be on. A browser with no text to speech at all stays silent (the caption still shows); the HD voice button can still give him a voice there if the browser supports WebAssembly and AudioContext.
 
 ## Court orientation (shot map)
 
