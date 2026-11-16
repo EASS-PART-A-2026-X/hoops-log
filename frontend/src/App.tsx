@@ -24,6 +24,10 @@ import ScoreBug, { MuteButton } from './ScoreBug'
 import { play, unlockAudio } from './game/audio'
 import { useCelebrations } from './game/useCelebrations'
 import { levelInfo } from './game/xp'
+import Coach from './coach/Coach'
+import { useCoach } from './coach/useCoach'
+import { useCoachChatter } from './coach/useCoachChatter'
+import { useCoachEvents } from './coach/useCoachEvents'
 
 /** The drawer covers the page below this width (the layout breakpoint in index.css). */
 const NARROW = '(max-width: 960px)'
@@ -255,6 +259,32 @@ export default function App() {
   // True from the moment the player presses start, while the wipe is still running.
   const [started, setStarted] = useState(false)
   const covered = title && !started
+  const coachContext = useMemo(() => ({ shots: shooterShots ?? [], shooter }), [shooterShots, shooter])
+  const coach = useCoach()
+  useCoachChatter({
+    coach,
+    ready: !covered && shots !== null,
+    context: () => ({
+      shots: shooterShots ?? [],
+      shooter,
+      now: new Date(),
+      dates: (shooterShots ?? []).map((s) => s.game_date),
+      xpToNext: level.span - level.into,
+    }),
+  })
+  // The coach's big 3D view is open: the court behind it stops drawing, so only one 3D picture runs at a time.
+  const [coachOpen, setCoachOpen] = useState(false)
+  useCoachEvents({
+    coach,
+    shots,
+    truncated,
+    ready: !covered,
+    tab,
+    name: shooter,
+    shotCount: shooterShots?.length ?? 0,
+    rank: level.title,
+    toasts: celebrations.toasts,
+  })
   const titleStats = useMemo(
     () =>
       shooterShots
@@ -379,6 +409,7 @@ export default function App() {
             baseline={baseline}
             visible={tab === 'log'}
             suspended={covered}
+            paused={coachOpen}
           />
 
           {drawerOpen && <div className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />}
@@ -462,6 +493,7 @@ export default function App() {
           </aside>
         </div>
       </main>
+      <Coach coach={coach} context={coachContext} onOpenChange={setCoachOpen} />
     </div>
     </>
   )

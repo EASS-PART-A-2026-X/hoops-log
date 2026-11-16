@@ -32,6 +32,8 @@ interface Props {
   visible: boolean
   /** The page is covered (title screen): the 3D court stops drawing. */
   suspended?: boolean
+  /** Something covers the court for a while (the coach's big view): stop drawing, and carry on as it was after. */
+  paused?: boolean
 }
 
 interface Hover {
@@ -96,7 +98,7 @@ const RESULTS: [ResultFilter, string][] = [
 ]
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible, suspended = false }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible, suspended = false, paused = false }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
@@ -294,10 +296,10 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   useEffect(() => {
     const scene = sceneRef.current
     if (!scene) return
-    scene.setSuspended(suspended)
+    scene.setSuspended(suspended || paused)
     if (wasSuspended.current && !suspended) scene.playEntrance()
     wasSuspended.current = suspended
-  }, [suspended, ready])
+  }, [suspended, paused, ready])
 
   const [wasVisible, setWasVisible] = useState(visible)
   if (wasVisible !== visible) {
