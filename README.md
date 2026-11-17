@@ -1,5 +1,7 @@
 # Hoops Log
 
+Repository: https://github.com/EASS-PART-A-2026-X/hoops-log
+
 A shot-chart tracker for basketball players and coaches: log shots on a court, see where you score, and turn a messy game recap into structured shots.
 
 **Purpose:** shots recorded in notes apps and chat messages cannot be mapped or compared, so players never see where they are actually efficient.
@@ -30,7 +32,7 @@ One stateless service (FastAPI + Pydantic AI); it never touches the database. Th
    - Code rejects an answer if a number in it does not appear in the stats it was given, if a recommendation does not state how many shots it rests on, or if it recommends anything from a zone with too few attempts (for example under 10).
 
 ## Data flow
-browser -> frontend (:8501) -> backend (:8000) -> ai-service (:8001)
+browser -> frontend (:5173) -> backend (:8000) -> ai-service (:8001)
 
 Only the backend touches the database (SQLite) and calls the AI service.
 
@@ -45,7 +47,7 @@ cd backend
 uv run fastapi dev
 ```
 
-On first start the app creates `data/app.db` (git-ignored) and adds three demo shots if the table is empty. In a second terminal:
+On first start the app creates `data/app.db` (git-ignored) and adds three demo shots if the table is empty (if you delete every shot and restart, the three demo shots are added again, with new ids). In a second terminal:
 
 ```bash
 curl http://localhost:8000/health   # prints {"status":"ok"}
@@ -80,7 +82,8 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 | `GET /shots/{id}` | Read one (ids start at 1) | 200, 404, or 422 if the id is below 1 or above 2147483647 |
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, 404, or 422 (bad body, or an id below 1 or above 2147483647) |
 | `DELETE /shots/{id}` | Delete one | 204, 404, or 422 if the id is below 1 or above 2147483647 |
-| `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional. It ignores letter case and spaces around the name, so `yuly` and `Yuly` are the same player; it uses Unicode case folding, so `Straße` and `STRASSE` also match | 200 |
+| `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional. It ignores letter case and spaces around the name, so `yuly` and `Yuly` are the same player; it uses Unicode case folding, so `Straße` and `STRASSE` also match | 200, or 422 if `player` is empty or longer than 50 characters |
+| `GET /health` | Liveness check, returns `{"status":"ok"}` | 200 |
 
 ```bash
 curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/shots
