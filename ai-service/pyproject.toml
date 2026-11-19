@@ -1,0 +1,29 @@
+[project]
+name = "ai-service"
+version = "0.1.0"
+description = "Hoops Log AI service: turns pasted shot notes into proposed shots"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.148.0",
+    "pydantic-ai-slim[groq,openrouter]>=1.0.0",
+]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.14.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error"]
+
+[tool.ruff.lint]
+extend-select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PT", "RUF", "FAST"]

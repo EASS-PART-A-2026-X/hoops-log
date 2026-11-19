@@ -2,6 +2,7 @@
 # One command that says whether this repo is safe to merge.
 #
 #   scripts/ci.sh            lint, format, tests, mutation score   (about 1 minute)
+#                            (backend and ai-service; mutation score is backend only)
 #   scripts/ci.sh --docker   ...plus the Docker persistence and kill test
 #   scripts/ci.sh --fast     lint, format and tests only           (a few seconds)
 #
@@ -25,6 +26,9 @@ step() {  # step "name" command...
 step "ruff check"        uv run ruff check .
 step "ruff format"       uv run ruff format --check .
 step "pytest"            uv run pytest
+step "ai-service ruff check"  uv run --directory ../ai-service ruff check .
+step "ai-service ruff format" uv run --directory ../ai-service ruff format --check .
+step "ai-service pytest"      uv run --directory ../ai-service pytest
 if [ "$mode" != "--fast" ]; then
   step "mutation score >= 95%" uv run python ../scripts/mutation_score.py --min 95
 fi
