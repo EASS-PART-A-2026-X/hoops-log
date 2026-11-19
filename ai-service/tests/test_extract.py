@@ -194,3 +194,51 @@ def test_a_model_that_never_stops_calling_tools_is_cut_off(client, use_model):
         response = client.post("/extract", json=BODY)
     assert response.status_code == 502
     assert calls <= 6  # the request limit in app/routers/extract.py
+
+
+EMPTY = {"proposals": [], "questions": [], "skipped": []}
+
+
+def test_an_empty_answer_is_sent_back_so_the_model_asks_a_question(client, use_model):
+    attempts = 0
+
+    def model(messages, info: AgentInfo) -> ModelResponse:
+        nonlocal attempts
+        attempts += 1
+        args = EMPTY if attempts == 1 else {**EMPTY, "questions": ["Which shots?"]}
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, args)])
+
+    with use_model(FunctionModel(model)):
+        response = client.post("/extract", json={"text": "played well today"})
+    assert response.status_code == 200
+    assert attempts == 2
+    assert response.json()["questions"] == ["Which shots?"]
+
+
+def test_a_model_that_stays_silent_still_gets_a_fallback_question(client, use_model):
+    def model(messages, info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, EMPTY)])
+
+    with use_model(FunctionModel(model)):
+        response = client.post("/extract", json={"text": "played well today"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["proposals"] == []
+    assert len(data["questions"]) == 1
+    assert "where was it taken" in data["questions"][0]
+
+
+def test_only_skipped_things_is_a_real_answer_not_an_empty_one(client, use_model):
+    attempts = 0
+
+    def model(messages, info: AgentInfo) -> ModelResponse:
+        nonlocal attempts
+        attempts += 1
+        args = {**EMPTY, "skipped": ["2 free throws"]}
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, args)])
+
+    with use_model(FunctionModel(model)):
+        response = client.post("/extract", json={"text": "2 free throws"})
+    assert response.status_code == 200
+    assert attempts == 1  # accepted at once, no repair round
+    assert response.json()["questions"] == []

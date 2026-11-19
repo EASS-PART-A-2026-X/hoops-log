@@ -67,7 +67,9 @@ Answer (`200`):
 
 - `proposals`: at most 20 shots; `x` 0-50 and `y` 0-47 feet (the backend's court), so a proposal
   fits the backend's shot rules. `quote` is the words it came from.
-- `questions`: it asks instead of guessing (where, whether it went in, which day).
+- `questions`: it asks instead of guessing (where, whether it went in, which day). An answer
+  is never silent: with no shots, no questions and nothing skipped the model is sent back to
+  ask one (in the notes' language); if it still says nothing, a plain English question is added.
 - `skipped`: things that are not logged (free throws, assists...).
 
 | Status | When |
@@ -83,14 +85,15 @@ Error messages are plain sentences; provider details go to the server log only.
 ## Test it
 
 ```bash
-uv run pytest          # 29 tests, about a second
+uv run pytest          # 32 tests, about a second
 uv run ruff check . && uv run ruff format --check .
 ```
 
 Tests make **no** model calls: they use Pydantic AI's `TestModel` and `FunctionModel`, and
 `tests/conftest.py` sets `ALLOW_MODEL_REQUESTS = False` and clears `AI_MODEL` and the keys, so a
 test that reaches for a real model fails instead of calling out. They cover the contract, the
-prompt, the tool, the repair of bad output, every error status, and the runaway limit. They check
+prompt, the tool, the repair of bad output, the never-silent rule, every error status, and the
+runaway limit. They check
 the service's own behaviour, not how good a real model's answers are (that is the evaluation work).
 
 `scripts/ci.sh` runs this service's lint, format and tests together with the backend's.
