@@ -34,7 +34,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.148.0" },
-    { name = "pydantic-ai-slim", extras = ["groq", "openrouter"], specifier = ">=1.0.0" },
+    { name = "pydantic-ai-slim", extras = ["groq", "openrouter"], specifier = ">=2.71.0" },
 ]
 
 [package.metadata.requires-dev]

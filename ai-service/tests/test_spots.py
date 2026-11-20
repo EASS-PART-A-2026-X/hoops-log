@@ -1,10 +1,55 @@
-from math import hypot
+"""Every named spot is checked against the BACKEND's own court rules.
+
+The two services are separate programs, so the AI service cannot import the backend. But
+the backend's court.py uses only the standard library, so this test loads that one file
+by its path. If the backend changes a zone boundary, this fails here instead of letting
+the AI service propose a "corner three" that the backend would store as a mid-range 2PT.
+"""
+
+import importlib.util
+from pathlib import Path
 
 import pytest
 
 from app.spots import SPOTS, court_spot
 
-HOOP = (25.0, 5.25)
+BACKEND_COURT = Path(__file__).resolve().parents[2] / "backend" / "app" / "court.py"
+
+# (zone, shot type) each name must get from the backend.
+EXPECTED = {
+    "at_the_rim": ("restricted_area", "2PT"),
+    "left_block": ("paint", "2PT"),
+    "right_block": ("paint", "2PT"),
+    "left_elbow": ("left_elbow", "2PT"),
+    "right_elbow": ("right_elbow", "2PT"),
+    "free_throw_line": ("paint", "2PT"),
+    "left_corner_three": ("left_corner_3", "3PT"),
+    "right_corner_three": ("right_corner_3", "3PT"),
+    "left_wing_three": ("left_wing_3", "3PT"),
+    "right_wing_three": ("right_wing_3", "3PT"),
+    "top_of_key_three": ("top_3", "3PT"),
+}
+
+
+@pytest.fixture(scope="module")
+def backend_court():
+    assert BACKEND_COURT.is_file(), f"the backend's court.py moved: {BACKEND_COURT}"
+    spec = importlib.util.spec_from_file_location("backend_court", BACKEND_COURT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_expectations_cover_every_spot():
+    assert set(EXPECTED) == set(SPOTS)
+
+
+@pytest.mark.parametrize("name", sorted(SPOTS))
+def test_each_spot_is_classified_as_its_name_says(backend_court, name):
+    x, y = SPOTS[name]
+    zone, shot_type = EXPECTED[name]
+    assert backend_court.zone_of(x, y).value == zone, name
+    assert backend_court.shot_type_of(x, y).value == shot_type, name
 
 
 def test_every_spot_is_on_the_half_court():
@@ -13,27 +58,12 @@ def test_every_spot_is_on_the_half_court():
         assert 0 <= y <= 47, name
 
 
-@pytest.mark.parametrize("name", [n for n in SPOTS if n.endswith("_three")])
-def test_three_point_spots_are_outside_the_arc(name):
-    x, y = SPOTS[name]
-    # Corner threes are 22 ft from the hoop's centre line, everywhere else 23.75 ft.
-    if "corner" in name:
-        assert abs(x - HOOP[0]) >= 22.0, name
-    else:
-        assert hypot(x - HOOP[0], y - HOOP[1]) >= 23.75, name
-
-
-@pytest.mark.parametrize("name", [n for n in SPOTS if not n.endswith("_three")])
-def test_two_point_spots_are_inside_the_arc(name):
-    x, y = SPOTS[name]
-    assert hypot(x - HOOP[0], y - HOOP[1]) < 22.0, name
-
-
 def test_left_is_smaller_x_and_right_is_larger_x():
     for side in ("corner_three", "wing_three"):
         assert SPOTS[f"left_{side}"].x < 25 < SPOTS[f"right_{side}"].x
     assert SPOTS["left_elbow"].x < 25 < SPOTS["right_elbow"].x
+    assert SPOTS["left_block"].x < 25 < SPOTS["right_block"].x
 
 
 def test_court_spot_returns_labelled_feet():
-    assert court_spot("right_corner_three") == {"x": 47.0, "y": 3.0}
+    assert court_spot("right_corner_three") == {"x": 47.5, "y": 3.0}

@@ -1,7 +1,10 @@
+import hmac
 import logging
+import os
+import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic_ai import Agent, UsageLimits
 from pydantic_ai.exceptions import (
     ModelAPIError,
@@ -28,19 +31,45 @@ AgentDep = Annotated["Agent[None, ExtractionResult] | None", Depends(get_agent)]
 
 
 def _prompt(body: ExtractRequest) -> str:
-    # The notes sit between tags and are labelled as data, so text inside them is read
-    # as the user's words and not as instructions.
-    return f"today: {body.today.isoformat()}\n\n<notes>\n{body.text}\n</notes>"
+    # The notes sit between two markers and are labelled as data, so text inside them
+    # is read as the user's words, not as instructions. The marker has a random part
+    # that is new for every request: notes cannot contain the closing marker to
+    # "escape" it, because nobody can know it in advance.
+    marker = f"notes-{secrets.token_hex(6)}"
+    return (
+        f"today: {body.today.isoformat()}\n\n"
+        f"The player's notes are between <{marker}> and </{marker}>:\n"
+        f"<{marker}>\n{body.text}\n</{marker}>"
+    )
 
 
-@router.post("/extract", response_model=ExtractResponse)
+def require_token(
+    x_service_token: Annotated[str | None, Header()] = None,
+) -> None:
+    """If AI_SERVICE_TOKEN is set, /extract needs the same value in X-Service-Token.
+
+    The backend is this service's only caller. On a public host the token stops anyone
+    else from spending the model's quota. Unset = no check (local development).
+    """
+    expected = os.environ.get("AI_SERVICE_TOKEN", "")
+    if not expected:
+        return
+    if x_service_token is None or not hmac.compare_digest(
+        x_service_token.encode(), expected.encode()
+    ):
+        raise HTTPException(401, "Missing or wrong service token.")
+
+
+@router.post(
+    "/extract", response_model=ExtractResponse, dependencies=[Depends(require_token)]
+)
 async def extract(body: ExtractRequest, agent: AgentDep) -> ExtractResponse:
     """Turn pasted notes into PROPOSED shots. Nothing is saved here."""
     if agent is None:
         raise HTTPException(503, "No AI model is configured (set AI_MODEL).")
     try:
         run = await agent.run(_prompt(body), usage_limits=LIMITS)
-    except UserError as error:  # e.g. the provider's API key is missing
+    except UserError as error:  # the model is set up wrong: no key, unknown provider...
         log.error("AI model setup problem: %s", error)
         raise HTTPException(503, "The AI model is not set up correctly.") from error
     except (ModelRateLimitError, ModelQuotaExceededError) as error:
@@ -57,6 +86,9 @@ async def extract(body: ExtractRequest, agent: AgentDep) -> ExtractResponse:
         raise HTTPException(
             502, "The AI model could not give a usable answer."
         ) from error
+    except Exception as error:  # a bug, or a failure nobody planned for
+        log.exception("Unexpected error while asking the AI model")
+        raise HTTPException(500, "The AI service had an unexpected problem.") from error
     return ExtractResponse(
         **run.output.model_dump(), model=run.response.model_name or "unknown"
     )

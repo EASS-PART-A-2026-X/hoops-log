@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic_ai import models
 
-from app.agent import get_agent
+from app.agent import _cached_agent, get_agent
 from app.main import app
 
 # Safety net: any test that reaches for a real model fails here instead of calling out.
@@ -10,10 +10,13 @@ models.ALLOW_MODEL_REQUESTS = False
 
 
 @pytest.fixture(autouse=True)
-def _no_ambient_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A developer's own AI_MODEL / keys must never leak into a test."""
-    for name in ("AI_MODEL", "GROQ_API_KEY", "OPENROUTER_API_KEY"):
+def _clean_environment(monkeypatch: pytest.MonkeyPatch):
+    """Neither a developer's own settings nor one test may leak into the next test."""
+    for name in ("AI_MODEL", "GROQ_API_KEY", "OPENROUTER_API_KEY", "AI_SERVICE_TOKEN"):
         monkeypatch.delenv(name, raising=False)
+    _cached_agent.cache_clear()
+    yield
+    _cached_agent.cache_clear()
 
 
 @pytest.fixture

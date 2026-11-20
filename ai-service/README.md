@@ -40,6 +40,14 @@ AI_MODEL=groq:openai/gpt-oss-120b uv run fastapi dev --port 8001
 
 With `AI_MODEL` unset, `/health` still answers (with `"model": null`) and `/extract` answers `503`.
 
+### Who may call it
+
+The backend is the only caller. Set `AI_SERVICE_TOKEN` on any host that strangers can reach, and
+the backend sends the same value in an `X-Service-Token` header; without it `/extract` answers
+`401` and nobody else can spend the model's quota. Unset (local development) there is no check.
+`/health` is always open. There is no per-minute limit here: the backend, which faces the
+users, will limit requests (not built yet).
+
 ## API
 
 | Method | Path | What |
@@ -74,10 +82,12 @@ Answer (`200`):
 
 | Status | When |
 |---|---|
-| 422 | The request does not fit the contract (empty or too long text, bad date, unknown field). |
+| 401 | `AI_SERVICE_TOKEN` is set and the `X-Service-Token` header is missing or wrong. |
+| 422 | The request does not fit the contract (empty or too long text, text with control characters, bad date, unknown field). |
 | 429 | The provider says rate limit or quota. Try again in a minute. |
 | 502 | The provider failed, or the model kept returning output that does not fit the contract (it gets 2 repair attempts), or one request used more than 6 model calls or 20,000 tokens. |
-| 503 | No `AI_MODEL`, or the provider's key is missing. |
+| 500 | Something nobody planned for. A plain sentence; the details go to the server log only. |
+| 503 | No `AI_MODEL`, or the model is set up wrong (missing key, unknown provider). |
 | 504 | The model took longer than 30 seconds. |
 
 Error messages are plain sentences; provider details go to the server log only.
@@ -85,16 +95,25 @@ Error messages are plain sentences; provider details go to the server log only.
 ## Test it
 
 ```bash
-uv run pytest          # 32 tests, about a second
+uv run pytest          # 40 tests, about a second
 uv run ruff check . && uv run ruff format --check .
 ```
 
 Tests make **no** model calls: they use Pydantic AI's `TestModel` and `FunctionModel`, and
-`tests/conftest.py` sets `ALLOW_MODEL_REQUESTS = False` and clears `AI_MODEL` and the keys, so a
-test that reaches for a real model fails instead of calling out. They cover the contract, the
-prompt, the tool, the repair of bad output, the never-silent rule, every error status, and the
-runaway limit. They check
-the service's own behaviour, not how good a real model's answers are (that is the evaluation work).
+`tests/conftest.py` sets `ALLOW_MODEL_REQUESTS = False` and clears `AI_MODEL`, the keys and the
+token, so a test that reaches for a real model fails instead of calling out. They cover:
+
+- the contract, and the prompt (the notes sit between markers with a random part, so they cannot
+  close the block themselves);
+- the tool, and the repair of bad output, including future dates and unprintable text (the
+  backend's own rules);
+- the never-silent rule, every error status, the token and the runaway limit;
+- `tests/test_spots.py` loads the backend's `court.py` and checks that every named spot gets the
+  zone and shot type its name says (the backend is strict: a corner three must be more than 22 ft
+  from the centre line).
+
+They check the service's own behaviour, not how good a real model's answers are (that is the
+evaluation work).
 
 `scripts/ci.sh` runs this service's lint, format and tests together with the backend's.
 
