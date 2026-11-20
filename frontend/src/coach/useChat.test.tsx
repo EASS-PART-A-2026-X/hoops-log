@@ -259,19 +259,6 @@ describe('one chat per player', () => {
   })
 })
 
-describe('answers from his written lines', () => {
-  it('adds the question and the answer without asking the AI, and makes him say it', () => {
-    const { result, props } = setup()
-    act(() => result.current.addScripted('How am I shooting?', { text: 'You made 2 of 3.', mood: 'happy' }))
-    expect(chatCall).not.toHaveBeenCalled()
-    expect(result.current.messages.map((m) => [m.role, m.text, m.scripted])).toEqual([
-      ['user', 'How am I shooting?', true],
-      ['deni', 'You made 2 of 3.', true],
-    ])
-    expect(props.say).toHaveBeenCalledWith({ text: 'You made 2 of 3.', mood: 'happy' })
-  })
-})
-
 describe('saving the shots he proposed', () => {
   const proposed = async (proposals = [corner, elbow], over: { shots?: MapShot[]; player?: string } = {}) => {
     chatCall.mockResolvedValue(answer('Got it.', proposals))

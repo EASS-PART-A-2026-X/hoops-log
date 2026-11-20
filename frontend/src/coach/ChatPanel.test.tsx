@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProposedShot } from '../api'
 import ChatPanel from './ChatPanel'
-import { QUESTIONS } from './lines'
 import type { Card } from './proposals'
 import type { ChatApi, ChatMessage } from './useChat'
 
@@ -21,8 +20,6 @@ const corner: ProposedShot = {
   shot_type: '3PT',
 }
 const elbow: ProposedShot = { ...corner, x: 17, y: 19, made: false, note: '', quote: '', zone: 'left_elbow', shot_type: '2PT' }
-const shots = [1, 2, 3, 4, 5, 6].map((id) => ({ id, player: 'Yuly', made: true, zone: 'paint', shot_type: '2PT' as const, x: 25, y: 5 }))
-const context = { shots, shooter: 'Yuly' }
 
 function stubChat(over: Partial<ChatApi> = {}): ChatApi {
   return {
@@ -33,7 +30,6 @@ function stubChat(over: Partial<ChatApi> = {}): ChatApi {
     send: vi.fn(async () => {}),
     cancel: vi.fn(),
     reset: vi.fn(),
-    addScripted: vi.fn(),
     save: vi.fn(async () => {}),
     discard: vi.fn(),
     saveAll: vi.fn(async () => {}),
@@ -41,21 +37,23 @@ function stubChat(over: Partial<ChatApi> = {}): ChatApi {
   }
 }
 const panel = (chat: ChatApi, props: { aiAvailable?: boolean | null; player?: string } = {}) =>
-  render(<ChatPanel chat={chat} aiAvailable={props.aiAvailable === undefined ? true : props.aiAvailable} context={context} player={props.player ?? 'Yuly'} />)
+  render(<ChatPanel chat={chat} aiAvailable={props.aiAvailable === undefined ? true : props.aiAvailable} player={props.player ?? 'Yuly'} />)
 const box = () => screen.getByRole('textbox', { name: 'Message to Deni' }) as HTMLTextAreaElement
 const message = (over: Partial<ChatMessage>): ChatMessage => ({ id: 1, role: 'deni', text: 'Hello', ...over })
 const card = (over: Partial<Card> = {}): Card => ({ shot: corner, status: 'pending', ...over })
 
 describe('what it says before anything is said', () => {
-  it('invites you to ask or to tell him about a session', () => {
+  it('opens with Deni\'s own words as his first message, inviting you to ask or to tell him about a session', () => {
     panel(stubChat())
-    expect(screen.getByText(/tell me about a session/)).toBeTruthy()
-    expect(screen.getByRole('log', { name: 'Conversation with Deni' })).toBeTruthy()
+    const first = within(screen.getByRole('log', { name: 'Conversation with Deni' })).getAllByRole('listitem')[0]!
+    expect(first.className).toContain('deni')
+    expect(first.textContent).toMatch(/tell me about a session/)
   })
 
-  it('says his AI helper is offline, and points to the questions and the by-hand route', () => {
+  it('says his AI helper is offline, and points to adding a shot by hand', () => {
     panel(stubChat(), { aiAvailable: false })
-    expect(screen.getByText(/AI helper is offline/)).toBeTruthy()
+    expect(screen.getByText(/AI helper is offline right now/)).toBeTruthy()
+    expect(screen.getByText(/add a shot by hand/)).toBeTruthy()
     expect(box().placeholder).toBe('His AI helper is offline')
   })
 
@@ -63,6 +61,13 @@ describe('what it says before anything is said', () => {
     panel(stubChat(), { aiAvailable: null })
     expect(screen.queryByText(/offline/)).toBeNull()
     expect(box().placeholder).toBe('Message Deni…')
+  })
+
+  it('has ONE way to talk to him: a text box, with no separate buttons for questions', () => {
+    panel(stubChat())
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    expect(screen.queryByRole('list', { name: /questions/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /How am I shooting/ })).toBeNull()
   })
 
   it('tells you your messages go to an AI model', () => {
@@ -130,8 +135,6 @@ describe('while he is thinking', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(chat.cancel).toHaveBeenCalledTimes(1)
     expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
-    for (const q of QUESTIONS) expect((screen.getByRole('button', { name: q.label }) as HTMLButtonElement).disabled).toBe(true)
-    expect((box().form as HTMLFormElement).querySelector('button[type=submit]')).toBeTruthy()
   })
 
   it('shows no Cancel when nothing is running', () => {
@@ -140,72 +143,16 @@ describe('while he is thinking', () => {
   })
 })
 
-describe('the quick questions', () => {
-  it.each(['How am I shooting?', 'What should I practise?', 'Where am I best?'])('send "%s" to the AI when it is there', async (label) => {
-    const chat = stubChat()
-    panel(chat)
-    await userEvent.click(screen.getByRole('button', { name: label }))
-    expect(chat.send).toHaveBeenCalledWith(label)
-    expect(chat.addScripted).not.toHaveBeenCalled()
-  })
-
-  it.each(['How am I shooting?', 'What should I practise?', 'Where am I best?'])('are answered from his written lines when the AI is offline: "%s"', async (label) => {
-    const chat = stubChat()
-    panel(chat, { aiAvailable: false })
-    await userEvent.click(screen.getByRole('button', { name: label }))
-    expect(chat.send).not.toHaveBeenCalled()
-    expect(chat.addScripted).toHaveBeenCalledWith(label, expect.objectContaining({ text: expect.stringMatching(/./) }))
-  })
-
-  it.each(['Which NBA player am I like?', 'What am I looking at on the court?', 'How do XP and levels work?', 'Tell me something about Deni'])(
-    'about the app or about him ("%s") always come from lines written in advance, so the AI cannot make things up',
-    async (label) => {
-      const chat = stubChat()
-      panel(chat)
-      await userEvent.click(screen.getByRole('button', { name: label }))
-      expect(chat.send).not.toHaveBeenCalled()
-      expect(chat.addScripted).toHaveBeenCalledTimes(1)
-    },
-  )
-
-  it('answers how to add a shot by saying to tell him, or by pointing to the form when he is offline', async () => {
-    const online = stubChat()
-    const view = panel(online)
-    await userEvent.click(screen.getByRole('button', { name: 'How do I add a shot?' }))
-    expect(vi.mocked(online.addScripted).mock.calls[0]![1].text).toMatch(/Just tell me/)
-    view.unmount()
-    const offline = stubChat()
-    panel(offline, { aiAvailable: false })
-    await userEvent.click(screen.getByRole('button', { name: 'How do I add a shot?' }))
-    expect(vi.mocked(offline.addScripted).mock.calls[0]![1].text).toMatch(/offline.*Add a shot/)
-  })
-
-  it('answers the same written question twice with a remark, but not a fact, and an AI question in between resets it', async () => {
-    const chat = stubChat()
-    panel(chat)
-    const lines = () => vi.mocked(chat.addScripted).mock.calls.map((call) => call[1].text)
-    await userEvent.click(screen.getByRole('button', { name: 'How do XP and levels work?' }))
-    await userEvent.click(screen.getByRole('button', { name: 'How do XP and levels work?' }))
-    expect(lines()[0]).not.toMatch(/^Same question/)
-    expect(lines()[1]).toMatch(/^Same question/)
-    await userEvent.click(screen.getByRole('button', { name: 'Where am I best?' })) // goes to the AI: resets
-    await userEvent.click(screen.getByRole('button', { name: 'How do XP and levels work?' }))
-    expect(lines()[2]).not.toMatch(/^Same question/)
-    await userEvent.click(screen.getByRole('button', { name: 'Tell me something about Deni' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Tell me something about Deni' }))
-    expect(lines()[4]).not.toMatch(/^Same question/)
-    expect(lines()[3]).not.toBe(lines()[4]) // facts rotate
-  })
-})
-
 describe('the conversation', () => {
   it('shows what was said by whom', () => {
     panel(stubChat({ messages: [message({ id: 1, role: 'user', text: 'hi Deni' }), message({ id: 2, role: 'deni', text: 'Hello player' })] }))
+    // His greeting comes first, then the conversation.
     const items = within(screen.getByRole('log')).getAllByRole('listitem')
-    expect(items[0]!.className).toContain('user')
-    expect(items[0]!.textContent).toContain('hi Deni')
-    expect(items[1]!.className).toContain('deni')
-    expect(items[1]!.textContent).toContain('Hello player')
+    expect(items).toHaveLength(3)
+    expect(items[1]!.className).toContain('user')
+    expect(items[1]!.textContent).toContain('hi Deni')
+    expect(items[2]!.className).toContain('deni')
+    expect(items[2]!.textContent).toContain('Hello player')
   })
 
   it('shows what the app says when the AI could not answer as an alert, apart from Deni\'s words', () => {
@@ -213,11 +160,6 @@ describe('the conversation', () => {
     const alert = screen.getByRole('alert')
     expect(alert.textContent).toBe('Deni\'s AI helper is busy. Try again in a minute.')
     expect(alert.closest('li')!.className).toContain('failed')
-  })
-
-  it('has no invitation once there are messages', () => {
-    panel(stubChat({ messages: [message({})] }))
-    expect(screen.queryByText(/tell me about a session/)).toBeNull()
   })
 
   it('can clear the chat, but only when there is one and he is not busy', async () => {

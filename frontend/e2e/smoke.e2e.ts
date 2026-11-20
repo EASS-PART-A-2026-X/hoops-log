@@ -121,11 +121,12 @@ test.describe('the main screens really render (kept here so the fast run catches
     await expect(page.getByRole('img', { name: /^Areas led: Yuly \d+, NBA average \d+/ })).toBeVisible()
   })
 
-  test('Deni opens with a 3D figure and his eight questions', async ({ page }) => {
+  test('Deni opens with a 3D figure and his chat', async ({ page }) => {
     await openApp(page)
     await page.getByRole('button', { name: 'Open Deni, the coach' }).click()
     const dialog = page.getByRole('dialog', { name: 'Deni Avdija' })
     await expect(dialog.locator('.deni-stage canvas')).toBeVisible({ timeout: 30_000 })
-    await expect(dialog.getByRole('list', { name: 'Quick questions for Deni' }).getByRole('button')).toHaveCount(8)
+    await expect(dialog.getByRole('log', { name: 'Conversation with Deni' })).toBeVisible()
+    await expect(dialog.getByRole('textbox', { name: 'Message to Deni' })).toBeVisible()
   })
 })

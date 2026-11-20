@@ -116,7 +116,7 @@ export default function CoachDialog({ coach, chat, aiAvailable, context, onClose
           </button>
           <h2 id="coach-dialog-name">Deni Avdija</h2>
           <p className="coach-panel-sub">Forward, number 8. Your coach here.</p>
-          <ChatPanel chat={chat} aiAvailable={aiAvailable} context={context} player={context.shooter} />
+          <ChatPanel chat={chat} aiAvailable={aiAvailable} player={context.shooter} />
           <div className="coach-toggles">
           {(speechSupported() || hdSupported()) && (
             <button type="button" className="coach-voice" aria-pressed={voiceOn} onClick={() => setVoiceOn(!voiceOn)}>

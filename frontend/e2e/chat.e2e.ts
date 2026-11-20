@@ -91,15 +91,6 @@ test.describe('the chat, with his AI helper there', () => {
     expect(await api.list()).toHaveLength(6) // a question saves nothing
   })
 
-  test('a tapped question about your numbers goes to him, and one about the app is answered from his written lines', async ({ page, api }) => {
-    const seeded = await api.seed(makeShots('Yuly', 6, { seed: 91 }))
-    await openChat(page)
-    await dialog(page).getByRole('button', { name: 'How am I shooting?' }).click()
-    await expect(log(page).getByText(`You have made ${seeded.filter((s) => s.made).length} of 6 for Yuly.`)).toBeVisible()
-    await dialog(page).getByRole('button', { name: 'How do XP and levels work?' }).click()
-    await expect(log(page).getByText(/Every shot you log gives/)).toBeVisible()
-  })
-
   test('the conversation so far is sent with each new message', async ({ page, api }) => {
     await api.seed(makeShots('Yuly', 6, { seed: 91 }))
     await openChat(page)
@@ -187,7 +178,7 @@ test.describe('the chat, with his AI helper there', () => {
 
 test.describe('when his AI helper is offline', () => {
   // The page is told the helper is not available (the default), as it is when the AI service or its key is missing.
-  test('shots are added by hand, and Deni still answers the tapped questions from his written lines', async ({ page, api }) => {
+  test('shots are added by hand, and Deni says he cannot chat', async ({ page, api }) => {
     await api.seed(makeShots('Yuly', 6, { seed: 91 }))
     await openApp(page)
     await openDrawer(page, 'list')
@@ -197,10 +188,9 @@ test.describe('when his AI helper is offline', () => {
 
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: /Open Deni/ }).click()
-    await expect(log(page).getByText(/AI helper is offline/)).toBeVisible()
-    await dialog(page).getByRole('button', { name: 'How am I shooting?' }).click()
-    await expect(log(page).getByText(/You have made \d+ of 7/)).toBeVisible()
-    await dialog(page).getByRole('button', { name: 'How do I add a shot?' }).click()
-    await expect(log(page).getByText(/AI helper is offline right now, so add shots by hand/)).toBeVisible()
+    await expect(log(page).getByText(/AI helper is offline right now/)).toBeVisible()
+    await expect(log(page).getByText(/add a shot by hand/)).toBeVisible()
+    // Still one text box, and no separate buttons for questions.
+    await expect(dialog(page).getByRole('textbox')).toHaveCount(1)
   })
 })

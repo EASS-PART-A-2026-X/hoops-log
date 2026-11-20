@@ -118,16 +118,6 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
     [append, onOutcome, player, savingFor, say, shots],
   )
 
-  /** A tapped question answered from his written lines: no AI involved (used when the AI is not available). */
-  const addScripted = useCallback(
-    (question: string, line: Line) => {
-      append(player, { role: 'user', text: question, scripted: true })
-      append(player, { role: 'deni', text: line.text, scripted: true })
-      say(line)
-    },
-    [append, player, say],
-  )
-
   const cancel = useCallback(() => {
     latest.current++
     pending.current?.abort()
@@ -210,7 +200,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
     [adopt, create, onSaved, player],
   )
 
-  return { messages, thinking, savingFor, setTypedPlayer, send, cancel, reset, addScripted, save, discard, saveAll }
+  return { messages, thinking, savingFor, setTypedPlayer, send, cancel, reset, save, discard, saveAll }
 }
 
 export type ChatApi = ReturnType<typeof useChat>

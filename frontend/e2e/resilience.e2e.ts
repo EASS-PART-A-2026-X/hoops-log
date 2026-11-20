@@ -98,8 +98,11 @@ test.describe('when the data changed behind the page’s back', () => {
 test.describe('slow and large', () => {
   test('a slow backend shows a loading state instead of an empty or broken page', async ({ page, api }) => {
     await api.seed(makeShots('Yuly', 8, { seed: 82 }))
+    // The backend answers only when the test says so (not after a fixed time, which a slow browser could outrun).
+    let release: () => void = () => {}
+    const answer = new Promise<void>((resolve) => (release = resolve))
     await page.route(`${BACKEND_URL}/shots*`, async (route) => {
-      await new Promise((r) => setTimeout(r, 2500))
+      await answer
       await route.fallback()
     })
     await page.goto('/')
@@ -107,6 +110,7 @@ test.describe('slow and large', () => {
     await openDrawer(page, 'list')
     await expect(drawer(page).getByText('Loading shots…')).toBeVisible()
     await expect(drawer(page).getByText('No shots yet.')).toHaveCount(0)
+    release()
     await closeDrawer(page)
     await expect(kpi(page, 'SHOTS')).toHaveText('8', { timeout: 20_000 })
   })

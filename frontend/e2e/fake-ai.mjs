@@ -9,9 +9,10 @@
 //   3. "simulate garbage"  200 but an answer that breaks the rules
 //   4. "how am i"          a reply that repeats the numbers the app sent, proving they arrived
 //   5. "context"           a reply that says how many messages of the conversation it was sent
-//   6. "vague"             a question, no shots
-//   7. "corner"            two shots
-//   8. anything else       one layup at the rim
+//   6. "markdown"          a reply full of markdown marks and an emoji (it must not be read out loud)
+//   7. "vague"             a question, no shots
+//   8. "corner"            two shots
+//   9. anything else       one layup at the rim
 // "yesterday" in the message makes the shots yesterday's, counted from the `today` the backend sends.
 import http from 'node:http'
 
@@ -36,6 +37,7 @@ function answer({ messages, stats }, today) {
     return reply(stats ? `You have made ${stats.made} of ${stats.attempts} for ${stats.player}.` : 'I have no numbers yet.')
   }
   if (text.includes('context')) return reply(`I can see ${messages.length} messages.`)
+  if (text.includes('markdown')) return reply('**Nice** work 🏀, here is `code` and a #hashtag with _emphasis_.')
   if (text.includes('vague')) return reply('Where was each shot taken, and did it go in?')
   if (text.includes('corner')) {
     return reply('Got it: a made three from the right corner and a missed elbow shot. Tap Save to log them.', [

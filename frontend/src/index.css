@@ -4106,16 +4106,6 @@ h3 {
   }
 }
 
-.coach-questions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.coach-questions li button,
 .coach-voice {
   width: 100%;
   text-align: left;
@@ -4128,7 +4118,6 @@ h3 {
   cursor: pointer;
 }
 
-.coach-questions li button:hover,
 .coach-voice:hover {
   border-color: #e03a3e;
   background: rgba(224, 58, 62, 0.12);
@@ -4476,7 +4465,7 @@ h3 {
   flex-direction: column;
   gap: 10px;
   flex: 0 0 auto;
-  height: clamp(150px, 24vh, 240px);
+  height: clamp(200px, 38vh, 380px);
   margin: 0;
   padding: 10px;
   list-style: none;
@@ -4551,26 +4540,6 @@ h3 {
 
 .chat-save-all {
   align-self: flex-start;
-}
-
-/* The tapped questions are small pills here, so the log keeps the room. */
-.chat .coach-questions {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.chat .coach-questions li button {
-  width: auto;
-  padding: 5px 10px;
-  font-size: 0.8rem;
-  line-height: 1.2;
-  border-radius: 999px;
-}
-
-.chat .coach-questions li button:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .chat-name {

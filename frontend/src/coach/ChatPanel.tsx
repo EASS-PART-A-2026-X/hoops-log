@@ -1,39 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
-import { QUESTIONS, again, answer } from './lines'
-import type { AnswerContext, QuestionId } from './lines'
 import { describeShot, isOpen } from './proposals'
 import type { ChatApi, ChatMessage } from './useChat'
 
 /** The longest message the backend takes. */
 export const MAX_MESSAGE = 2000
 
-/** Questions the AI can answer from the numbers it is given. The rest are about the app, so his written lines answer them. */
-const AI_QUESTIONS: ReadonlySet<QuestionId> = new Set(['doing', 'practise', 'best'])
-
 interface Props {
   chat: ChatApi
   /** Is the AI helper there? null = not known yet (treated as there), false = offline. */
   aiAvailable: boolean | null
-  /** What his written lines need to answer a tapped question. */
-  context: AnswerContext
   /** Who the shots are saved for. */
   player: string
 }
 
+/** What he says first, as his own message, so the chat reads as one conversation and not as an empty box. */
+const GREETING = 'Ask me about your shots, or tell me about a session: "hit one from the right corner, missed two from the left elbow".'
+const GREETING_OFFLINE = 'My AI helper is offline right now, so I cannot chat. You can still add a shot by hand from the Shots button.'
+
 /**
- * The chat with Deni. You type (or tap a question); he answers. When you tell him about shots he shows them as
- * cards: nothing is saved until you press Save. When his AI helper is offline he still answers the questions from
- * his written lines, and says so.
+ * The chat with Deni: ONE place to talk to him. You type; his AI works out whether you are telling him about shots
+ * (he shows them as cards, and nothing is saved until you press Save) or asking about your numbers (he answers).
  */
-export default function ChatPanel({ chat, aiAvailable, context, player }: Props) {
-  const { messages, thinking, savingFor, setTypedPlayer, send, cancel, reset, addScripted, save, discard, saveAll } = chat
+export default function ChatPanel({ chat, aiAvailable, player }: Props) {
+  const { messages, thinking, savingFor, setTypedPlayer, send, cancel, reset, save, discard, saveAll } = chat
   const [draft, setDraft] = useState('')
   const logRef = useRef<HTMLOListElement>(null)
   const offline = aiAvailable === false
-  // The question tapped last, so the same one twice gets a remark (his facts rotate, so they are always new).
-  const lastQuestion = useRef<QuestionId | null>(null)
-  const asked = useRef(0)
 
   // Keep the newest message in view.
   useEffect(() => {
@@ -57,28 +50,13 @@ export default function ChatPanel({ chat, aiAvailable, context, player }: Props)
     }
   }
 
-  function ask(id: QuestionId, label: string) {
-    if (thinking) return
-    if (AI_QUESTIONS.has(id) && !offline) {
-      lastQuestion.current = null
-      void send(label)
-      return
-    }
-    const line = answer(id, { ...context, n: asked.current++, aiAvailable: !offline })
-    addScripted(label, lastQuestion.current === id && id !== 'fact' ? again(line) : line)
-    lastQuestion.current = id
-  }
-
   return (
     <div className="chat">
       <ol className="chat-log" ref={logRef} role="log" aria-label="Conversation with Deni">
-        {messages.length === 0 && (
-          <li className="chat-hint">
-            {offline
-              ? 'His AI helper is offline right now. Tap a question below and he answers from what he knows, or add a shot by hand from the Shots button.'
-              : 'Ask me about your shots, or tell me about a session: "hit one from the right corner, missed two from the left elbow".'}
-          </li>
-        )}
+        {/* His first words, in his own bubble. They are not part of the conversation sent to the AI. */}
+        <li className="chat-msg deni">
+          <span className="chat-bubble">{offline ? GREETING_OFFLINE : GREETING}</span>
+        </li>
         {messages.map((m) => (
           <Message key={m.id} message={m} player={savingFor} onSave={save} onDiscard={discard} onSaveAll={saveAll} />
         ))}
@@ -98,16 +76,6 @@ export default function ChatPanel({ chat, aiAvailable, context, player }: Props)
           <input id="chat-name" value={savingFor} onChange={(e) => setTypedPlayer(e.target.value)} maxLength={50} autoComplete="off" />
         </div>
       )}
-
-      <ul className="coach-questions" aria-label="Quick questions for Deni">
-        {QUESTIONS.map((q) => (
-          <li key={q.id}>
-            <button type="button" onClick={() => ask(q.id, q.label)} disabled={thinking}>
-              {q.label}
-            </button>
-          </li>
-        ))}
-      </ul>
 
       <form className="chat-form" onSubmit={submit}>
         <label htmlFor="chat-input" className="sr-only">
