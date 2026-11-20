@@ -22,7 +22,8 @@ Deni Avdija: never claim to be him, never quote him, and never state facts about
 life or career (if asked, say you do not know).
 
 How you talk: friendly and direct, short (two or three sentences, about 80 words at the
-very most). Answer in the language the player writes in (Hebrew or English).
+very most). ALWAYS answer in the language of the player's LAST message: if they write
+Hebrew, you write Hebrew; if they write English, you write English.
 
 What you know: only the STATS block and the conversation. The app computed the STATS;
 they are the ONLY numbers you may state. Never calculate, round differently, estimate
@@ -32,12 +33,15 @@ and that they are estimates when you compare. If a zone has fewer than 5 attempt
 the sample is too small to judge. If there are no shots yet, say so and invite the
 player to tell you about a session.
 
-Logging shots: when the player tells you about shots they took, fill `proposals` (one
-entry per shot). You can only PROPOSE: nothing is saved until the player taps Save, so
-NEVER say a shot is saved or logged; say what you understood and that they can tap Save.
-- Only field goal attempts (2-pointers and 3-pointers) are logged. Free throws (foul
-  shots), assists and rebounds are not: say so in `reply`. A jump shot taken FROM the
-  free throw line is a normal shot (spot `free_throw_line`), not a free throw.
+Shots the player tells you about: fill `proposals` (one entry per shot). You can only
+PROPOSE: each shot is kept only when the player presses the Save button under it. So
+start your reply with "Got it" or "I understood" (in the player's language), say what
+you understood, and end by telling them to tap Save. Never say that a shot "is saved",
+"is logged", "I logged it" or "I saved it": it is not, until they tap Save.
+- Only field goal attempts (2-pointers and 3-pointers) can be proposed. Free throws
+  (foul shots), assists and rebounds are not tracked in this app: say so in `reply`. A
+  jump shot taken FROM the free throw line is a normal shot (spot `free_throw_line`),
+  not a free throw.
 - Where a shot was taken: for a named place ("right corner three", "left elbow", "free
   throw line") set `spot` to the matching name and leave `x` and `y` empty: the service
   turns the name into exact feet. NEVER write coordinates for a named place yourself.
@@ -80,6 +84,24 @@ def to_proposals(result: AgentChatResult) -> list[ProposedShot]:
     return proposals
 
 
+def model_settings_for(model: str) -> dict[str, object]:
+    """Settings for one model.
+
+    A rate limit must fail FAST (the player is told it is busy), not be retried quietly
+    by the provider's own client for ten seconds or more: that hidden retrying is the
+    likely cause of the unexplained 12-30 s waits seen with the real model.
+    """
+    settings: dict[str, object] = {
+        "timeout": 30.0,
+        "temperature": 0.3,
+        "max_retries": 0,
+    }
+    if model.startswith("groq:"):
+        # Fewer thinking tokens: faster answers and less of a small per-minute quota.
+        settings["groq_reasoning_effort"] = "low"
+    return settings
+
+
 def build_agent(model: str) -> Agent[None, AgentChatResult]:
     """An agent for one model name. `retries` lets the model repair invalid output."""
     return Agent(
@@ -88,7 +110,7 @@ def build_agent(model: str) -> Agent[None, AgentChatResult]:
         instructions=INSTRUCTIONS,
         retries=2,
         defer_model_check=True,
-        model_settings={"timeout": 30.0, "temperature": 0.3},
+        model_settings=model_settings_for(model),  # type: ignore[arg-type]
     )
 
 

@@ -516,3 +516,43 @@ def test_stats_may_be_absent_and_percentages_null(client, use_model):
     with use_model(TestModel(custom_output_args=GOOD)):
         assert post(client, {**BODY, "stats": empty}).status_code == 200
         assert post(client, {"messages": BODY["messages"]}).status_code == 200
+
+
+def test_a_rate_limit_fails_fast_instead_of_being_retried_quietly():
+    from app.agent import model_settings_for
+
+    for model in ("groq:openai/gpt-oss-120b", "test", "openrouter:some/model"):
+        assert model_settings_for(model)["max_retries"] == 0
+
+
+def test_only_a_groq_model_gets_the_groq_reasoning_setting():
+    from app.agent import model_settings_for
+
+    assert (
+        model_settings_for("groq:openai/gpt-oss-120b")["groq_reasoning_effort"] == "low"
+    )
+    assert "groq_reasoning_effort" not in model_settings_for("test")
+    assert "groq_reasoning_effort" not in model_settings_for("openrouter:some/model")
+
+
+def test_the_agent_is_built_with_those_settings():
+    from app.agent import build_agent, model_settings_for
+
+    agent = build_agent("groq:openai/gpt-oss-120b")
+    assert agent.model_settings == model_settings_for("groq:openai/gpt-oss-120b")
+
+
+def test_what_a_request_cost_is_logged(client, use_model, caplog):
+    with (
+        caplog.at_level("INFO", logger="app.routers.chat"),
+        use_model(TestModel(custom_output_args=GOOD)),
+    ):
+        assert post(client).status_code == 200
+    line = next(
+        r.getMessage() for r in caplog.records if r.getMessage().startswith("chat used")
+    )
+    assert re.fullmatch(
+        r"chat used 1 model calls, \d+ input and \d+ output tokens", line
+    )
+    # Only numbers: nothing the player wrote or Deni answered is logged.
+    assert "right corner" not in line

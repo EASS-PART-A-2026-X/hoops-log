@@ -105,6 +105,14 @@ async def chat(body: ChatRequest, agent: AgentDep) -> ChatResponse:
     except Exception as error:  # a bug, or a failure nobody planned for
         log.exception("Unexpected error while asking the AI model")
         raise HTTPException(500, "The AI service had an unexpected problem.") from error
+    # What each request cost: the free tiers are small, so the real numbers matter.
+    usage = run.usage
+    log.info(
+        "chat used %s model calls, %s input and %s output tokens",
+        usage.requests,
+        usage.input_tokens,
+        usage.output_tokens,
+    )
     return ChatResponse(
         reply=run.output.reply,
         proposals=to_proposals(run.output),
