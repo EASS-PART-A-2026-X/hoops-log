@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from app import db
-from app.routers import chart, health, shots
+from app.routers import chart, health, notes, shots
 from app.seed import seed_if_empty
 
 
@@ -43,6 +43,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(shots.router)
 app.include_router(chart.router)
+app.include_router(notes.router)
 
 
 def _json_safe(value: Any) -> Any:
