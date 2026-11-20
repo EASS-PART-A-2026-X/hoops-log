@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
-import type { ShotInput } from './api'
+import type { Shot, ShotInput } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
@@ -11,6 +11,7 @@ import { deletedText, withShooterSwitch } from './notices'
 import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
+import NotesImport from './NotesImport'
 import ShotList from './ShotList'
 import ShotMap from './ShotMap'
 import { useShots } from './useShots'
@@ -51,7 +52,7 @@ export default function App() {
   const markFaceOffSeen = useCallback((key: string) => setFaceOffSeen((seen) => (seen.includes(key) ? seen : [...seen, key])), [])
   // The side drawer with the shot list and the add form: closed by default, so the page is just the map.
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
+  const [drawerView, setDrawerView] = useState<'list' | 'add' | 'notes'>('list')
   const toggleRef = useRef<HTMLButtonElement>(null)
   // The trophy wall: a second drawer, from its own button in the top bar. Only one drawer is open at a time.
   const [trophyOpen, setTrophyOpen] = useState(false)
@@ -68,13 +69,20 @@ export default function App() {
   const selectedId = shots?.some((s) => s.id === pickedId) ? pickedId : null
 
   // After a write, show the backend's fresh data, not our guess of it.
-  async function add(input: ShotInput) {
-    const saved = await createShot(input)
-    setNotice({ kind: 'ok', text: `Saved shot #${saved.id} for ${saved.player}.` })
-    play(saved.made ? 'swish' : 'rim')
+  // One shot or a whole batch is saved: say so once, play one sound, and show the backend's fresh list once.
+  async function afterSaved(saved: Shot[]) {
+    const last = saved.at(-1)
+    if (!last) return
+    const text = saved.length === 1 ? `Saved shot #${last.id} for ${last.player}.` : `Saved ${saved.length} shots for ${last.player}.`
+    setNotice({ kind: 'ok', text })
+    play(last.made ? 'swish' : 'rim')
     await refresh()
-    // The map shows one player's shots: switch to the saved shot's player so the new shot is visible.
-    setShooterChoice(saved.player)
+    // The map shows one player's shots: switch to the saved shot's player so the new shots are visible.
+    setShooterChoice(last.player)
+  }
+
+  async function add(input: ShotInput) {
+    await afterSaved([await createShot(input)])
     setDrawerView('list') // show the new row
   }
 
@@ -433,6 +441,9 @@ export default function App() {
                 <button type="button" className="chip" aria-pressed={drawerView === 'add'} onClick={() => setDrawerView('add')}>
                   Add a shot
                 </button>
+                <button type="button" className="chip" aria-pressed={drawerView === 'notes'} onClick={() => setDrawerView('notes')}>
+                  Paste notes
+                </button>
               </div>
               <button type="button" className="drawer-close" onClick={() => setDrawerOpen(false)}>
                 <span aria-hidden="true">✕</span>
@@ -444,6 +455,11 @@ export default function App() {
               <section hidden={drawerView !== 'add'} aria-labelledby="add-title">
                 <h2 id="add-title">Add a shot</h2>
                 <ShotForm submitLabel="Add shot" onSubmit={add} />
+              </section>
+
+              <section hidden={drawerView !== 'notes'} aria-labelledby="notes-title">
+                <h2 id="notes-title">Paste notes</h2>
+                <NotesImport defaultPlayer={shooter} onCreate={createShot} onSaved={afterSaved} />
               </section>
 
               <section hidden={drawerView !== 'list'} aria-labelledby="list-title">

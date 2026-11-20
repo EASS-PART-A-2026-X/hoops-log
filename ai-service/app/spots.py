@@ -1,9 +1,10 @@
 """Named places on the half court, as plain code.
 
 The model is good at reading "I hit one from the right corner" and bad at geometry,
-so it never invents coordinates for a named place: it calls the `court_spot` tool and
-gets exact feet from this table. Feet, as in the backend: x 0-50 across (left is
-smaller x), y 0-47 from the baseline, hoop at (25, 5.25).
+so it never writes coordinates for a named place: it picks the place from `Spot` (a
+fixed list in its output) and this table turns the name into exact feet. Feet, as in
+the backend: x 0-50 across (left is smaller x), y 0-47 from the baseline, hoop at
+(25, 5.25).
 
 Each point must be classified as its name says by the BACKEND's own rules, which are
 strict: a corner three must be more than 22 ft from the centre line, and the lane edge

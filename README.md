@@ -71,6 +71,9 @@ The named volume `backend-data` holds the database, so shots survive `docker rm 
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./data/app.db` | Where the SQLite database file lives. See `backend/.env.example`. |
+| `AI_SERVICE_URL` | `http://localhost:8001` | Where the AI service listens (`ai-service/`). Only `POST /notes/extract` uses it. |
+| `AI_RATE_LIMIT` | `10` | How many `POST /notes/extract` requests are allowed per minute, all callers together (one shared budget on purpose: it protects the model's small free quota, and a limit per visitor would not cap the total; the cost is that one heavy user can use up the minute for everybody). Only requests that pass validation count. Read on every request, so it changes without a restart. Not a whole number of at least 1: the default. |
+| `AI_SERVICE_TOKEN` | *(empty)* | If the AI service asks for a token (its own `AI_SERVICE_TOKEN`), the same value is sent in the `X-Service-Token` header. |
 
 The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run fastapi dev`, or `docker run -e DATABASE_URL=...`.
 
@@ -83,6 +86,7 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, 404, or 422 (bad body, or an id below 1 or above 2147483647) |
 | `DELETE /shots/{id}` | Delete one | 204, 404, or 422 if the id is below 1 or above 2147483647 |
 | `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional. It ignores letter case and spaces around the name, so `yuly` and `Yuly` are the same player; it uses Unicode case folding, so `Straße` and `STRASSE` also match | 200, or 422 if `player` is empty or longer than 50 characters |
+| `POST /notes/extract` | Body `{"text": "...", "today": "2026-11-20"}` (`today` optional). Asks the AI service to read pasted notes and returns PROPOSED shots (`proposals` with a computed `zone` and `shot_type`, `questions`, `skipped`, `model`). **Saves nothing**: to keep a proposal, send it to `POST /shots`. | 200, 422 (text empty, over 2000 characters, or with control characters), 429 (over the minute's limit, or the AI model is busy), 502 (no usable answer, including an answer that breaks this API's own rules or is over 200 KB), 503 (AI service not reachable), 504 (too slow: the AI service gives up after 60 s, this API after 70 s). The other endpoints never depend on it. |
 | `GET /health` | Liveness check, returns `{"status":"ok"}` | 200 |
 
 ```bash
@@ -94,7 +98,7 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 307 passed
+uv run pytest                 # 418 passed
 uv run ruff check .
 uv run ruff format --check .
 ```

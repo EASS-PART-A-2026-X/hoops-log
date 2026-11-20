@@ -310,10 +310,10 @@ export async function openApp(page: Page, tab: Tab = 'My log'): Promise<void> {
 export const drawerToggle = (page: Page): Locator => page.locator('button.drawer-toggle')
 export const drawer = (page: Page): Locator => page.locator('#shots-drawer')
 
-export async function openDrawer(page: Page, view: 'list' | 'add' = 'list'): Promise<void> {
+export async function openDrawer(page: Page, view: 'list' | 'add' | 'notes' = 'list'): Promise<void> {
   if ((await drawerToggle(page).getAttribute('aria-expanded')) !== 'true') await drawerToggle(page).click()
   await expect(drawer(page)).toBeVisible()
-  await drawer(page).getByRole('group', { name: 'Drawer view' }).getByRole('button', { name: view === 'add' ? /Add a shot/ : /^Shots/ }).click()
+  await drawer(page).getByRole('group', { name: 'Drawer view' }).getByRole('button', { name: view === 'add' ? /Add a shot/ : view === 'notes' ? /Paste notes/ : /^Shots/ }).click()
 }
 
 export async function closeDrawer(page: Page): Promise<void> {
