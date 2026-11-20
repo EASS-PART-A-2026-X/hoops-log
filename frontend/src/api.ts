@@ -41,7 +41,7 @@ export const BACKEND_URL = (
 export const TIMEOUT_MS = 10_000
 // Reading notes goes through an AI model, which can take a while. The deadlines are nested so the
 // inner one fires first (30 s a model call, 60 s the AI service, 70 s the backend, then this 90 s).
-export const NOTES_TIMEOUT_MS = 90_000
+export const CHAT_TIMEOUT_MS = 90_000
 export const PAGE_SIZE = 100 // the backend's maximum page
 export const MAX_PAGES = 50 // 5000 shots; past this the list is marked truncated
 
@@ -159,39 +159,91 @@ export function deleteShot(id: number): Promise<void> {
   return request<void>(`/shots/${id}`, { method: 'DELETE' })
 }
 
-/** A shot the AI found in the player's notes. NOT saved: the user confirms it first. */
+/** A shot the AI found in the conversation. NOT saved: the player confirms it first. */
 export interface ProposedShot {
   x: number
   y: number
   made: boolean
   game_date: string
   note: string
-  /** The words of the notes it came from. */
+  /** The player's words it came from. */
   quote: string
   /** Worked out by the backend from x and y, like for any saved shot. */
   zone: string
   shot_type: ShotType
 }
 
-export interface NotesResult {
+/** One message of the conversation, as the backend wants it. */
+export interface ChatTurn {
+  role: 'user' | 'deni'
+  text: string
+}
+
+/** The league's numbers in here are ESTIMATES (see court/nba.ts); the app computes everything else. */
+export interface ZoneStat {
+  zone: string
+  attempts: number
+  made: number
+  pct: number | null
+  nba_pct: number
+}
+
+/** What the app worked out from the player's log: the only numbers the AI may state. */
+export interface StatsSummary {
+  player: string
+  attempts: number
+  made: number
+  fg_pct: number | null
+  three_attempts: number
+  three_made: number
+  three_pct: number | null
+  zones: ZoneStat[]
+  nba_fg: number
+  nba_three: number
+}
+
+export interface ChatReply {
+  /** What Deni says. */
+  reply: string
+  /** Shots the player described, for them to Save or Discard. Empty for plain chat. */
   proposals: ProposedShot[]
-  /** Things the AI could not tell and asks about. */
-  questions: string[]
-  /** Things in the notes that are not logged (free throws, assists...). */
-  skipped: string[]
   /** Which model answered. "test" means a fake one. */
   model: string
 }
 
-/** Ask the backend (which asks the AI service) to read pasted notes. Saves nothing. */
-export async function extractNotes(text: string, today: string, signal?: AbortSignal): Promise<NotesResult> {
-  const result = await request<NotesResult>(
-    '/notes/extract',
-    { method: 'POST', body: JSON.stringify({ text, today }) },
-    { timeoutMs: NOTES_TIMEOUT_MS, useDetail: true, signal },
+/** The most messages the backend takes with a new one. */
+export const MAX_TURNS = 12
+
+/**
+ * Ask the backend (which asks the AI service) for Deni's reply to the last message of `messages`. Saves nothing.
+ * `today` is the player's own date, so "yesterday" is theirs.
+ */
+export async function sendChat(
+  messages: ChatTurn[],
+  stats: StatsSummary | null,
+  today: string,
+  signal?: AbortSignal,
+): Promise<ChatReply> {
+  const result = await request<ChatReply>(
+    '/chat',
+    { method: 'POST', body: JSON.stringify({ messages, ...(stats ? { stats } : {}), today }) },
+    { timeoutMs: CHAT_TIMEOUT_MS, useDetail: true, signal },
   )
-  if (!result || !Array.isArray(result.proposals) || !Array.isArray(result.questions) || !Array.isArray(result.skipped)) {
+  if (!result || typeof result.reply !== 'string' || !Array.isArray(result.proposals)) {
     throw new ApiError('server', 'The server sent a reply this app could not read. Try again.')
   }
   return result
+}
+
+/**
+ * Is Deni's AI helper there right now? The backend answers `{available}` and never fails; if even the backend is
+ * unreachable the answer is "not available" too, so the manual form shows and shots can still be added.
+ */
+export async function chatAvailable(): Promise<boolean> {
+  try {
+    const result = await request<{ available?: unknown }>('/chat/status')
+    return result?.available === true
+  } catch {
+    return false
+  }
 }

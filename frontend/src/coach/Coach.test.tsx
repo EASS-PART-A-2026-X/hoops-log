@@ -2,10 +2,13 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Coach from './Coach'
+import { useChat } from './useChat'
+
+vi.mock('../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api')>()), sendChat: vi.fn() }))
+const { sendChat } = await import('../api')
 
 // The 3D figure needs WebGL, which jsdom does not have: a stand-in keeps these tests about the dialog.
 vi.mock('./Deni3D', () => ({ default: ({ onPoke }: { onPoke?: () => void }) => <button type="button" data-testid="deni-3d" onClick={onPoke} /> }))
-import { QUESTIONS } from './lines'
 import { bubbleMs, useCoach } from './useCoach'
 
 beforeEach(() => vi.useFakeTimers())
@@ -16,9 +19,11 @@ afterEach(() => {
 
 const shots = [1, 2, 3, 4, 5, 6].map((id) => ({ id, player: 'A', made: true, zone: 'paint', shot_type: '2PT' as const, x: 25, y: 5 }))
 
-function Harness() {
+// The chat itself (the AI side) is tested in useChat.test.tsx and ChatPanel.test.tsx; here it is only part of the dialog.
+function Harness({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const coach = useCoach()
-  return <Coach coach={coach} context={{ shots, shooter: 'A' }} />
+  const chat = useChat({ shots, player: 'A', say: coach.say, onCreate: vi.fn(), onSaved: vi.fn(), onOutcome: vi.fn() })
+  return <Coach coach={coach} chat={chat} aiAvailable={true} context={{ shots, shooter: 'A' }} onOpenChange={onOpenChange} />
 }
 
 describe('Coach', () => {
@@ -28,7 +33,7 @@ describe('Coach', () => {
     return face
   }
 
-  it('opens the big view with the questions, and says what he is', () => {
+  it('opens the big view with the chat, and says what he is', () => {
     render(<Harness />)
     const face = screen.getByRole('button', { name: /Open Deni/ })
     expect(face.getAttribute('aria-expanded')).toBe('false')
@@ -36,22 +41,27 @@ describe('Coach', () => {
     expect(face.getAttribute('aria-expanded')).toBe('true')
     const dialog = screen.getByRole('dialog', { name: 'Deni Avdija' })
     expect(dialog.getAttribute('aria-modal')).toBe('true')
-    expect(screen.getAllByRole('button').filter((b) => QUESTIONS.some((q) => q.label === b.textContent))).toHaveLength(QUESTIONS.length)
+    // One way to talk to him: the chat. No separate question buttons.
+    expect(screen.queryByRole('list', { name: /questions/i })).toBeNull()
     expect(screen.getByText(/fan-made coach inspired by Deni Avdija/)).toBeTruthy()
-    expect(screen.getByText(/no AI/)).toBeTruthy()
+    expect(screen.getByText(/not the real Deni/)).toBeTruthy()
+    expect(screen.getByRole('log', { name: 'Conversation with Deni' })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Message to Deni' })).toBeTruthy()
     // His first words, since nothing was said before.
     expect(screen.getAllByText(/I am Deni/).length).toBeGreaterThan(0)
   })
 
-  it('answers a tapped question as a subtitle and for screen readers, and stays open for the next one', () => {
+  it('says his chat reply as a subtitle and for screen readers, and stays open for the next message', async () => {
+    vi.mocked(sendChat).mockResolvedValue({ reply: 'You made 6 of 6, that is 100%.', proposals: [], model: 'm' })
     render(<Harness />)
     openIt()
-    fireEvent.click(screen.getByRole('button', { name: 'How am I shooting?' }))
-    // Once in the subtitle, once in the live region.
-    expect(screen.getAllByText(/made 6 of 6/)).toHaveLength(2)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message to Deni' }), { target: { value: 'How am I doing?' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    })
+    // In the subtitle, in the live region and in the chat.
+    expect(screen.getAllByText(/made 6 of 6/)).toHaveLength(3)
     expect(screen.getByRole('dialog')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Where am I best?' }))
-    expect(screen.getAllByText(/Paint is your best area/)).toHaveLength(2)
   })
 
   it('closes with Escape, with the close button and with a click outside, and returns focus to his face', () => {
@@ -70,11 +80,7 @@ describe('Coach', () => {
 
   it('tells the app when the big view opens and closes', () => {
     const changes: boolean[] = []
-    function Told() {
-      const coach = useCoach()
-      return <Coach coach={coach} context={{ shots, shooter: 'A' }} onOpenChange={(o) => changes.push(o)} />
-    }
-    render(<Told />)
+    render(<Harness onOpenChange={(o) => changes.push(o)} />)
     openIt()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(changes).toEqual([true, false])
@@ -83,11 +89,11 @@ describe('Coach', () => {
   it('shows the corner caption only while the big view is closed, and takes it down after a while', () => {
     render(<Harness />)
     openIt()
-    fireEvent.click(screen.getByRole('button', { name: 'How do I add a shot?' }))
+    fireEvent.click(screen.getByTestId('deni-3d')) // poking him makes him say something
     expect(document.querySelector('.coach-bubble')).toBeNull()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(document.querySelector('.coach-bubble')).not.toBeNull()
-    act(() => void vi.advanceTimersByTime(bubbleMs('x'.repeat(200)) + 10))
+    act(() => void vi.advanceTimersByTime(bubbleMs('x'.repeat(400)) + 10))
     expect(document.querySelector('.coach-bubble')).toBeNull()
   })
 
@@ -95,26 +101,6 @@ describe('Coach', () => {
     render(<Harness />)
     openIt()
     expect(screen.queryByRole('button', { name: /Voice/ })).toBeNull()
-  })
-
-  it('answers the same question twice with a remark, but not a fact, which rotates', () => {
-    render(<Harness />)
-    openIt()
-    fireEvent.click(screen.getByRole('button', { name: 'Where am I best?' }))
-    expect(screen.queryAllByText(/Same question/)).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Where am I best?' }))
-    expect(screen.getAllByText(/Same question\? Fine, here it is again\. Paint is your best area/).length).toBeGreaterThan(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Where am I best?' }))
-    expect(screen.getAllByText(/Same question/).length).toBeGreaterThan(0)
-    // Another question in between resets it.
-    fireEvent.click(screen.getByRole('button', { name: 'How do XP and levels work?' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Where am I best?' }))
-    expect(screen.queryAllByText(/Same question/)).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Tell me something about Deni' }))
-    const first = document.querySelector('.coach-caption')!.textContent
-    fireEvent.click(screen.getByRole('button', { name: 'Tell me something about Deni' }))
-    expect(document.querySelector('.coach-caption')!.textContent).not.toBe(first)
-    expect(document.querySelector('.coach-caption')!.textContent).not.toMatch(/Same question/)
   })
 
   it('reacts when he is poked, and loses patience after many pokes in a row', () => {

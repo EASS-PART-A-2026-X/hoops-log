@@ -1,10 +1,14 @@
 import type { Page } from '@playwright/test'
-import { addShotViaForm, drawerToggle, expect, makeShots, notice, openApp, test } from './support'
+import { addShotViaForm, expect, makeShots, notice, openApp, test } from './support'
 
 const face = (page: Page) => page.getByRole('button', { name: 'Open Deni, the coach' })
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'Deni Avdija' })
 const caption = (page: Page) => page.locator('.coach-live')
-const ask = (page: Page, question: string) => dialog(page).getByRole('list', { name: 'Ask Deni' }).getByRole('button', { name: question }).click()
+/** Says something to him in the chat; the stand-in AI service answers (see fake-ai.mjs) and he says the reply. */
+const talk = async (page: Page, text: string) => {
+  await dialog(page).getByRole('textbox', { name: 'Message to Deni' }).fill(text)
+  await dialog(page).getByRole('button', { name: 'Send' }).click()
+}
 
 /** A browser voice that writes down what it is asked to say (and "finishes" it), so speech can be checked silently. */
 async function stubSpeech(page: Page): Promise<void> {
@@ -79,14 +83,20 @@ test.describe('Deni in the corner', () => {
 })
 
 test.describe('Deni’s big view', () => {
-  test('opens with a 3D figure, a name and eight questions, and closes with Escape giving focus back', async ({ page }) => {
+  // The chat needs his AI helper, so the page is not told it is offline here.
+  test.use({ aiHelper: true })
+
+  test('opens with a 3D figure, a name and the chat, and closes with Escape giving focus back', async ({ page }) => {
     await openApp(page)
     await face(page).click()
     await expect(dialog(page)).toBeVisible()
     await expect(dialog(page).getByRole('heading', { name: 'Deni Avdija' })).toBeVisible()
     await expect(dialog(page).locator('.deni-stage canvas')).toBeVisible({ timeout: 20_000 })
-    await expect(dialog(page).getByRole('list', { name: 'Ask Deni' }).getByRole('button')).toHaveCount(8)
-    await expect(dialog(page)).toContainText(/Not the real Deni, and no AI/)
+    await expect(dialog(page).getByRole('log', { name: 'Conversation with Deni' })).toBeVisible()
+    // One way to talk to him: a single message box, and no separate buttons for questions.
+    await expect(dialog(page).getByRole('textbox', { name: 'Message to Deni' })).toHaveCount(1)
+    await expect(dialog(page).getByRole('list', { name: /questions/i })).toHaveCount(0)
+    await expect(dialog(page)).toContainText(/not the real Deni/)
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toHaveCount(0)
     await expect(face(page)).toBeFocused()
@@ -122,41 +132,18 @@ test.describe('Deni’s big view', () => {
   test('answers with the real numbers from your log', async ({ page, api }) => {
     const rows = await api.seed(makeShots('Yuly', 30, { seed: 54, makeRate: 0.6 }))
     const made = rows.filter((r) => r.made).length
-    const fg = Math.round((made / rows.length) * 100)
     await openApp(page)
     await face(page).click()
-    await ask(page, 'How am I shooting?')
-    await expect(caption(page)).toContainText(`You have made ${made} of ${rows.length}, which is ${fg}%`)
-    await ask(page, 'Which NBA player am I like?')
-    await expect(caption(page)).toContainText(/like|closest|match/i)
-    await ask(page, 'How do XP and levels work?')
-    await expect(caption(page)).toContainText(/XP/)
+    await talk(page, 'How am I doing?')
+    // The app worked the numbers out and sent them; the stand-in AI repeats them, and he says them.
+    await expect(caption(page)).toContainText(`You have made ${made} of ${rows.length} for Yuly.`)
   })
 
-  test('with an empty log he does not invent numbers', async ({ page }) => {
+  test('with an empty log nothing is sent for him to invent numbers from', async ({ page }) => {
     await openApp(page)
     await face(page).click()
-    for (const q of ['How am I shooting?', 'What should I practise?', 'Where am I best?']) {
-      await ask(page, q)
-      await expect(caption(page)).toContainText('no shots in this log yet')
-    }
-  })
-
-  test('with too few shots in an area he says the sample is too small', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 4, { seed: 55 }))
-    await openApp(page)
-    await face(page).click()
-    await ask(page, 'Where am I best?')
-    await expect(caption(page)).toContainText(/cannot say|shots yet/i)
-  })
-
-  test('the same question twice in a row gets a "same question" answer', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 20, { seed: 56 }))
-    await openApp(page)
-    await face(page).click()
-    await ask(page, 'How am I shooting?')
-    await ask(page, 'How am I shooting?')
-    await expect(caption(page)).toContainText('Same question?')
+    await talk(page, 'How am I doing?')
+    await expect(caption(page)).toContainText('I have no numbers yet.')
   })
 
   test('poking the figure six times quickly makes him lose patience', async ({ page }) => {
@@ -203,11 +190,10 @@ test.describe('Deni’s big view', () => {
     await expect(caption(page)).toContainText('Cheat code accepted')
   })
 
-  test('the cheat code does not fire while typing in a form field', async ({ page }) => {
+  test('the cheat code does not fire while typing in a field (the chat box, say)', async ({ page }) => {
     await openApp(page)
-    await drawerToggle(page).click()
-    await page.getByRole('button', { name: /Add a shot/ }).click()
-    const note = page.locator('#shots-drawer').getByLabel('Note (optional)')
+    await face(page).click()
+    const note = dialog(page).getByRole('textbox', { name: 'Message to Deni' })
     await note.fill('x')
     await note.focus()
     const before = await caption(page).innerText()
@@ -227,11 +213,11 @@ test.describe('Deni’s big view', () => {
     await openApp(page)
     await face(page).click()
     await expect(dialog(page)).toBeVisible()
-    await ask(page, 'How do I add a shot?')
-    await expect(caption(page)).toContainText(/Shots/)
+    await talk(page, 'How am I doing?')
+    await expect(caption(page)).toContainText(/You have made|no numbers/)
   })
 
-  test('without WebGL the drawn face is shown in the dialog and the questions still work', async ({ page, guard }) => {
+  test('without WebGL the drawn face is shown in the dialog and the chat still works', async ({ page, guard }) => {
     guard.allow(/WebGL/)
     await page.addInitScript(() => {
       const original = HTMLCanvasElement.prototype.getContext
@@ -243,28 +229,29 @@ test.describe('Deni’s big view', () => {
     await openApp(page)
     await face(page).click()
     await expect(dialog(page).getByText(/cannot show the 3D view/)).toBeVisible({ timeout: 20_000 })
-    await ask(page, 'How do I add a shot?')
-    await expect(caption(page)).toContainText(/Shots/)
+    await talk(page, 'How am I doing?')
+    await expect(caption(page)).toContainText(/You have made|no numbers/)
   })
 })
 
 test.describe('Deni’s voice', () => {
-  test.use({ quiet: false })
+  test.use({ quiet: false, aiHelper: true })
 
   test('speaks the caption through the browser voice once you have clicked, and the switch turns it off for good', async ({ page, api }) => {
     await stubSpeech(page)
     await api.seed(makeShots('Yuly', 20, { seed: 61 }))
     await openApp(page)
     await face(page).click()
-    await ask(page, 'How do XP and levels work?')
-    await expect.poll(async () => (await spoken(page)).some((t) => /XP/.test(t))).toBe(true)
+    await talk(page, 'How am I doing?')
+    await expect.poll(async () => (await spoken(page)).some((t) => /You have made/.test(t))).toBe(true)
 
     const voice = dialog(page).getByRole('button', { name: /^Voice:/ })
     await expect(voice).toHaveAttribute('aria-pressed', 'true')
     await voice.click()
     await expect(voice).toContainText('off')
     const count = (await spoken(page)).length
-    await ask(page, 'Tell me something about Deni')
+    await talk(page, 'tell me about the context')
+    await expect(dialog(page).getByText(/I can see \d+ messages/).first()).toBeVisible()
     await page.waitForTimeout(500)
     expect((await spoken(page)).length).toBe(count)
     expect(await page.evaluate(() => window.localStorage.getItem('coach-voice'))).toBe('0')
@@ -278,16 +265,16 @@ test.describe('Deni’s voice', () => {
     await stubSpeech(page)
     await openApp(page)
     await face(page).click()
-    // Positive control: with the sound on, a question is spoken.
-    await ask(page, 'How do XP and levels work?')
-    await expect.poll(async () => (await spoken(page)).filter((t) => /XP/.test(t)).length).toBeGreaterThanOrEqual(1)
+    // Positive control: with the sound on, his answer is spoken.
+    await talk(page, 'How am I doing?')
+    await expect.poll(async () => (await spoken(page)).filter((t) => /no numbers/.test(t)).length).toBeGreaterThanOrEqual(1)
     // The sound button sits outside his dialog (a click out there would close it), so close it first.
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Sound is on, turn it off' }).click()
     await expect(page.getByRole('button', { name: 'Sound is off, turn it on' })).toBeVisible()
     await face(page).click()
     const count = (await spoken(page)).length
-    await ask(page, 'Tell me something about Deni')
+    await talk(page, 'tell me about the context')
     await expect(caption(page)).not.toHaveText('') // he still answers, in writing
     await page.waitForTimeout(600)
     expect((await spoken(page)).length).toBe(count)
@@ -297,8 +284,9 @@ test.describe('Deni’s voice', () => {
     await stubSpeech(page)
     await openApp(page)
     await face(page).click()
-    await ask(page, 'Tell me something about Deni')
-    await expect.poll(async () => (await spoken(page)).length).toBeGreaterThan(0)
+    await talk(page, 'please answer with markdown')
+    await expect(dialog(page).getByText(/Nice/).first()).toBeVisible()
+    await expect.poll(async () => (await spoken(page)).some((t) => /Nice/.test(t))).toBe(true)
     for (const text of await spoken(page)) expect(text).not.toMatch(/[*_`#]|\p{Extended_Pictographic}/u)
   })
 
@@ -312,8 +300,8 @@ test.describe('Deni’s voice', () => {
     await expect(hd).toHaveAttribute('aria-pressed', 'false')
     await hd.click()
     await expect(hd).toContainText('could not load, tap to try again', { timeout: 90_000 })
-    await ask(page, 'How do XP and levels work?')
-    await expect.poll(async () => (await spoken(page)).some((t) => /XP/.test(t))).toBe(true)
+    await talk(page, 'How am I doing?')
+    await expect.poll(async () => (await spoken(page)).some((t) => /no numbers/.test(t))).toBe(true)
   })
 
   test('the HD button is hidden while the voice is off', async ({ page }) => {

@@ -4,12 +4,19 @@ import DeniAvatar from './DeniAvatar'
 import { INTRO, KONAMI, KONAMI_CODE } from './lines'
 import type { AnswerContext } from './lines'
 import type { CoachApi } from './useCoach'
+import type { ChatApi } from './useChat'
 import { play } from '../game/audio'
 
 
 interface Props {
   coach: CoachApi
+  /** The conversation with him, kept by the app so it survives closing the big view. */
+  chat: ChatApi
+  /** Is his AI helper there? null = not known yet, false = offline. */
+  aiAvailable: boolean | null
   context: AnswerContext
+  /** When given, the app decides whether the big view is open (so it can open it from elsewhere). */
+  open?: boolean
   /** Told when the big view opens or closes, so the app can rest the court behind it. */
   onOpenChange?: (open: boolean) => void
 }
@@ -18,9 +25,10 @@ interface Props {
  * The coach in the corner of the page: his face and what he just said as a caption (the voice is a bonus).
  * A click on his face opens the big view with the 3D figure and the questions.
  */
-export default function Coach({ coach, context, onOpenChange }: Props) {
+export default function Coach({ coach, chat, aiAvailable, context, open: controlledOpen, onOpenChange }: Props) {
   const { said, talking, visible, say, hide } = coach
-  const [open, setOpen] = useState(false)
+  const [ownOpen, setOpen] = useState(false)
+  const open = controlledOpen ?? ownOpen
   const faceRef = useRef<HTMLButtonElement>(null)
   const change = useCallback(
     (next: boolean) => {
@@ -82,7 +90,7 @@ export default function Coach({ coach, context, onOpenChange }: Props) {
           <DeniAvatar mood={mood} talking={talking} />
         </button>
       </aside>
-      {open && <CoachDialog coach={coach} context={context} onClose={close} returnTo={faceRef} />}
+      {open && <CoachDialog coach={coach} chat={chat} aiAvailable={aiAvailable} context={context} onClose={close} returnTo={faceRef} />}
     </>
   )
 }

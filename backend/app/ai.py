@@ -33,6 +33,10 @@ CONNECT_TIMEOUT_SECONDS = 5.0
 # The largest answer accepted from the AI service. A real one is a few KB (at most 20
 # shots with short texts); this only stops a broken or hostile reply filling memory.
 MAX_REPLY_BYTES = 200_000
+# "Is the AI helper there?" is answered from a short memory, so many page loads do not
+# each knock on the AI service. Asking is cheap and must never hold a page up.
+STATUS_TTL_SECONDS = 15.0
+STATUS_TIMEOUT_SECONDS = 3.0
 DEFAULT_RATE_LIMIT = 10  # requests ...
 RATE_WINDOW_SECONDS = 60.0  # ... per minute, all callers together
 
@@ -108,3 +112,29 @@ def limit_notes() -> None:
         raise HTTPException(
             429, "Too many requests to the AI helper. Wait a minute and try again."
         )
+
+
+class TimedValue:
+    """Remembers one answer for `ttl` seconds."""
+
+    def __init__(self, ttl: float, clock: Callable[[], float] = time.monotonic) -> None:
+        self.ttl = ttl
+        self.clock = clock
+        self._value: bool | None = None
+        self._at = 0.0
+
+    def get(self) -> bool | None:
+        """The remembered answer, or None when there is none or it is too old."""
+        if self._value is None or self.clock() - self._at >= self.ttl:
+            return None
+        return self._value
+
+    def set(self, value: bool) -> None:
+        self._value = value
+        self._at = self.clock()
+
+    def reset(self) -> None:
+        self._value = None
+
+
+status_cache = TimedValue(STATUS_TTL_SECONDS)
