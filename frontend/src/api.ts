@@ -18,7 +18,7 @@ export interface Shot extends ShotInput {
   shot_type: ShotType
 }
 
-export type ErrorKind = 'unreachable' | 'timeout' | 'invalid' | 'not_found' | 'server'
+export type ErrorKind = 'unreachable' | 'timeout' | 'invalid' | 'not_found' | 'server' | 'unavailable'
 
 export class ApiError extends Error {
   kind: ErrorKind
@@ -39,6 +39,9 @@ export const BACKEND_URL = (
 // A browser fetch has no separate connect timeout, so one deadline covers the whole
 // call, including reading the reply.
 export const TIMEOUT_MS = 10_000
+// Reading notes goes through an AI model, which can take a while: the backend waits up to 70 s
+// for it, so wait a little longer than that before giving up.
+export const NOTES_TIMEOUT_MS = 90_000
 export const PAGE_SIZE = 100 // the backend's maximum page
 export const MAX_PAGES = 50 // 5000 shots; past this the list is marked truncated
 
@@ -58,9 +61,16 @@ export function describeValidation(detail: unknown): string {
   return `Please fix: ${parts.join('; ')}`
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+interface RequestOptions {
+  /** The deadline for the whole call; defaults to TIMEOUT_MS. */
+  timeoutMs?: number
+  /** Show the backend's own `detail` sentence for 429, 502, 503 and 504 (it writes them for people). */
+  useDetail?: boolean
+}
+
+async function request<T>(path: string, init: RequestInit = {}, options: RequestOptions = {}): Promise<T> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TIMEOUT_MS)
   try {
     const hasBody = init.body !== undefined
     const response = await fetch(BACKEND_URL + path, {
@@ -83,6 +93,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     if (response.status === 404) {
       throw new ApiError('not_found', 'That shot no longer exists. The list has been refreshed.')
+    }
+    if (options.useDetail && [429, 502, 503, 504].includes(response.status)) {
+      const detail = (body as { detail?: unknown } | undefined)?.detail
+      if (typeof detail === 'string') throw new ApiError('unavailable', detail)
     }
     throw new ApiError('server', `The server had a problem (status ${response.status}). Try again.`)
   } catch (error) {
@@ -136,4 +150,41 @@ export function updateShot(id: number, input: ShotInput): Promise<Shot> {
 
 export function deleteShot(id: number): Promise<void> {
   return request<void>(`/shots/${id}`, { method: 'DELETE' })
+}
+
+/** A shot the AI found in the player's notes. NOT saved: the user confirms it first. */
+export interface ProposedShot {
+  x: number
+  y: number
+  made: boolean
+  game_date: string
+  note: string
+  /** The words of the notes it came from. */
+  quote: string
+  /** Worked out by the backend from x and y, like for any saved shot. */
+  zone: string
+  shot_type: ShotType
+}
+
+export interface NotesResult {
+  proposals: ProposedShot[]
+  /** Things the AI could not tell and asks about. */
+  questions: string[]
+  /** Things in the notes that are not logged (free throws, assists...). */
+  skipped: string[]
+  /** Which model answered. "test" means a fake one. */
+  model: string
+}
+
+/** Ask the backend (which asks the AI service) to read pasted notes. Saves nothing. */
+export async function extractNotes(text: string, today: string): Promise<NotesResult> {
+  const result = await request<NotesResult>(
+    '/notes/extract',
+    { method: 'POST', body: JSON.stringify({ text, today }) },
+    { timeoutMs: NOTES_TIMEOUT_MS, useDetail: true },
+  )
+  if (!result || !Array.isArray(result.proposals) || !Array.isArray(result.questions) || !Array.isArray(result.skipped)) {
+    throw new ApiError('server', 'The server sent a reply this app could not read. Try again.')
+  }
+  return result
 }

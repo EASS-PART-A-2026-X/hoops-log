@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { defineConfig } from '@playwright/test'
-import { BACKEND_PORT, BACKEND_URL, BASE_URL, FRONTEND_PORT, assertSafeBackend, assertSafeFrontend, assertSafePorts } from './e2e/env'
+import { AI_PORT, AI_URL, BACKEND_PORT, BACKEND_URL, BASE_URL, FRONTEND_PORT, assertSafeBackend, assertSafeFrontend, assertSafePorts } from './e2e/env'
 
 // Before anything is started: a backend URL or port that points at the real one stops the run here.
 assertSafePorts()
@@ -54,7 +54,7 @@ export default defineConfig({
   projects: [
     {
       name: 'fast',
-      testMatch: ['**/smoke.e2e.ts', '**/api.e2e.ts', '**/log-journey.e2e.ts', '**/monkey.e2e.ts'],
+      testMatch: ['**/smoke.e2e.ts', '**/api.e2e.ts', '**/log-journey.e2e.ts', '**/notes.e2e.ts', '**/monkey.e2e.ts'],
       // One short monkey seed; the full run does them all.
       grepInvert: /monkey, seed [2-9]/,
     },
@@ -76,10 +76,19 @@ export default defineConfig({
           command: `uv run fastapi run --host 127.0.0.1 --port ${BACKEND_PORT}`,
           cwd: '../backend',
           url: `${BACKEND_URL}/health`,
-          env: { DATABASE_URL: `sqlite:///${dbFile}` },
+          // The AI service is a stand-in (below). The request limit is raised so the tests are not slowed by it
+          // (the limit itself is covered by the backend's own tests).
+          env: { DATABASE_URL: `sqlite:///${dbFile}`, AI_SERVICE_URL: AI_URL, AI_RATE_LIMIT: '1000' },
           // Never reuse a server that is already there: it could be one with real data.
           reuseExistingServer: false,
           timeout: 60_000,
+        },
+        {
+          command: 'node e2e/fake-ai.mjs',
+          url: `${AI_URL}/health`,
+          env: { E2E_AI_PORT: String(AI_PORT) },
+          reuseExistingServer: false,
+          timeout: 30_000,
         },
         {
           command: `npm run dev -- --host 127.0.0.1 --port ${FRONTEND_PORT} --strictPort`,

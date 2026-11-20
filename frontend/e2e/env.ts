@@ -3,9 +3,12 @@ export const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8011)
 export const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 5199)
 export const BACKEND_URL = process.env.E2E_BACKEND_URL ?? `http://127.0.0.1:${BACKEND_PORT}`
 export const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${FRONTEND_PORT}`
+/** The stand-in AI service (e2e/fake-ai.mjs). The real one is on 8001 and spends a free model quota: never used here. */
+export const AI_PORT = Number(process.env.E2E_AI_PORT ?? 8012)
+export const AI_URL = `http://127.0.0.1:${AI_PORT}`
 
 /** The usual dev servers. Your own shots live behind them, so the tests never touch them. */
-export const FORBIDDEN_PORTS = ['8000', '5173']
+export const FORBIDDEN_PORTS = ['8000', '5173', '8001']
 const LOOPBACK = new Set(['127.0.0.1', 'localhost'])
 
 /**
@@ -34,9 +37,9 @@ export function assertSafeBackend(url: string = BACKEND_URL): void {
 
 /** The ports can be set on their own (E2E_BACKEND_PORT, E2E_FRONTEND_PORT), so they are checked on their own too. */
 export function assertSafePorts(): void {
-  for (const [name, port] of [['E2E_BACKEND_PORT', BACKEND_PORT], ['E2E_FRONTEND_PORT', FRONTEND_PORT]] as const) {
+  for (const [name, port] of [['E2E_BACKEND_PORT', BACKEND_PORT], ['E2E_FRONTEND_PORT', FRONTEND_PORT], ['E2E_AI_PORT', AI_PORT]] as const) {
     if (!Number.isInteger(port) || port < 1024 || FORBIDDEN_PORTS.includes(String(port))) {
-      throw new Error(`Refusing to run the e2e tests: ${name}=${port} is not a safe throwaway port (not 8000 or 5173, and 1024 or higher).`)
+      throw new Error(`Refusing to run the e2e tests: ${name}=${port} is not a safe throwaway port (not 8000, 8001 or 5173, and 1024 or higher).`)
     }
   }
 }
