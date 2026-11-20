@@ -72,6 +72,7 @@ The named volume `backend-data` holds the database, so shots survive `docker rm 
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./data/app.db` | Where the SQLite database file lives. See `backend/.env.example`. |
 | `AI_SERVICE_URL` | `http://localhost:8001` | Where the AI service listens (`ai-service/`). Only `POST /notes/extract` uses it. |
+| `AI_RATE_LIMIT` | `10` | How many `POST /notes/extract` requests are allowed per minute, all callers together (the model's free quota is small). Not a whole number of at least 1: the default. |
 | `AI_SERVICE_TOKEN` | *(empty)* | If the AI service asks for a token (its own `AI_SERVICE_TOKEN`), the same value is sent in the `X-Service-Token` header. |
 
 The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run fastapi dev`, or `docker run -e DATABASE_URL=...`.

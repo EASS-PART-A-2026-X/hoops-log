@@ -23,8 +23,16 @@ CONNECT_TIMEOUT_SECONDS = 5.0
 # The users face this backend, so this is where requests are limited (one shared window:
 # behind a proxy every visitor looks like one address anyway). The model's free quota is
 # small and one request can use several model calls.
-RATE_LIMIT = 10  # requests ...
+DEFAULT_RATE_LIMIT = 10  # requests ...
 RATE_WINDOW_SECONDS = 60.0  # ... per minute, all callers together
+
+
+def rate_limit_from_env() -> int:
+    """Requests per minute (AI_RATE_LIMIT); any other value means the default."""
+    raw = os.environ.get("AI_RATE_LIMIT", "")
+    if raw.isascii() and raw.isdigit() and int(raw) >= 1:
+        return int(raw)
+    return DEFAULT_RATE_LIMIT
 
 
 def ai_url() -> str:
@@ -75,6 +83,7 @@ class RateLimiter:
             self._calls.clear()
 
 
+RATE_LIMIT = rate_limit_from_env()
 notes_limiter = RateLimiter(RATE_LIMIT, RATE_WINDOW_SECONDS)
 
 

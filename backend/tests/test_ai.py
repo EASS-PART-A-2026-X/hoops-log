@@ -7,6 +7,7 @@ import pytest
 
 from app.ai import (
     CONNECT_TIMEOUT_SECONDS,
+    DEFAULT_RATE_LIMIT,
     DEFAULT_URL,
     RATE_LIMIT,
     RATE_WINDOW_SECONDS,
@@ -15,6 +16,7 @@ from app.ai import (
     ai_headers,
     ai_url,
     get_ai_client,
+    rate_limit_from_env,
 )
 
 
@@ -52,8 +54,36 @@ def test_the_client_waits_for_the_model_but_not_for_a_dead_connection():
     assert (READ_TIMEOUT_SECONDS, CONNECT_TIMEOUT_SECONDS) == (70.0, 5.0)
 
 
-def test_the_limit_is_ten_requests_a_minute():
-    assert (RATE_LIMIT, RATE_WINDOW_SECONDS) == (10, 60.0)
+def test_the_limit_is_ten_requests_a_minute_unless_set():
+    assert (DEFAULT_RATE_LIMIT, RATE_WINDOW_SECONDS) == (10, 60.0)
+    assert RATE_LIMIT == 10
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("25", 25),
+        ("1", 1),
+        ("1000", 1000),
+        ("0", 10),
+        ("-3", 10),
+        ("", 10),
+        ("abc", 10),
+        ("2.5", 10),
+        ("\u00b2", 10),
+        (" 7", 10),
+    ],
+)
+def test_the_limit_can_be_set_and_nonsense_means_the_default(
+    monkeypatch, raw, expected
+):
+    monkeypatch.setenv("AI_RATE_LIMIT", raw)
+    assert rate_limit_from_env() == expected
+
+
+def test_no_setting_means_the_default(monkeypatch):
+    monkeypatch.delenv("AI_RATE_LIMIT", raising=False)
+    assert rate_limit_from_env() == 10
 
 
 class Clock:
