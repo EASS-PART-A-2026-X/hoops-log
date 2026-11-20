@@ -51,7 +51,7 @@ NOTHING_FOUND = (
 )
 
 
-def _never_silent(ctx: RunContext[None], result: ExtractionResult) -> ExtractionResult:
+def _never_silent(ctx: RunContext[None], result: AgentResult) -> AgentResult:
     """An empty answer (no shots, no questions, nothing skipped) tells the user nothing.
 
     The model is asked to repair it, so the question comes in the notes' own language.

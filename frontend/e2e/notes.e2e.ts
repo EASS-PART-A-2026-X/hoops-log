@@ -46,6 +46,8 @@ test.describe('paste notes', () => {
     await findShots(page, NOTES)
     await drawer(page).getByRole('button', { name: 'Save all (2)' }).click()
     await expect(drawer(page).getByText('Saved ✓')).toHaveCount(2)
+    // One notice for the whole batch, not one per shot.
+    await expect(notice(page)).toContainText('Saved 2 shots for Yuly.')
     const saved = await api.list()
     expect(saved.map((s) => [s.x, s.y, s.made, s.zone])).toEqual([
       [47.5, 3, true, 'right_corner_3'],

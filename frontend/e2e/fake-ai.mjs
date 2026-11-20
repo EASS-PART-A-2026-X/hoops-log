@@ -2,10 +2,14 @@
 // The throwaway backend is pointed at it (AI_SERVICE_URL), so the tests exercise the real chain
 // browser -> frontend -> backend -> HTTP call to "the AI service", with answers that never change.
 //
-// What it answers depends on a word in the notes, so each test can pick the situation it needs:
-//   "simulate down"     503 (the AI service has no model)        "simulate busy"  429 (provider quota)
-//   "simulate garbage"  200 but an answer that breaks the rules  "vague"          a question, no shots
-//   "corner"            two shots and one thing not logged       anything else    one layup at the rim
+// What it answers depends on a word in the notes, so each test can pick the situation it needs.
+// The FIRST word found in this order wins (so a note with "vague" and "corner" is the vague one):
+//   1. "simulate down"     503 (the AI service has no model)
+//   2. "simulate busy"     429 (provider quota)
+//   3. "simulate garbage"  200 but an answer that breaks the rules
+//   4. "vague"             a question, no shots
+//   5. "corner"            two shots and one thing not logged
+//   6. anything else       one layup at the rim
 // "yesterday" in the notes makes the shots yesterday's, counted from the `today` the backend sends.
 import http from 'node:http'
 

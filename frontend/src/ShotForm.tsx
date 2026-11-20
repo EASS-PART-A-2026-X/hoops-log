@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError } from './api'
 import type { Shot, ShotInput } from './api'
+import { today } from './today'
 
 interface Props {
   /** Present when editing; absent when adding. */
@@ -10,9 +11,6 @@ interface Props {
   onSubmit: (input: ShotInput) => Promise<void>
   onCancel?: () => void
 }
-
-// "Today" for the player, in their own time zone, as YYYY-MM-DD.
-const today = () => new Date().toLocaleDateString('en-CA')
 
 export default function ShotForm({ shot, submitLabel, onSubmit, onCancel }: Props) {
   const id = useId()

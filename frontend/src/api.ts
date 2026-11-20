@@ -18,7 +18,7 @@ export interface Shot extends ShotInput {
   shot_type: ShotType
 }
 
-export type ErrorKind = 'unreachable' | 'timeout' | 'invalid' | 'not_found' | 'server' | 'unavailable'
+export type ErrorKind = 'unreachable' | 'timeout' | 'invalid' | 'not_found' | 'server' | 'unavailable' | 'cancelled'
 
 export class ApiError extends Error {
   kind: ErrorKind
@@ -39,8 +39,8 @@ export const BACKEND_URL = (
 // A browser fetch has no separate connect timeout, so one deadline covers the whole
 // call, including reading the reply.
 export const TIMEOUT_MS = 10_000
-// Reading notes goes through an AI model, which can take a while: the backend waits up to 70 s
-// for it, so wait a little longer than that before giving up.
+// Reading notes goes through an AI model, which can take a while. The deadlines are nested so the
+// inner one fires first (30 s a model call, 60 s the AI service, 70 s the backend, then this 90 s).
 export const NOTES_TIMEOUT_MS = 90_000
 export const PAGE_SIZE = 100 // the backend's maximum page
 export const MAX_PAGES = 50 // 5000 shots; past this the list is marked truncated
@@ -66,11 +66,16 @@ interface RequestOptions {
   timeoutMs?: number
   /** Show the backend's own `detail` sentence for 429, 502, 503 and 504 (it writes them for people). */
   useDetail?: boolean
+  /** Lets the caller give up early: the call then fails with kind 'cancelled'. */
+  signal?: AbortSignal
 }
 
 async function request<T>(path: string, init: RequestInit = {}, options: RequestOptions = {}): Promise<T> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TIMEOUT_MS)
+  const giveUp = () => controller.abort()
+  if (options.signal?.aborted) giveUp()
+  else options.signal?.addEventListener('abort', giveUp, { once: true })
   try {
     const hasBody = init.body !== undefined
     const response = await fetch(BACKEND_URL + path, {
@@ -101,6 +106,7 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
     throw new ApiError('server', `The server had a problem (status ${response.status}). Try again.`)
   } catch (error) {
     if (error instanceof ApiError) throw error
+    if (options.signal?.aborted) throw new ApiError('cancelled', 'The request was cancelled.')
     if (controller.signal.aborted) {
       throw new ApiError('timeout', 'The server took too long to answer. Try again.')
     }
@@ -110,6 +116,7 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
     )
   } finally {
     clearTimeout(timer)
+    options.signal?.removeEventListener('abort', giveUp)
   }
 }
 
@@ -177,11 +184,11 @@ export interface NotesResult {
 }
 
 /** Ask the backend (which asks the AI service) to read pasted notes. Saves nothing. */
-export async function extractNotes(text: string, today: string): Promise<NotesResult> {
+export async function extractNotes(text: string, today: string, signal?: AbortSignal): Promise<NotesResult> {
   const result = await request<NotesResult>(
     '/notes/extract',
     { method: 'POST', body: JSON.stringify({ text, today }) },
-    { timeoutMs: NOTES_TIMEOUT_MS, useDetail: true },
+    { timeoutMs: NOTES_TIMEOUT_MS, useDetail: true, signal },
   )
   if (!result || !Array.isArray(result.proposals) || !Array.isArray(result.questions) || !Array.isArray(result.skipped)) {
     throw new ApiError('server', 'The server sent a reply this app could not read. Try again.')

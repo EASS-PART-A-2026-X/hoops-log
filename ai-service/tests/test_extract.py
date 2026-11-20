@@ -130,8 +130,23 @@ def test_explicit_feet_are_kept_as_given(client, use_model):
     assert (proposal["x"], proposal["y"]) == (30.25, 10.5)
 
 
-def test_the_model_is_never_asked_for_feet_of_a_named_place(client, use_model):
-    """The output schema the model sees offers the fixed list of places."""
+def _enums(node):
+    """Every `enum` list anywhere in a JSON schema."""
+    found = []
+    if isinstance(node, dict):
+        if isinstance(node.get("enum"), list):
+            found.append(node["enum"])
+        for value in node.values():
+            found.extend(_enums(value))
+    elif isinstance(node, list):
+        for value in node:
+            found.extend(_enums(value))
+    return found
+
+
+def test_the_schema_the_model_sees_offers_exactly_the_fixed_list_of_spots(
+    client, use_model
+):
     seen: list[dict] = []
 
     def spy(messages, info: AgentInfo) -> ModelResponse:
@@ -140,9 +155,7 @@ def test_the_model_is_never_asked_for_feet_of_a_named_place(client, use_model):
 
     with use_model(FunctionModel(spy)):
         client.post("/extract", json=BODY)
-    schema = str(seen[0])
-    assert "right_corner_three" in schema
-    assert "left_elbow" in schema
+    assert sorted(SPOTS) in [sorted(values) for values in _enums(seen[0])]
 
 
 @pytest.mark.parametrize(
@@ -399,3 +412,37 @@ def test_only_skipped_things_is_a_real_answer_not_an_empty_one(client, use_model
     assert response.status_code == 200
     assert attempts == 1  # accepted at once, no repair round
     assert response.json()["questions"] == []
+
+
+def test_a_request_that_takes_too_long_is_a_504_and_the_model_is_cut_off(
+    client, use_model, monkeypatch
+):
+    import asyncio
+
+    from app.routers import extract as extract_module
+
+    monkeypatch.setattr(extract_module, "EXTRACT_DEADLINE_SECONDS", 0.05)
+    finished: list[bool] = []
+
+    async def slow(messages, info: AgentInfo) -> ModelResponse:
+        await asyncio.sleep(5)
+        finished.append(True)  # must never be reached: the request is cancelled
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, GOOD)])
+
+    with use_model(FunctionModel(slow)):
+        response = client.post("/extract", json=BODY)
+    assert response.status_code == 504
+    assert response.json()["detail"] == "The AI model took too long to answer."
+    assert finished == []
+
+
+def test_one_model_call_is_cut_before_the_whole_request_is():
+    from app.agent import build_agent
+    from app.routers.extract import EXTRACT_DEADLINE_SECONDS
+
+    per_call = build_agent("test").model_settings["timeout"]
+    # The chain is 30 s per model call < 60 s for the whole request < 70 s (the
+    # backend waits) < 90 s (the browser waits). The last two live in other programs.
+    assert per_call == 30.0
+    assert EXTRACT_DEADLINE_SECONDS == 60.0
+    assert per_call < EXTRACT_DEADLINE_SECONDS

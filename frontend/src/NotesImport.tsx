@@ -1,21 +1,30 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, extractNotes } from './api'
-import type { NotesResult, ProposedShot, ShotInput } from './api'
+import type { NotesResult, ProposedShot, Shot, ShotInput } from './api'
 import { zoneLabel } from './court/stats'
+import { today } from './today'
 
 export const MAX_NOTES = 2000 // the backend's limit
 
-// "Today" for the player, in their own time zone, as YYYY-MM-DD (so "yesterday" is theirs).
-const today = () => new Date().toLocaleDateString('en-CA')
+type Card = {
+  status: 'pending' | 'saving' | 'saved' | 'discarded' | 'error'
+  /** Why a save failed (status 'error'). */
+  message?: string
+  /** Looks like a shot saved from this panel a moment ago: it is not part of "Save all". */
+  lookalike?: boolean
+}
 
-type Card = { status: 'pending' | 'saving' | 'saved' | 'discarded' } | { status: 'error'; message: string }
+// What makes two proposals the same shot, for the "you just saved this" marker.
+const keyOf = (player: string, shot: ProposedShot) => `${player}|${shot.x}|${shot.y}|${shot.made}|${shot.game_date}`
 
 interface Props {
   /** The player the shots are saved for: the "Shots of" choice, or '' when none is chosen yet. */
   defaultPlayer: string
-  /** Save one shot through the normal add-shot path. Rejects with an ApiError when refused. */
-  onSave: (input: ShotInput) => Promise<void>
+  /** Create one shot in the backend, nothing else. Rejects with an ApiError when refused. */
+  onCreate: (input: ShotInput) => Promise<Shot>
+  /** Called ONCE after one shot, or after a whole "Save all", with what was really saved (it refreshes the list and says so). */
+  onSaved: (saved: Shot[]) => Promise<void>
 }
 
 function describe(shot: ProposedShot): string {
@@ -26,7 +35,7 @@ function describe(shot: ProposedShot): string {
  * Paste what you remember about a session; an AI reads it and PROPOSES shots. Nothing is
  * saved until you press Save on a shot, and that goes through the same path as the form.
  */
-export default function NotesImport({ defaultPlayer, onSave }: Props) {
+export default function NotesImport({ defaultPlayer, onCreate, onSaved }: Props) {
   const id = useId()
   const [text, setText] = useState('')
   const [typedPlayer, setTypedPlayer] = useState<string | null>(null)
@@ -36,20 +45,36 @@ export default function NotesImport({ defaultPlayer, onSave }: Props) {
   const [error, setError] = useState<string | null>(null)
   // A ticket per search: a search that was cancelled, or replaced by a newer one, is ignored when it ends.
   const latest = useRef(0)
+  // The request in flight, so Cancel (or leaving the page) really stops it and not only the waiting.
+  const pending = useRef<AbortController | null>(null)
+  // Shots saved from this panel, so a new search that finds the same shots can say so.
+  const savedKeys = useRef<string[]>([])
+  useEffect(() => () => pending.current?.abort(), [])
 
   const player = (typedPlayer ?? defaultPlayer).trim()
   const loading = phase === 'loading'
+  const saving = cards.some((card) => card.status === 'saving')
 
   async function find(event: FormEvent) {
     event.preventDefault()
     const ticket = ++latest.current
+    const controller = new AbortController()
+    pending.current = controller
     setPhase('loading')
     setError(null)
     try {
-      const found = await extractNotes(text.trim(), today())
+      const found = await extractNotes(text.trim(), today(), controller.signal)
       if (ticket !== latest.current) return
+      // Proposals that look like shots just saved are marked (identical shots in one answer are counted one by one).
+      const unmatched = [...savedKeys.current]
+      const marks = found.proposals.map((shot) => {
+        const at = unmatched.indexOf(keyOf(player, shot))
+        if (at === -1) return false
+        unmatched.splice(at, 1)
+        return true
+      })
       setResult(found)
-      setCards(found.proposals.map(() => ({ status: 'pending' })))
+      setCards(marks.map((lookalike) => ({ status: 'pending', lookalike })))
       setPhase('done')
     } catch (caught) {
       if (ticket !== latest.current) return
@@ -61,30 +86,45 @@ export default function NotesImport({ defaultPlayer, onSave }: Props) {
 
   function cancel() {
     latest.current++
+    pending.current?.abort()
     setPhase(result ? 'done' : 'idle')
   }
 
   const setCard = (index: number, card: Card) => setCards((all) => all.map((old, i) => (i === index ? card : old)))
 
-  async function save(index: number) {
+  /** Create one proposed shot; the card shows how it went. Returns the saved shot, or null when it failed. */
+  async function create(index: number): Promise<Shot | null> {
     const shot = result?.proposals[index]
-    if (!shot) return
+    if (!shot) return null
     setCard(index, { status: 'saving' })
     try {
-      await onSave({ player, x: shot.x, y: shot.y, made: shot.made, game_date: shot.game_date, note: shot.note })
+      const saved = await onCreate({ player, x: shot.x, y: shot.y, made: shot.made, game_date: shot.game_date, note: shot.note })
+      savedKeys.current.push(keyOf(player, shot))
       setCard(index, { status: 'saved' })
+      return saved
     } catch (caught) {
       setCard(index, { status: 'error', message: caught instanceof ApiError ? caught.message : 'Could not save this shot.' })
+      return null
     }
   }
 
-  async function saveAll() {
-    // One at a time, in order, so the shot numbers follow the order of the notes.
-    const todo = cards.flatMap((card, index) => (card.status === 'pending' || card.status === 'error' ? [index] : []))
-    for (const index of todo) await save(index)
+  async function save(index: number) {
+    const saved = await create(index)
+    if (saved) await onSaved([saved])
   }
 
-  const open = cards.flatMap((card, index) => (card.status === 'pending' || card.status === 'error' ? [index] : []))
+  async function saveAll() {
+    // One at a time, in order, so the shot numbers follow the order of the notes; then ONE refresh and ONE notice.
+    const todo = cards.flatMap((card, index) => ((card.status === 'pending' || card.status === 'error') && !card.lookalike ? [index] : []))
+    const saved: Shot[] = []
+    for (const index of todo) {
+      const one = await create(index)
+      if (one) saved.push(one)
+    }
+    if (saved.length > 0) await onSaved(saved)
+  }
+
+  const open = cards.flatMap((card, index) => ((card.status === 'pending' || card.status === 'error') && !card.lookalike ? [index] : []))
   const nothingFound = result && result.proposals.length === 0 && result.questions.length === 0 && result.skipped.length === 0
 
   return (
@@ -118,7 +158,7 @@ export default function NotesImport({ defaultPlayer, onSave }: Props) {
           />
         </div>
         <div className="actions">
-          <button type="submit" className="btn primary" disabled={loading || text.trim() === ''}>
+          <button type="submit" className="btn primary" disabled={loading || saving || text.trim() === ''}>
             {loading ? 'Reading…' : 'Find shots'}
           </button>
           {loading && (
@@ -167,6 +207,7 @@ export default function NotesImport({ defaultPlayer, onSave }: Props) {
                           {card.message}
                         </span>
                       )}
+                      {card.lookalike && card.status === 'pending' && <span className="notes-hint">Looks like a shot you just saved.</span>}
                       <span className="actions">
                         {card.status === 'saved' ? (
                           <span className="notes-saved">Saved ✓</span>
@@ -179,7 +220,7 @@ export default function NotesImport({ defaultPlayer, onSave }: Props) {
                               disabled={card.status === 'saving' || !player}
                               onClick={() => void save(index)}
                             >
-                              {card.status === 'saving' ? 'Saving…' : card.status === 'error' ? 'Try again' : 'Save'}
+                              {card.status === 'saving' ? 'Saving…' : card.status === 'error' ? 'Try again' : card.lookalike ? 'Save again' : 'Save'}
                             </button>
                             <button
                               type="button"
@@ -198,7 +239,7 @@ export default function NotesImport({ defaultPlayer, onSave }: Props) {
                 })}
               </ul>
               {open.length > 1 && (
-                <button type="button" className="btn primary" disabled={!player || cards.some((c) => c.status === 'saving')} onClick={() => void saveAll()}>
+                <button type="button" className="btn primary" disabled={!player || saving} onClick={() => void saveAll()}>
                   Save all ({open.length})
                 </button>
               )}

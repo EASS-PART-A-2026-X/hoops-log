@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import logging
 import os
@@ -23,9 +24,14 @@ from app.schemas import AgentResult, ExtractRequest, ExtractResponse
 router = APIRouter(tags=["extract"])
 log = logging.getLogger(__name__)
 
-# One request may take a few model calls (a tool call, a repair). More than this is a
-# runaway: stop it instead of paying for it.
+# One request may take a few model calls (a repair or two). More than this is a runaway:
+# stop it instead of paying for it.
 LIMITS = UsageLimits(request_limit=6, total_tokens_limit=20_000)
+# The whole request, repairs included. A model call alone is cut at 30 s (agent.py); the
+# backend waits 70 s (backend/app/ai.py) and the browser 90 s, so this inner deadline
+# fires first: the answer is a plain 504 and nothing keeps spending the model's quota
+# for a caller who has given up.
+EXTRACT_DEADLINE_SECONDS = 60.0
 
 AgentDep = Annotated["Agent[None, AgentResult] | None", Depends(get_agent)]
 
@@ -68,7 +74,8 @@ async def extract(body: ExtractRequest, agent: AgentDep) -> ExtractResponse:
     if agent is None:
         raise HTTPException(503, "No AI model is configured (set AI_MODEL).")
     try:
-        run = await agent.run(_prompt(body), usage_limits=LIMITS)
+        async with asyncio.timeout(EXTRACT_DEADLINE_SECONDS):
+            run = await agent.run(_prompt(body), usage_limits=LIMITS)
     except UserError as error:  # the model is set up wrong: no key, unknown provider...
         log.error("AI model setup problem: %s", error)
         raise HTTPException(503, "The AI model is not set up correctly.") from error
@@ -77,7 +84,7 @@ async def extract(body: ExtractRequest, agent: AgentDep) -> ExtractResponse:
         raise HTTPException(
             429, "The AI model is busy. Try again in a minute."
         ) from error
-    except (ModelRequestTimeout, ModelTimeoutError) as error:
+    except (ModelRequestTimeout, ModelTimeoutError, TimeoutError) as error:
         log.warning("AI model timed out: %s", error)
         raise HTTPException(504, "The AI model took too long to answer.") from error
     except (ModelAPIError, UnexpectedModelBehavior, UsageLimitExceeded) as error:

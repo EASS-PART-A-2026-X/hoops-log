@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApiError } from './api'
-import type { NotesResult, ProposedShot } from './api'
+import type { NotesResult, ProposedShot, Shot, ShotInput } from './api'
 import NotesImport from './NotesImport'
 
 vi.mock('./api', async (importOriginal) => ({
@@ -32,14 +32,19 @@ const elbow: ProposedShot = { ...corner, x: 17, y: 19, made: false, note: '', qu
 const found = (over: Partial<NotesResult> = {}): NotesResult => ({ proposals: [corner], questions: [], skipped: [], model: 'groq:test', ...over })
 
 const setup = (props: Partial<Parameters<typeof NotesImport>[0]> = {}) => {
-  const onSave = vi.fn().mockResolvedValue(undefined)
+  let id = 0
+  // What the backend does for a new shot: gives it an id and works out its zone.
+  const onCreate = vi.fn(async (input: ShotInput): Promise<Shot> => ({ ...input, id: ++id, zone: 'paint', shot_type: '2PT' }))
+  const onSaved = vi.fn().mockResolvedValue(undefined)
   const user = userEvent.setup()
-  render(<NotesImport defaultPlayer="Yuly" onSave={onSave} {...props} />)
-  return { user, onSave }
+  render(<NotesImport defaultPlayer="Yuly" onCreate={onCreate} onSaved={onSaved} {...props} />)
+  return { user, onCreate, onSaved }
 }
 const write = async (user: ReturnType<typeof userEvent.setup>, text = 'hit one from the right corner') => {
   await user.type(screen.getByLabelText('Your notes'), text)
 }
+// The shots the app was told about in the first (and only) call to onSaved.
+const savedBy = (onSaved: ReturnType<typeof vi.fn>): Shot[] => (onSaved.mock.calls[0] ?? [[]])[0] as Shot[]
 const find = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Find shots' }))
 
 describe('asking', () => {
@@ -58,7 +63,7 @@ describe('asking', () => {
     const { user } = setup()
     await write(user, '  hit one  ')
     await find(user)
-    expect(extract).toHaveBeenCalledWith('hit one', new Date().toLocaleDateString('en-CA'))
+    expect(extract).toHaveBeenCalledWith('hit one', new Date().toLocaleDateString('en-CA'), expect.any(AbortSignal))
   })
 
   it('counts the characters and stops at the backends limit', async () => {
@@ -180,70 +185,70 @@ describe('the answer', () => {
 describe('saving', () => {
   it('saves one shot with the chosen player and the proposed fields, then marks it saved', async () => {
     extract.mockResolvedValue(found())
-    const { user, onSave } = setup()
+    const { user, onCreate } = setup()
     await write(user)
     await find(user)
     await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
-    expect(onSave).toHaveBeenCalledWith({ player: 'Yuly', x: 47.5, y: 3, made: true, game_date: '2026-11-19', note: 'caught and shot' })
+    expect(onCreate).toHaveBeenCalledWith({ player: 'Yuly', x: 47.5, y: 3, made: true, game_date: '2026-11-19', note: 'caught and shot' })
     expect(await screen.findByText('Saved ✓')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Save shot 1' })).toBeNull()
   })
 
   it('uses the player typed in the box instead of the default', async () => {
     extract.mockResolvedValue(found())
-    const { user, onSave } = setup()
+    const { user, onCreate } = setup()
     await write(user)
     await user.clear(screen.getByLabelText('Save the shots for'))
     await user.type(screen.getByLabelText('Save the shots for'), '  Noam ')
     await find(user)
     await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
-    expect(onSave.mock.calls[0]?.[0].player).toBe('Noam')
+    expect(onCreate.mock.calls[0]?.[0].player).toBe('Noam')
   })
 
   it('will not save without a player, and says why', async () => {
     extract.mockResolvedValue(found())
-    const { user, onSave } = setup({ defaultPlayer: '' })
+    const { user, onCreate } = setup({ defaultPlayer: '' })
     await write(user)
     await find(user)
     expect(await screen.findByText('Enter the player above to save these shots.')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Save shot 1' }) as HTMLButtonElement).disabled).toBe(true)
     await user.type(screen.getByLabelText('Save the shots for'), 'Yuly')
     expect((screen.getByRole('button', { name: 'Save shot 1' }) as HTMLButtonElement).disabled).toBe(false)
-    expect(onSave).not.toHaveBeenCalled()
+    expect(onCreate).not.toHaveBeenCalled()
   })
 
   it('keeps a shot that failed to save, shows why, and lets the user try again', async () => {
     extract.mockResolvedValue(found())
-    const { user, onSave } = setup()
-    onSave.mockImplementationOnce(() => Promise.reject(new ApiError('unreachable', "Can't reach the backend")))
+    const { user, onCreate } = setup()
+    onCreate.mockImplementationOnce(() => Promise.reject(new ApiError('unreachable', "Can't reach the backend")))
     await write(user)
     await find(user)
     await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
     expect((await screen.findByRole('alert')).textContent).toContain("Can't reach the backend")
     await user.click(screen.getByRole('button', { name: 'Save shot 1' }))
     expect(await screen.findByText('Saved ✓')).toBeTruthy()
-    expect(onSave).toHaveBeenCalledTimes(2)
+    expect(onCreate).toHaveBeenCalledTimes(2)
   })
 
   it('discarding removes a proposal without saving it', async () => {
     extract.mockResolvedValue(found({ proposals: [corner, elbow] }))
-    const { user, onSave } = setup()
+    const { user, onCreate } = setup()
     await write(user)
     await find(user)
     await user.click(await screen.findByRole('button', { name: 'Discard shot 1' }))
     expect(screen.queryByText(/Right corner 3/)).toBeNull()
     expect(screen.getByText(/Left elbow/)).toBeTruthy()
-    expect(onSave).not.toHaveBeenCalled()
+    expect(onCreate).not.toHaveBeenCalled()
   })
 
   it('Save all saves every open shot in the order of the notes, and only shows with two or more', async () => {
     extract.mockResolvedValue(found({ proposals: [corner, elbow] }))
-    const { user, onSave } = setup()
+    const { user, onCreate } = setup()
     await write(user)
     await find(user)
     await user.click(await screen.findByRole('button', { name: 'Save all (2)' }))
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2))
-    expect(onSave.mock.calls.map((call) => call[0])).toEqual([
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(2))
+    expect(onCreate.mock.calls.map((call) => call[0])).toEqual([
       { player: 'Yuly', x: 47.5, y: 3, made: true, game_date: '2026-11-19', note: 'caught and shot' },
       { player: 'Yuly', x: 17, y: 19, made: false, game_date: '2026-11-19', note: '' },
     ])
@@ -262,14 +267,190 @@ describe('saving', () => {
 
   it('Save all skips a shot that is already saved or discarded', async () => {
     extract.mockResolvedValue(found({ proposals: [corner, elbow, { ...elbow, x: 33 }] }))
-    const { user, onSave } = setup()
+    const { user, onCreate } = setup()
     await write(user)
     await find(user)
     await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
     await user.click(screen.getByRole('button', { name: 'Discard shot 2' }))
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     expect(screen.queryByRole('button', { name: /Save all/ })).toBeNull()
     const list = screen.getByRole('list')
     expect(within(list).getAllByRole('listitem')).toHaveLength(2)
+  })
+})
+
+describe('one refresh and one notice per save, however many shots', () => {
+  it('tells the app once after a single save, with the shot that was really created', async () => {
+    extract.mockResolvedValue(found())
+    const { user, onSaved } = setup()
+    await write(user)
+    await find(user)
+    await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(onSaved.mock.calls[0]?.[0]).toEqual([expect.objectContaining({ id: 1, x: 47.5, y: 3, made: true, player: 'Yuly' })])
+  })
+
+  it('Save all creates each shot but tells the app only once, with all of them in order', async () => {
+    extract.mockResolvedValue(found({ proposals: [corner, elbow] }))
+    const { user, onCreate, onSaved } = setup()
+    await write(user)
+    await find(user)
+    await user.click(await screen.findByRole('button', { name: 'Save all (2)' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(onCreate).toHaveBeenCalledTimes(2)
+    expect(savedBy(onSaved).map((shot) => [shot.id, shot.x])).toEqual([
+      [1, 47.5],
+      [2, 17],
+    ])
+  })
+
+  it('Save all tells the app only about the shots that really saved, and keeps the failed one to retry', async () => {
+    extract.mockResolvedValue(found({ proposals: [corner, elbow] }))
+    const { user, onCreate, onSaved } = setup()
+    onCreate.mockImplementationOnce(() => Promise.reject(new ApiError('server', 'The server had a problem (status 500). Try again.')))
+    await write(user)
+    await find(user)
+    await user.click(await screen.findByRole('button', { name: 'Save all (2)' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(savedBy(onSaved).map((shot) => shot.x)).toEqual([17])
+    expect((await screen.findByRole('alert')).textContent).toContain('status 500')
+    expect(screen.getByRole('button', { name: 'Save shot 1' }).textContent).toBe('Try again')
+  })
+
+  it('does not tell the app anything when the only save failed', async () => {
+    extract.mockResolvedValue(found())
+    const { user, onCreate, onSaved } = setup()
+    onCreate.mockImplementationOnce(() => Promise.reject(new ApiError('unreachable', "Can't reach the backend")))
+    await write(user)
+    await find(user)
+    await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
+    await screen.findByRole('alert')
+    expect(onSaved).not.toHaveBeenCalled()
+  })
+})
+
+describe('a search cannot start while a save is running', () => {
+  it('disables Find shots until the save ends', async () => {
+    extract.mockResolvedValue(found())
+    let finish: (shot: Shot) => void = () => {}
+    const { user, onCreate } = setup()
+    onCreate.mockImplementationOnce(() => new Promise<Shot>((resolve) => (finish = resolve)))
+    await write(user)
+    await find(user)
+    await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
+    expect((screen.getByRole('button', { name: 'Find shots' }) as HTMLButtonElement).disabled).toBe(true)
+    finish({ ...corner, player: 'Yuly', id: 9, note: '' } as unknown as Shot)
+    await screen.findByText('Saved ✓')
+    expect((screen.getByRole('button', { name: 'Find shots' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+})
+
+describe('shots that look like ones just saved', () => {
+  const searchTwice = async (second: ProposedShot[], first: ProposedShot[] = [corner]) => {
+    extract.mockResolvedValueOnce(found({ proposals: first })).mockResolvedValueOnce(found({ proposals: second }))
+    const view = setup()
+    await write(view.user)
+    await find(view.user)
+    await view.user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
+    await screen.findByText('Saved ✓')
+    await find(view.user)
+    return view
+  }
+
+  it('marks them, offers Save again, and keeps them out of Save all', async () => {
+    await searchTwice([corner, elbow, { ...elbow, x: 33 }])
+    expect(await screen.findByText('Looks like a shot you just saved.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save shot 1' }).textContent).toBe('Save again')
+    expect(screen.getByRole('button', { name: 'Save shot 2' }).textContent).toBe('Save')
+    expect(screen.getByRole('button', { name: 'Save all (2)' })).toBeTruthy()
+  })
+
+  it('Save all really leaves the marked shot out', async () => {
+    const { user, onCreate, onSaved } = await searchTwice([corner, elbow, { ...elbow, x: 33 }])
+    await user.click(await screen.findByRole('button', { name: 'Save all (2)' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2)) // the first save, then this batch
+    // 1 for the first save, then only the two that are not marked.
+    expect(onCreate.mock.calls.map((call) => call[0].x)).toEqual([47.5, 17, 33])
+  })
+
+  it('a shot at the same spot with a different result is not the same shot', async () => {
+    await searchTwice([{ ...corner, made: false }])
+    await screen.findByRole('button', { name: 'Save shot 1' })
+    expect(screen.queryByText('Looks like a shot you just saved.')).toBeNull()
+  })
+
+  it('a shot on a different day is not the same shot', async () => {
+    await searchTwice([{ ...corner, game_date: '2026-11-18' }])
+    await screen.findByRole('button', { name: 'Save shot 1' })
+    expect(screen.queryByText('Looks like a shot you just saved.')).toBeNull()
+  })
+
+  it('a marked shot can still be saved on purpose', async () => {
+    const { user, onCreate } = await searchTwice([corner])
+    await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
+    await screen.findByText('Saved ✓')
+    expect(onCreate).toHaveBeenCalledTimes(2)
+  })
+
+  it('counts identical shots one by one: one saved before means one marked now', async () => {
+    await searchTwice([elbow, elbow], [elbow, elbow])
+    expect(await screen.findAllByText('Looks like a shot you just saved.')).toHaveLength(1)
+  })
+
+  it('does not mark a shot for a different player', async () => {
+    extract.mockResolvedValue(found())
+    const { user } = setup()
+    await write(user)
+    await find(user)
+    await user.click(await screen.findByRole('button', { name: 'Save shot 1' }))
+    await screen.findByText('Saved ✓')
+    await user.clear(screen.getByLabelText('Save the shots for'))
+    await user.type(screen.getByLabelText('Save the shots for'), 'Noam')
+    await find(user)
+    await screen.findByRole('button', { name: 'Save shot 1' })
+    expect(screen.queryByText('Looks like a shot you just saved.')).toBeNull()
+  })
+
+  it('does not mark shots that were never saved (discarded or not yet saved)', async () => {
+    extract.mockResolvedValue(found())
+    const { user } = setup()
+    await write(user)
+    await find(user)
+    await user.click(await screen.findByRole('button', { name: 'Discard shot 1' }))
+    await find(user)
+    await screen.findByRole('button', { name: 'Save shot 1' })
+    expect(screen.queryByText('Looks like a shot you just saved.')).toBeNull()
+  })
+})
+
+describe('Cancel really stops the request', () => {
+  // The signal of every call, in order.
+  const signals: AbortSignal[] = []
+  const neverAnswers = () =>
+    extract.mockImplementation((_text, _today, given) => {
+      if (given) signals.push(given)
+      return new Promise(() => {})
+    })
+  beforeEach(() => {
+    signals.length = 0
+  })
+
+  it('aborts the call that is in flight', async () => {
+    neverAnswers()
+    const { user } = setup()
+    await write(user)
+    await find(user)
+    expect(signals.map((signal) => signal.aborted)).toEqual([false])
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(signals.map((signal) => signal.aborted)).toEqual([true])
+  })
+
+  it('aborts the call when the panel goes away', async () => {
+    neverAnswers()
+    const { user } = setup()
+    await write(user)
+    await find(user)
+    cleanup()
+    expect(signals.map((signal) => signal.aborted)).toEqual([true])
   })
 })

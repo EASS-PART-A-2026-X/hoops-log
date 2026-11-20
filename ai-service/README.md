@@ -92,14 +92,14 @@ Answer (`200`):
 | 502 | The provider failed, or the model kept returning output that does not fit the contract (it gets 2 repair attempts), or one request used more than 6 model calls or 20,000 tokens. |
 | 500 | Something nobody planned for. A plain sentence; the details go to the server log only. |
 | 503 | No `AI_MODEL`, or the model is set up wrong (missing key, unknown provider). |
-| 504 | The model took longer than 30 seconds. |
+| 504 | One model call took longer than 30 seconds, or the whole request (repairs included) took longer than 60. |
 
 Error messages are plain sentences; provider details go to the server log only.
 
 ## Test it
 
 ```bash
-uv run pytest          # 58 tests, about a second
+uv run pytest          # 60 tests, about a second
 uv run ruff check . && uv run ruff format --check .
 ```
 
@@ -121,6 +121,13 @@ They check the service's own behaviour, not how good a real model's answers are 
 evaluation work).
 
 `scripts/ci.sh` runs this service's lint, format and tests together with the backend's.
+
+## Deadlines
+
+They are nested so the inner one always fires first and says so: 30 s for one model call, 60 s for
+the whole `/extract` (then it answers `504` and stops, so it does not keep spending the model's quota
+for a caller who gave up), 70 s that the backend waits for this service, 90 s that the browser waits
+for the backend.
 
 ## Who calls it
 

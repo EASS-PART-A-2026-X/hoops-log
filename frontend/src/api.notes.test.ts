@@ -77,4 +77,52 @@ describe('extractNotes', () => {
     expect(error.kind).toBe('timeout')
     expect(NOTES_TIMEOUT_MS).toBe(90_000)
   })
+
+  describe('when the caller gives up', () => {
+    // A fetch that waits until its signal is aborted, like the real one.
+    const waiting = (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        const fail = () => reject(new DOMException('aborted', 'AbortError'))
+        if (init?.signal?.aborted) fail() // a real fetch refuses an already aborted signal at once
+        else init?.signal?.addEventListener('abort', fail)
+      })
+
+    it('stops the request and fails with kind "cancelled", not "timeout"', async () => {
+      const fetch = stubFetch(waiting)
+      const caller = new AbortController()
+      const pending = extractNotes('x', '2026-11-20', caller.signal).catch((e: unknown) => e)
+      await Promise.resolve()
+      expect(fetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(false)
+      caller.abort()
+      const error = (await pending) as ApiError
+      expect(error.kind).toBe('cancelled')
+      expect(error.message).toBe('The request was cancelled.')
+      expect(fetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    })
+
+    it('does not even wait when the signal is already aborted', async () => {
+      stubFetch(waiting)
+      const caller = new AbortController()
+      caller.abort()
+      const error = (await extractNotes('x', '2026-11-20', caller.signal).catch((e: unknown) => e)) as ApiError
+      expect(error.kind).toBe('cancelled')
+    })
+
+    it('a call nobody cancels still times out as before, with a signal given', async () => {
+      vi.useFakeTimers()
+      stubFetch(waiting)
+      const caller = new AbortController()
+      const pending = extractNotes('x', '2026-11-20', caller.signal).catch((e: unknown) => e)
+      await vi.advanceTimersByTimeAsync(NOTES_TIMEOUT_MS)
+      expect(((await pending) as ApiError).kind).toBe('timeout')
+    })
+
+    it('lets go of the signal when the call is over', async () => {
+      stubFetch(async () => reply(200, GOOD))
+      const caller = new AbortController()
+      const remove = vi.spyOn(caller.signal, 'removeEventListener')
+      await extractNotes('x', '2026-11-20', caller.signal)
+      expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+    })
+  })
 })

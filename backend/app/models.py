@@ -16,7 +16,7 @@ def _not_too_far_ahead(value: date) -> date:
     return value
 
 
-def _printable_text(value: str) -> str:
+def printable_text(value: str) -> str:
     """Reject text that cannot be stored or drawn.
 
     Lone surrogates make SQLite fail (500). Control characters and the non-characters
@@ -34,12 +34,12 @@ def _printable_text(value: str) -> str:
 
 # Each limit is defined once and used by both ShotBase and ShotUpdate.
 Player = Annotated[
-    str, Field(min_length=1, max_length=50), AfterValidator(_printable_text)
+    str, Field(min_length=1, max_length=50), AfterValidator(printable_text)
 ]
 CourtX = Annotated[float, Field(ge=0, le=50)]
 CourtY = Annotated[float, Field(ge=0, le=47)]
 GameDate = Annotated[date, AfterValidator(_not_too_far_ahead)]
-Note = Annotated[str, Field(max_length=200), AfterValidator(_printable_text)]
+Note = Annotated[str, Field(max_length=200), AfterValidator(printable_text)]
 
 
 class ShotBase(SQLModel):

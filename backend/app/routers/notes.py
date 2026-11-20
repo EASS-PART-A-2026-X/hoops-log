@@ -13,15 +13,19 @@ from pydantic import (
     computed_field,
 )
 
-from app.ai import ai_headers, ai_url, get_ai_client, limit_notes
+from app.ai import MAX_REPLY_BYTES, ai_headers, ai_url, get_ai_client, limit_notes
 from app.court import ShotType, Zone, shot_type_of, zone_of
-from app.models import CourtX, CourtY, GameDate, Note, _printable_text
+from app.models import CourtX, CourtY, GameDate, Note, printable_text
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 log = logging.getLogger(__name__)
 
-MAX_TEXT = 2000  # characters of pasted notes (the AI service has the same limit)
-Line = Annotated[str, Field(max_length=200), AfterValidator(_printable_text)]
+# These limits match the AI service's own (ai-service/app/schemas.py).
+MAX_TEXT = 2000  # characters of pasted notes
+MAX_PROPOSALS = 20  # shots in one answer
+MAX_QUESTIONS = 5
+MAX_SKIPPED = 10
+MAX_MODEL_NAME = 100
 
 UNAVAILABLE = (
     "The AI helper is not available right now. You can still add shots with the form."
@@ -42,7 +46,7 @@ class NotesRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     text: Annotated[
-        str, Field(min_length=1, max_length=MAX_TEXT), AfterValidator(_printable_text)
+        str, Field(min_length=1, max_length=MAX_TEXT), AfterValidator(printable_text)
     ]
     # The player's today, so "yesterday" is theirs even when the server is elsewhere.
     today: date | None = None
@@ -56,7 +60,7 @@ class ProposedShot(BaseModel):
     made: bool
     game_date: GameDate
     note: Note = ""
-    quote: Line = ""  # the words of the notes it came from
+    quote: Note = ""  # the words of the notes it came from
 
     @computed_field
     @property
@@ -70,16 +74,15 @@ class ProposedShot(BaseModel):
 
 
 class NotesResult(BaseModel):
-    proposals: Annotated[list[ProposedShot], Field(max_length=20)]
-    questions: Annotated[list[Line], Field(max_length=5)]
-    skipped: Annotated[list[Line], Field(max_length=10)]
-    model: Annotated[str, Field(max_length=100)]
+    proposals: Annotated[list[ProposedShot], Field(max_length=MAX_PROPOSALS)]
+    questions: Annotated[list[Note], Field(max_length=MAX_QUESTIONS)]
+    skipped: Annotated[list[Note], Field(max_length=MAX_SKIPPED)]
+    model: Annotated[str, Field(max_length=MAX_MODEL_NAME)]
 
 
 @router.post(
     "/extract",
     response_model=NotesResult,
-    dependencies=[Depends(limit_notes)],
     responses={
         429: {"description": "Too many requests, or the AI model is busy"},
         502: {"description": "The AI helper gave no usable answer"},
@@ -93,12 +96,21 @@ async def extract_shots(body: NotesRequest, client: ClientDep) -> NotesResult:
 
     To keep a proposed shot, the browser sends it to `POST /shots` like any other shot.
     """
+    # Here, after the body was checked, so a request that ends in a 422 is not counted.
+    limit_notes()
+    content = bytearray()
     try:
-        reply = await client.post(
+        async with client.stream(
+            "POST",
             f"{ai_url()}/extract",
             json=body.model_dump(mode="json", exclude_none=True),
             headers=ai_headers(),
-        )
+        ) as reply:
+            status = reply.status_code
+            async for chunk in reply.aiter_bytes():
+                content += chunk
+                if len(content) > MAX_REPLY_BYTES:
+                    break  # never read more than this from another program
     except (httpx.ConnectError, httpx.ConnectTimeout) as error:
         log.warning("AI service unreachable: %s", error)
         raise HTTPException(503, UNAVAILABLE) from error
@@ -108,19 +120,23 @@ async def extract_shots(body: NotesRequest, client: ClientDep) -> NotesResult:
     except httpx.HTTPError as error:
         log.error("AI service call failed: %s", error)
         raise HTTPException(502, UNUSABLE) from error
-    if reply.status_code == 429:
+    if status == 429:
         raise HTTPException(429, BUSY)
-    if reply.status_code == 503:
+    if status == 503:
         raise HTTPException(503, UNAVAILABLE)
-    if reply.status_code == 504:
+    if status == 504:
         raise HTTPException(504, TIMED_OUT)
-    if reply.status_code != 200:
+    text = content.decode("utf-8", "replace")
+    if status != 200:
         # Includes a wrong service token (401) and anything we did not plan for.
-        log.error("AI service answered %s: %s", reply.status_code, reply.text[:200])
+        log.error("AI service answered %s: %s", status, text[:200])
+        raise HTTPException(502, UNUSABLE)
+    if len(content) > MAX_REPLY_BYTES:
+        log.error("AI service sent more than %s bytes", MAX_REPLY_BYTES)
         raise HTTPException(502, UNUSABLE)
     try:
         # Never trust another program's answer: it must obey this backend's own rules.
-        return NotesResult.model_validate_json(reply.content)
+        return NotesResult.model_validate_json(content)
     except ValidationError as error:
         log.error("AI service sent an answer that breaks the rules: %s", error)
         raise HTTPException(502, UNUSABLE) from error

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
-import type { ShotInput } from './api'
+import type { Shot, ShotInput } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
@@ -69,17 +69,20 @@ export default function App() {
   const selectedId = shots?.some((s) => s.id === pickedId) ? pickedId : null
 
   // After a write, show the backend's fresh data, not our guess of it.
-  async function saveNew(input: ShotInput) {
-    const saved = await createShot(input)
-    setNotice({ kind: 'ok', text: `Saved shot #${saved.id} for ${saved.player}.` })
-    play(saved.made ? 'swish' : 'rim')
+  // One shot or a whole batch is saved: say so once, play one sound, and show the backend's fresh list once.
+  async function afterSaved(saved: Shot[]) {
+    const last = saved.at(-1)
+    if (!last) return
+    const text = saved.length === 1 ? `Saved shot #${last.id} for ${last.player}.` : `Saved ${saved.length} shots for ${last.player}.`
+    setNotice({ kind: 'ok', text })
+    play(last.made ? 'swish' : 'rim')
     await refresh()
-    // The map shows one player's shots: switch to the saved shot's player so the new shot is visible.
-    setShooterChoice(saved.player)
+    // The map shows one player's shots: switch to the saved shot's player so the new shots are visible.
+    setShooterChoice(last.player)
   }
 
   async function add(input: ShotInput) {
-    await saveNew(input)
+    await afterSaved([await createShot(input)])
     setDrawerView('list') // show the new row
   }
 
@@ -456,7 +459,7 @@ export default function App() {
 
               <section hidden={drawerView !== 'notes'} aria-labelledby="notes-title">
                 <h2 id="notes-title">Paste notes</h2>
-                <NotesImport defaultPlayer={shooter} onSave={saveNew} />
+                <NotesImport defaultPlayer={shooter} onCreate={createShot} onSaved={afterSaved} />
               </section>
 
               <section hidden={drawerView !== 'list'} aria-labelledby="list-title">

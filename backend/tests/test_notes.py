@@ -11,7 +11,8 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.ai import RATE_LIMIT, notes_limiter
+from app.ai import DEFAULT_RATE_LIMIT as RATE_LIMIT
+from app.ai import notes_limiter
 
 GOOD = {
     "proposals": [
@@ -304,6 +305,20 @@ def test_the_eleventh_request_in_a_minute_is_refused_without_calling_the_ai(
     assert "Too many requests" in last.json()["detail"]
 
 
+def test_requests_that_fail_validation_do_not_use_up_the_minute(client, fake_ai):
+    seen = fake_ai(answer())
+    codes = [post(client, {"text": ""}).status_code for _ in range(RATE_LIMIT + 5)]
+    assert codes == [422] * (RATE_LIMIT + 5)
+    assert post(client).status_code == 200  # the whole minute is still there
+    assert len(seen) == 1
+
+
+def test_ai_rate_limit_is_read_when_a_request_arrives(client, fake_ai, monkeypatch):
+    fake_ai(answer())
+    monkeypatch.setenv("AI_RATE_LIMIT", "2")
+    assert [post(client).status_code for _ in range(3)] == [200, 200, 429]
+
+
 def test_a_minute_later_requests_are_allowed_again(client, fake_ai, monkeypatch):
     fake_ai(answer())
     now = [1000.0]
@@ -319,6 +334,61 @@ def test_the_limit_only_covers_the_ai_endpoint(client, fake_ai):
         post(client)
     assert client.get("/shots").status_code == 200
     assert client.get("/health").status_code == 200
+
+
+# --- a reply that is too big ---
+
+
+def test_a_reply_over_the_size_cap_is_refused(client, fake_ai):
+    from app.ai import MAX_REPLY_BYTES
+
+    huge = {**GOOD, "skipped": ["x" * 150] * 10, "padding": "p" * MAX_REPLY_BYTES}
+    fake_ai(answer(huge))
+    response = post(client)
+    assert response.status_code == 502
+    assert "usable answer" in response.json()["detail"]
+
+
+def test_a_reply_just_under_the_size_cap_is_still_read(client, fake_ai):
+    from app.ai import MAX_REPLY_BYTES
+
+    body = json.dumps({**GOOD, "padding": ""})
+    padding = "p" * (MAX_REPLY_BYTES - len(body))
+    exact = json.dumps({**GOOD, "padding": padding})
+    assert len(exact) == MAX_REPLY_BYTES
+    fake_ai(lambda request: httpx.Response(200, content=exact))
+    assert post(client).status_code == 200
+
+
+def test_one_byte_over_the_cap_is_refused_even_when_it_arrives_in_pieces(
+    client, fake_ai
+):
+    from app.ai import MAX_REPLY_BYTES
+
+    valid = json.dumps(GOOD)
+    # Valid JSON padded with spaces to exactly one byte over the cap, sent in two
+    # pieces: cutting it at the cap would still leave a valid answer, so only a real
+    # size check refuses it.
+    body = (valid + " " * (MAX_REPLY_BYTES + 1 - len(valid))).encode()
+    assert len(body) == MAX_REPLY_BYTES + 1
+
+    async def pieces():
+        yield body[:MAX_REPLY_BYTES]
+        yield body[MAX_REPLY_BYTES:]
+
+    fake_ai(lambda request: httpx.Response(200, content=pieces()))
+    assert post(client).status_code == 502
+
+
+def test_the_error_log_shows_only_the_start_of_a_multibyte_body(
+    client, fake_ai, caplog
+):
+    fake_ai(lambda request: httpx.Response(500, content=("\u05e9" * 300).encode()))
+    with caplog.at_level("ERROR", logger="app.routers.notes"):
+        assert post(client).status_code == 502
+    logged = " ".join(record.getMessage() for record in caplog.records)
+    assert "\u05e9" * 200 in logged
+    assert "\u05e9" * 201 not in logged
 
 
 # --- it is documented ---
