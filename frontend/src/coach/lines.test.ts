@@ -207,6 +207,18 @@ describe('milestones, facts and eggs', () => {
     expect(second.text).toMatch(/^Same question/)
   })
 
+  it('tells you to just tell him about a shot when his AI helper is there, and to use the form when it is offline', () => {
+    expect(answer('add', { ...ctx([]), aiAvailable: true }).text).toMatch(/Just tell me/)
+    expect(answer('add', ctx([])).text).toMatch(/Just tell me/) // not known yet counts as there
+    const offline = answer('add', { ...ctx([]), aiAvailable: false }).text
+    expect(offline).toMatch(/offline/)
+    expect(offline).toMatch(/Add a shot/)
+  })
+
+  it('invites a new player to tell him about the first shot', () => {
+    expect(greet('Yuly', 0, 'Rookie').text).toMatch(/tell me about your first shot/)
+  })
+
   it('has the cheat code in the right order', () => {
     expect(KONAMI_CODE.join(' ')).toBe('arrowup arrowup arrowdown arrowdown arrowleft arrowright arrowleft arrowright b a')
     expect(poke(0).text).not.toBe(poke(1).text)

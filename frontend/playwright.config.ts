@@ -54,7 +54,7 @@ export default defineConfig({
   projects: [
     {
       name: 'fast',
-      testMatch: ['**/smoke.e2e.ts', '**/api.e2e.ts', '**/log-journey.e2e.ts', '**/notes.e2e.ts', '**/monkey.e2e.ts'],
+      testMatch: ['**/smoke.e2e.ts', '**/api.e2e.ts', '**/log-journey.e2e.ts', '**/chat.e2e.ts', '**/monkey.e2e.ts'],
       // One short monkey seed; the full run does them all.
       grepInvert: /monkey, seed [2-9]/,
     },

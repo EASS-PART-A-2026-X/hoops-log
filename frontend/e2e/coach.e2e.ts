@@ -4,7 +4,7 @@ import { addShotViaForm, drawerToggle, expect, makeShots, notice, openApp, test 
 const face = (page: Page) => page.getByRole('button', { name: 'Open Deni, the coach' })
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'Deni Avdija' })
 const caption = (page: Page) => page.locator('.coach-live')
-const ask = (page: Page, question: string) => dialog(page).getByRole('list', { name: 'Ask Deni' }).getByRole('button', { name: question }).click()
+const ask = (page: Page, question: string) => dialog(page).getByRole('list', { name: 'Quick questions for Deni' }).getByRole('button', { name: question }).click()
 
 /** A browser voice that writes down what it is asked to say (and "finishes" it), so speech can be checked silently. */
 async function stubSpeech(page: Page): Promise<void> {
@@ -85,8 +85,8 @@ test.describe('Deni’s big view', () => {
     await expect(dialog(page)).toBeVisible()
     await expect(dialog(page).getByRole('heading', { name: 'Deni Avdija' })).toBeVisible()
     await expect(dialog(page).locator('.deni-stage canvas')).toBeVisible({ timeout: 20_000 })
-    await expect(dialog(page).getByRole('list', { name: 'Ask Deni' }).getByRole('button')).toHaveCount(8)
-    await expect(dialog(page)).toContainText(/Not the real Deni, and no AI/)
+    await expect(dialog(page).getByRole('list', { name: 'Quick questions for Deni' }).getByRole('button')).toHaveCount(8)
+    await expect(dialog(page)).toContainText(/Not the real Deni/)
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toHaveCount(0)
     await expect(face(page)).toBeFocused()

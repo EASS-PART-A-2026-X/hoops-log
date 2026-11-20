@@ -1,6 +1,7 @@
 /**
- * What the coach says. Every line is written in advance and filled in with the user's own numbers: there is
- * no AI behind it (that is a later step), so the same shots always give the same words. The lines are
+ * What the coach says WITHOUT the AI. Every line here is written in advance and filled in with the user's own
+ * numbers, so the same shots always give the same words. It is what he says unprompted (greetings, milestones),
+ * how he answers the tapped questions about the app, and everything when his AI helper is offline. The lines are
  * plain coaching, never quotes from a real person.
  */
 import { MIN_SHOTS_FOR_MATCH, NBA_OVERALL, NBA_THREE_SHARE, SMALL_SAMPLE, compareZones, rankPlayers } from '../court/nba'
@@ -21,7 +22,7 @@ function pick<T>(options: readonly T[], n: number): T {
 }
 
 export const INTRO: Line = {
-  text: 'I am Deni, a fan-made coach. I only know what is in your log, so ask me about your shots.',
+  text: 'I am Deni, a fan-made coach. Ask me about your shots, or tell me about a session and I will show the shots for you to save.',
   mood: 'happy',
 }
 
@@ -32,7 +33,7 @@ function shotsOf(n: number): string {
 
 export function greet(name: string, shots: number, rank: string, n = 0): Line {
   if (shots === 0) {
-    return { text: 'Welcome. Your log is empty, so open the Shots button and add your first shot. I will be here.', mood: 'happy' }
+    return { text: 'Welcome. Your log is empty, so tell me about your first shot. I will be here.', mood: 'happy' }
   }
   const who = name || 'there'
   return {
@@ -101,6 +102,8 @@ export interface AnswerContext {
   /** The shots of the player the app is showing, oldest first. */
   shots: MapShot[]
   shooter: string
+  /** False when his AI helper is offline: shots are then added by hand, and the written lines say so. */
+  aiAvailable?: boolean
   /** Which wording to use when a question has several (a rotating number). */
   n?: number
 }
@@ -114,10 +117,15 @@ export function answer(id: QuestionId, ctx: AnswerContext): Line {
     case 'fact':
       return fact(ctx.n ?? 0)
     case 'add':
-      return {
-        text: 'Press the Shots button at the top, then Add a shot. Type where you shot from, X across the court and Y from the baseline, say made or missed, and save.',
-        mood: 'idle',
-      }
+      return ctx.aiAvailable === false
+        ? {
+            text: 'My AI helper is offline right now, so add shots by hand: press the Shots button at the top, then Add a shot. Type where you shot from, X across the court and Y from the baseline, say made or missed, and save.',
+            mood: 'idle',
+          }
+        : {
+            text: 'Just tell me, right here: for example "hit one from the right corner, missed two from the left elbow". I show the shots I understood, and nothing is saved until you press Save.',
+            mood: 'idle',
+          }
     case 'map':
       return {
         text: 'Each light is one shot: orange for made, blue for missed. Use Style to switch between the heat map, beams and flight paths, and the chips to filter by area or result.',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
+import { ApiError, MAX_PAGES, PAGE_SIZE, chatAvailable, createShot, deleteShot, updateShot } from './api'
 import type { Shot, ShotInput } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
@@ -11,7 +11,7 @@ import { deletedText, withShooterSwitch } from './notices'
 import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
-import NotesImport from './NotesImport'
+import { useChat } from './coach/useChat'
 import ShotList from './ShotList'
 import ShotMap from './ShotMap'
 import { useShots } from './useShots'
@@ -52,7 +52,11 @@ export default function App() {
   const markFaceOffSeen = useCallback((key: string) => setFaceOffSeen((seen) => (seen.includes(key) ? seen : [...seen, key])), [])
   // The side drawer with the shot list and the add form: closed by default, so the page is just the map.
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [drawerView, setDrawerView] = useState<'list' | 'add' | 'notes'>('list')
+  const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
+  // Is Deni's AI helper there? null = not asked yet (treated as there). When it is not, shots are added by hand.
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null)
+  const checkAi = useCallback(() => void chatAvailable().then(setAiAvailable), [])
+  useEffect(checkAi, [checkAi])
   const toggleRef = useRef<HTMLButtonElement>(null)
   // The trophy wall: a second drawer, from its own button in the top bar. Only one drawer is open at a time.
   const [trophyOpen, setTrophyOpen] = useState(false)
@@ -85,6 +89,10 @@ export default function App() {
     await afterSaved([await createShot(input)])
     setDrawerView('list') // show the new row
   }
+
+  // The by-hand form is only offered while Deni's AI helper is not available; if it comes back, the view moves on.
+  const manualAdd = aiAvailable === false
+  const view = drawerView === 'add' && !manualAdd ? 'list' : drawerView
 
   async function save(id: number, input: ShotInput) {
     try {
@@ -282,6 +290,19 @@ export default function App() {
   })
   // The coach's big 3D view is open: the court behind it stops drawing, so only one 3D picture runs at a time.
   const [coachOpen, setCoachOpen] = useState(false)
+  // Opening his view asks again, so a helper that came back (or went away) is noticed.
+  useEffect(() => {
+    if (coachOpen) checkAi()
+  }, [coachOpen, checkAi])
+  const chat = useChat({
+    shots: shooterShots ?? [],
+    player: shooter,
+    say: coach.say,
+    onCreate: createShot,
+    onSaved: afterSaved,
+    // An answer means it is there; a failure is checked against the backend's own view of it.
+    onOutcome: (answered) => (answered ? setAiAvailable(true) : checkAi()),
+  })
   useCoachEvents({
     coach,
     shots,
@@ -435,15 +456,15 @@ export default function App() {
           >
             <div className="drawer-head">
               <div className="chips" role="group" aria-label="Drawer view">
-                <button type="button" className="chip" aria-pressed={drawerView === 'list'} onClick={() => setDrawerView('list')}>
+                <button type="button" className="chip" aria-pressed={view === 'list'} onClick={() => setDrawerView('list')}>
                   Shots{shooterShots ? ` (${shooterShots.length})` : ''}
                 </button>
-                <button type="button" className="chip" aria-pressed={drawerView === 'add'} onClick={() => setDrawerView('add')}>
-                  Add a shot
-                </button>
-                <button type="button" className="chip" aria-pressed={drawerView === 'notes'} onClick={() => setDrawerView('notes')}>
-                  Paste notes
-                </button>
+                {/* Shots are added by telling Deni. The form is only here when his AI helper is not available. */}
+                {manualAdd && (
+                  <button type="button" className="chip" aria-pressed={view === 'add'} onClick={() => setDrawerView('add')}>
+                    Add a shot
+                  </button>
+                )}
               </div>
               <button type="button" className="drawer-close" onClick={() => setDrawerOpen(false)}>
                 <span aria-hidden="true">✕</span>
@@ -452,23 +473,31 @@ export default function App() {
             </div>
 
             <div className="drawer-body">
-              <section hidden={drawerView !== 'add'} aria-labelledby="add-title">
+              <section hidden={view !== 'add'} aria-labelledby="add-title">
                 <h2 id="add-title">Add a shot</h2>
+                <p className="notes-hint">Deni's AI helper is not available right now, so add the shot by hand.</p>
                 <ShotForm submitLabel="Add shot" onSubmit={add} />
               </section>
 
-              <section hidden={drawerView !== 'notes'} aria-labelledby="notes-title">
-                <h2 id="notes-title">Paste notes</h2>
-                <NotesImport defaultPlayer={shooter} onCreate={createShot} onSaved={afterSaved} />
-              </section>
-
-              <section hidden={drawerView !== 'list'} aria-labelledby="list-title">
+              <section hidden={view !== 'list'} aria-labelledby="list-title">
                 <div className="list-head">
                   <h2 id="list-title">Shots</h2>
                   {shooterShots && shooterShots.length > 0 && (
                     <span className="count">
                       {made} made of {shooterShots.length}
                     </span>
+                  )}
+                  {!manualAdd && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        setDrawerOpen(false)
+                        setCoachOpen(true)
+                      }}
+                    >
+                      Tell Deni about a shot
+                    </button>
                   )}
                 </div>
 
@@ -490,7 +519,9 @@ export default function App() {
                 {!shots && loading && <p className="state">Loading shots…</p>}
 
                 {shooterShots && shooterShots.length === 0 && !loadError && (
-                  <p className="state">No shots yet. Open "Add a shot" to log your first one.</p>
+                  <p className="state">
+                    {manualAdd ? 'No shots yet. Open "Add a shot" to log your first one.' : 'No shots yet. Tell Deni about your first shot.'}
+                  </p>
                 )}
 
                 {shooterShots && shooterShots.length > 0 && (
@@ -509,7 +540,7 @@ export default function App() {
           </aside>
         </div>
       </main>
-      <Coach coach={coach} context={coachContext} onOpenChange={setCoachOpen} />
+      <Coach coach={coach} chat={chat} aiAvailable={aiAvailable} context={coachContext} open={coachOpen} onOpenChange={setCoachOpen} />
     </div>
     </>
   )

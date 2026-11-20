@@ -126,6 +126,6 @@ test.describe('the main screens really render (kept here so the fast run catches
     await page.getByRole('button', { name: 'Open Deni, the coach' }).click()
     const dialog = page.getByRole('dialog', { name: 'Deni Avdija' })
     await expect(dialog.locator('.deni-stage canvas')).toBeVisible({ timeout: 30_000 })
-    await expect(dialog.getByRole('list', { name: 'Ask Deni' }).getByRole('button')).toHaveCount(8)
+    await expect(dialog.getByRole('list', { name: 'Quick questions for Deni' }).getByRole('button')).toHaveCount(8)
   })
 })

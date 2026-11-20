@@ -169,11 +169,18 @@ interface Fixtures {
   seenTitle: boolean
   /** Deni stays quiet (no voice, no unprompted remarks) and the sound is off, unless a test turns this off. */
   quiet: boolean
+  /**
+   * Is Deni's AI helper there? False (the default): the page is TOLD it is not, so the manual add-shot form shows, as
+   * the tests of the log, the validation and the layout expect. True: the page asks the real backend, which asks the
+   * stand-in AI service (e2e/fake-ai.mjs), so the chat works for real. Only the chat tests turn this on.
+   */
+  aiHelper: boolean
 }
 
 export const test = base.extend<Fixtures>({
   seenTitle: [true, { option: true }],
   quiet: [true, { option: true }],
+  aiHelper: [false, { option: true }],
 
   // Playwright wants the first argument written as a destructuring pattern, even when it is empty.
   // oxlint-disable-next-line no-empty-pattern
@@ -193,7 +200,7 @@ export const test = base.extend<Fixtures>({
     { auto: true },
   ],
 
-  page: async ({ page, guard, seenTitle, quiet }, provide) => {
+  page: async ({ page, guard, seenTitle, quiet, aiHelper }, provide) => {
     assertSafeBackend()
     assertSafeFrontend()
     await page.addInitScript(
@@ -286,6 +293,17 @@ export const test = base.extend<Fixtures>({
       const response = await route.fetch()
       return route.fulfill({ response, headers: { ...response.headers(), ...cors } })
     })
+    if (!aiHelper) {
+      // Registered after the rule above, so it is asked first: the answer carries its own CORS headers.
+      await context.route(`${BACKEND_URL}/chat/status`, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'access-control-allow-origin': '*' },
+          body: JSON.stringify({ available: false }),
+        }),
+      )
+    }
     await provide(page)
     closing = true
   },
@@ -310,10 +328,10 @@ export async function openApp(page: Page, tab: Tab = 'My log'): Promise<void> {
 export const drawerToggle = (page: Page): Locator => page.locator('button.drawer-toggle')
 export const drawer = (page: Page): Locator => page.locator('#shots-drawer')
 
-export async function openDrawer(page: Page, view: 'list' | 'add' | 'notes' = 'list'): Promise<void> {
+export async function openDrawer(page: Page, view: 'list' | 'add' = 'list'): Promise<void> {
   if ((await drawerToggle(page).getAttribute('aria-expanded')) !== 'true') await drawerToggle(page).click()
   await expect(drawer(page)).toBeVisible()
-  await drawer(page).getByRole('group', { name: 'Drawer view' }).getByRole('button', { name: view === 'add' ? /Add a shot/ : view === 'notes' ? /Paste notes/ : /^Shots/ }).click()
+  await drawer(page).getByRole('group', { name: 'Drawer view' }).getByRole('button', { name: view === 'add' ? /Add a shot/ : /^Shots/ }).click()
 }
 
 export async function closeDrawer(page: Page): Promise<void> {
