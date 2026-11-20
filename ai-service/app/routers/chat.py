@@ -1,5 +1,6 @@
 import asyncio
 import hmac
+import json
 import logging
 import os
 import secrets
@@ -18,10 +19,10 @@ from pydantic_ai.exceptions import (
     UserError,
 )
 
-from app.agent import get_agent, to_extraction
-from app.schemas import AgentResult, ExtractRequest, ExtractResponse
+from app.agent import get_agent, to_proposals
+from app.schemas import AgentChatResult, ChatRequest, ChatResponse
 
-router = APIRouter(tags=["extract"])
+router = APIRouter(tags=["chat"])
 log = logging.getLogger(__name__)
 
 # One request may take a few model calls (a repair or two). More than this is a runaway:
@@ -31,28 +32,36 @@ LIMITS = UsageLimits(request_limit=6, total_tokens_limit=20_000)
 # backend waits 70 s (backend/app/ai.py) and the browser 90 s, so this inner deadline
 # fires first: the answer is a plain 504 and nothing keeps spending the model's quota
 # for a caller who has given up.
-EXTRACT_DEADLINE_SECONDS = 60.0
+CHAT_DEADLINE_SECONDS = 60.0
 
-AgentDep = Annotated["Agent[None, AgentResult] | None", Depends(get_agent)]
+AgentDep = Annotated["Agent[None, AgentChatResult] | None", Depends(get_agent)]
 
 
-def _prompt(body: ExtractRequest) -> str:
-    # The notes sit between two markers and are labelled as data, so text inside them
-    # is read as the user's words, not as instructions. The marker has a random part
-    # that is new for every request: notes cannot contain the closing marker to
-    # "escape" it, because nobody can know it in advance.
-    marker = f"notes-{secrets.token_hex(6)}"
+def _prompt(body: ChatRequest) -> str:
+    # The conversation sits between two markers and is labelled as data, so what is in
+    # it is read as words, not as instructions. Every message is one JSON line, so a
+    # message cannot fake another speaker with a newline and "deni:". The marker has a
+    # random part that is new for every request: nothing in the conversation can contain
+    # the closing marker to "escape" it, because nobody can know it in advance.
+    marker = f"chat-{secrets.token_hex(6)}"
+    stats = body.stats.model_dump_json() if body.stats else "none: no shots logged yet"
+    turns = "\n".join(
+        json.dumps(turn.model_dump(), ensure_ascii=False) for turn in body.messages
+    )
     return (
         f"today: {body.today.isoformat()}\n\n"
-        f"The player's notes are between <{marker}> and </{marker}>:\n"
-        f"<{marker}>\n{body.text}\n</{marker}>"
+        f"STATS (computed by the app from the player's log; the only numbers you may "
+        f"state): {stats}\n\n"
+        f"The conversation so far, one JSON message per line, between <{marker}> and "
+        f"</{marker}>:\n<{marker}>\n{turns}\n</{marker}>\n\n"
+        "Reply to the player's last message."
     )
 
 
 def require_token(
     x_service_token: Annotated[str | None, Header()] = None,
 ) -> None:
-    """If AI_SERVICE_TOKEN is set, /extract needs the same value in X-Service-Token.
+    """If AI_SERVICE_TOKEN is set, /chat needs the same value in X-Service-Token.
 
     The backend is this service's only caller. On a public host the token stops anyone
     else from spending the model's quota. Unset = no check (local development).
@@ -67,14 +76,14 @@ def require_token(
 
 
 @router.post(
-    "/extract", response_model=ExtractResponse, dependencies=[Depends(require_token)]
+    "/chat", response_model=ChatResponse, dependencies=[Depends(require_token)]
 )
-async def extract(body: ExtractRequest, agent: AgentDep) -> ExtractResponse:
-    """Turn pasted notes into PROPOSED shots. Nothing is saved here."""
+async def chat(body: ChatRequest, agent: AgentDep) -> ChatResponse:
+    """Deni's reply to the player's last message. Proposed shots are NOT saved here."""
     if agent is None:
         raise HTTPException(503, "No AI model is configured (set AI_MODEL).")
     try:
-        async with asyncio.timeout(EXTRACT_DEADLINE_SECONDS):
+        async with asyncio.timeout(CHAT_DEADLINE_SECONDS):
             run = await agent.run(_prompt(body), usage_limits=LIMITS)
     except UserError as error:  # the model is set up wrong: no key, unknown provider...
         log.error("AI model setup problem: %s", error)
@@ -96,7 +105,8 @@ async def extract(body: ExtractRequest, agent: AgentDep) -> ExtractResponse:
     except Exception as error:  # a bug, or a failure nobody planned for
         log.exception("Unexpected error while asking the AI model")
         raise HTTPException(500, "The AI service had an unexpected problem.") from error
-    return ExtractResponse(
-        **to_extraction(run.output).model_dump(),
+    return ChatResponse(
+        reply=run.output.reply,
+        proposals=to_proposals(run.output),
         model=run.response.model_name or "unknown",
     )
