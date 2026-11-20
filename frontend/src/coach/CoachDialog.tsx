@@ -117,6 +117,7 @@ export default function CoachDialog({ coach, chat, aiAvailable, context, onClose
           <h2 id="coach-dialog-name">Deni Avdija</h2>
           <p className="coach-panel-sub">Forward, number 8. Your coach here.</p>
           <ChatPanel chat={chat} aiAvailable={aiAvailable} context={context} player={context.shooter} />
+          <div className="coach-toggles">
           {(speechSupported() || hdSupported()) && (
             <button type="button" className="coach-voice" aria-pressed={voiceOn} onClick={() => setVoiceOn(!voiceOn)}>
               Voice: {voiceOn ? 'on' : 'off'}
@@ -140,8 +141,9 @@ export default function CoachDialog({ coach, chat, aiAvailable, context, onClose
           <button type="button" className="coach-voice" aria-pressed={chatterOn} onClick={() => setChatterOn(!chatterOn)}>
             Let him chime in: {chatterOn ? 'on' : 'off'}
           </button>
+          </div>
           <p className="coach-note">
-            A fan-made coach inspired by Deni Avdija. Not the real Deni. When his AI helper is on, his answers come from an AI that is given the numbers from your log, so check anything important; the questions about the app are answered from lines written in advance.
+            A fan-made coach inspired by Deni Avdija, not the real Deni. His answers come from an AI that is given the numbers from your log, so check anything important.
           </p>
         </div>
       </div>

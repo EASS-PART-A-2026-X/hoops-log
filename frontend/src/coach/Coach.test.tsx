@@ -42,7 +42,7 @@ describe('Coach', () => {
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     expect(screen.getAllByRole('button').filter((b) => QUESTIONS.some((q) => q.label === b.textContent))).toHaveLength(QUESTIONS.length)
     expect(screen.getByText(/fan-made coach inspired by Deni Avdija/)).toBeTruthy()
-    expect(screen.getByText(/Not the real Deni/)).toBeTruthy()
+    expect(screen.getByText(/not the real Deni/)).toBeTruthy()
     expect(screen.getByRole('log', { name: 'Conversation with Deni' })).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Message to Deni' })).toBeTruthy()
     // His first words, since nothing was said before.

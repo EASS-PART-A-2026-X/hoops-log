@@ -86,7 +86,7 @@ test.describe('Deni’s big view', () => {
     await expect(dialog(page).getByRole('heading', { name: 'Deni Avdija' })).toBeVisible()
     await expect(dialog(page).locator('.deni-stage canvas')).toBeVisible({ timeout: 20_000 })
     await expect(dialog(page).getByRole('list', { name: 'Quick questions for Deni' }).getByRole('button')).toHaveCount(8)
-    await expect(dialog(page)).toContainText(/Not the real Deni/)
+    await expect(dialog(page)).toContainText(/not the real Deni/)
     await page.keyboard.press('Escape')
     await expect(dialog(page)).toHaveCount(0)
     await expect(face(page)).toBeFocused()
