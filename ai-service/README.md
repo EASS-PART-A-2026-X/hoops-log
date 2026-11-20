@@ -12,8 +12,12 @@ calls this service over HTTP, and only the user pressing Save writes a shot. The
 not know who the shooter is either; the backend adds the player.
 
 The model is used only where the input is free text. Counting, zones and ratings stay plain code
-elsewhere; here, even a named place such as "right corner three" is turned into feet by a tool
-(`court_spot` in `app/spots.py`), never by the model.
+elsewhere; here, even a named place such as "right corner three" is turned into feet by code, never
+by the model: the model's answer names the place (`spot`, one of a fixed list) and `app/spots.py`
+holds the exact feet. The model writes `x` and `y` only when the notes themselves give feet. (An
+earlier version offered the model a `court_spot` tool instead; in a real run the model sometimes
+skipped it and made up the corner's coordinates, so the backend stored a corner three as a mid-range
+two. Now the model cannot.)
 
 ## Run it
 
@@ -64,7 +68,7 @@ Answer (`200`):
 ```json
 {
   "proposals": [
-    {"x": 47.0, "y": 3.0, "made": true, "game_date": "2026-11-18",
+    {"x": 47.5, "y": 3.0, "made": true, "game_date": "2026-11-18",
      "note": "caught and shot", "quote": "hit one from the right corner"}
   ],
   "questions": [],
@@ -95,7 +99,7 @@ Error messages are plain sentences; provider details go to the server log only.
 ## Test it
 
 ```bash
-uv run pytest          # 40 tests, about a second
+uv run pytest          # 58 tests, about a second
 uv run ruff check . && uv run ruff format --check .
 ```
 
@@ -105,9 +109,10 @@ token, so a test that reaches for a real model fails instead of calling out. The
 
 - the contract, and the prompt (the notes sit between markers with a random part, so they cannot
   close the block themselves);
-- the tool, and the repair of bad output, including future dates and unprintable text (the
-  backend's own rules);
-- the never-silent rule, every error status, the token and the runaway limit;
+- named spots turning into the table's exact feet (every spot), explicit feet kept as given, a place
+  that is not a spot or feet being sent back for repair, and the repair of other bad output,
+  including future dates and unprintable text (the backend's own rules);
+- the never-silent rule, every error status, the token and the usage limit;
 - `tests/test_spots.py` loads the backend's `court.py` and checks that every named spot gets the
   zone and shot type its name says (the backend is strict: a corner three must be more than 22 ft
   from the centre line).
@@ -117,7 +122,13 @@ evaluation work).
 
 `scripts/ci.sh` runs this service's lint, format and tests together with the backend's.
 
+## Who calls it
+
+The backend calls `POST /extract` from its own `POST /notes/extract` (see the main README), adds the
+zone and shot type, limits requests to 10 a minute, and checks the answer against its own rules. The
+frontend's "Paste notes" view is the first screen that uses it. The browser never calls this service.
+
 ## Not here yet
 
-A Dockerfile and Docker Compose entry, the backend calling this service, the frontend chat, and
-the evaluation dataset with real-model results.
+A Dockerfile and Docker Compose entry, the chat with Deni, the evaluation dataset with real-model
+results, and deployment.

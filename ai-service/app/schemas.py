@@ -9,9 +9,11 @@ its shape.
 
 import unicodedata
 from datetime import date, timedelta
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+
+from app.spots import Spot
 
 
 def _not_too_far_ahead(value: date) -> date:
@@ -67,8 +69,45 @@ class ProposedShot(BaseModel):
     quote: Line = ""
 
 
-class ExtractionResult(BaseModel):
+class AgentShot(BaseModel):
+    """One shot as the MODEL writes it: a named `spot`, or explicit feet, never both.
+
+    The model never writes coordinates for a named place. It picks the place from a
+    fixed list and the service turns it into exact feet (app/spots.py). It writes x and
+    y only when the notes themselves give feet.
+    """
+
+    spot: Spot | None = None
+    x: CourtX | None = None
+    y: CourtY | None = None
+    made: bool
+    game_date: GameDate
+    note: Line = ""
+    quote: Line = ""
+
+    @model_validator(mode="after")
+    def _place_is_a_spot_or_feet(self) -> Self:
+        if (self.x is None) != (self.y is None):
+            raise ValueError("give x and y together")
+        has_feet = self.x is not None
+        if (self.spot is not None) == has_feet:
+            raise ValueError(
+                "give the place as a `spot` name or as feet (x and y), not both "
+                "and not neither"
+            )
+        return self
+
+
+class AgentResult(BaseModel):
     """What the agent must produce (the output type the model is held to)."""
+
+    proposals: Annotated[list[AgentShot], Field(max_length=MAX_SHOTS)] = []
+    questions: Annotated[list[Line], Field(max_length=MAX_QUESTIONS)] = []
+    skipped: Annotated[list[Line], Field(max_length=10)] = []
+
+
+class ExtractionResult(BaseModel):
+    """What /extract answers: every proposal already has exact x and y."""
 
     proposals: Annotated[list[ProposedShot], Field(max_length=MAX_SHOTS)] = []
     # Ask instead of guessing: one short question per unclear thing.

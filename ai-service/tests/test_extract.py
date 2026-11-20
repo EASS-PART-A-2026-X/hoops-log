@@ -1,7 +1,8 @@
 import re
 from datetime import date
 
-from pydantic_ai import ModelResponse, ToolCallPart, ToolReturnPart
+import pytest
+from pydantic_ai import ModelResponse, ToolCallPart
 from pydantic_ai.exceptions import (
     ModelAPIError,
     ModelQuotaExceededError,
@@ -11,10 +12,12 @@ from pydantic_ai.exceptions import (
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
+from app.spots import SPOTS
+
 GOOD = {
     "proposals": [
         {
-            "x": 47.0,
+            "x": 47.5,
             "y": 3.0,
             "made": True,
             "game_date": "2026-11-18",
@@ -51,7 +54,7 @@ def test_extract_returns_the_proposals_and_the_model_name(client, use_model):
         response = client.post("/extract", json=BODY)
     assert response.status_code == 200
     data = response.json()
-    assert data["proposals"][0]["x"] == 47.0
+    assert data["proposals"][0]["x"] == 47.5
     assert data["proposals"][0]["made"] is True
     assert data["skipped"] == ["two free throws"]
     assert data["model"] == "test"
@@ -104,28 +107,74 @@ def test_today_defaults_to_the_servers_date(client, use_model):
     assert f"today: {date.today().isoformat()}" in seen[0]
 
 
-def test_the_agent_can_use_the_court_spot_tool(client, use_model):
-    tool_answers: list[object] = []
+def _shot(**place):
+    return {"made": True, "game_date": "2026-11-18", "note": "", "quote": "q", **place}
+
+
+def _answer(*shots):
+    return {"proposals": list(shots), "questions": [], "skipped": []}
+
+
+@pytest.mark.parametrize("name", sorted(SPOTS))
+def test_a_named_spot_becomes_the_tables_exact_feet(client, use_model, name):
+    with use_model(TestModel(custom_output_args=_answer(_shot(spot=name)))):
+        response = client.post("/extract", json=BODY)
+    assert response.status_code == 200
+    proposal = response.json()["proposals"][0]
+    assert (proposal["x"], proposal["y"]) == tuple(SPOTS[name])
+
+
+def test_explicit_feet_are_kept_as_given(client, use_model):
+    with use_model(TestModel(custom_output_args=_answer(_shot(x=30.25, y=10.5)))):
+        proposal = client.post("/extract", json=BODY).json()["proposals"][0]
+    assert (proposal["x"], proposal["y"]) == (30.25, 10.5)
+
+
+def test_the_model_is_never_asked_for_feet_of_a_named_place(client, use_model):
+    """The output schema the model sees offers the fixed list of places."""
+    seen: list[dict] = []
+
+    def spy(messages, info: AgentInfo) -> ModelResponse:
+        seen.append(info.output_tools[0].parameters_json_schema)
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, GOOD)])
+
+    with use_model(FunctionModel(spy)):
+        client.post("/extract", json=BODY)
+    schema = str(seen[0])
+    assert "right_corner_three" in schema
+    assert "left_elbow" in schema
+
+
+@pytest.mark.parametrize(
+    "bad_place",
+    [
+        {"spot": "right_corner_three", "x": 47.5, "y": 3.0},  # both
+        {},  # neither
+        {"x": 30.0},  # half the feet
+        {"y": 10.0},
+        {"spot": "mid_range_wing"},  # not in the list
+    ],
+)
+def test_a_place_that_is_not_a_spot_or_feet_is_repaired(client, use_model, bad_place):
+    attempts: list[int] = []
 
     def model(messages, info: AgentInfo) -> ModelResponse:
-        returns = [
-            part
-            for message in messages
-            for part in message.parts
-            if isinstance(part, ToolReturnPart)
-        ]
-        if not returns:
-            return ModelResponse(
-                parts=[ToolCallPart("court_spot", {"spot": "right_corner_three"})]
-            )
-        tool_answers.append(returns[-1].content)
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, GOOD)])
+        attempts.append(1)
+        args = (
+            _answer(_shot(**bad_place))
+            if len(attempts) == 1
+            else _answer(_shot(spot="left_elbow"))
+        )
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, args)])
 
     with use_model(FunctionModel(model)):
         response = client.post("/extract", json=BODY)
     assert response.status_code == 200
-    # The agent really offered the tool: the model got the exact feet back from it.
-    assert tool_answers == [{"x": 47.5, "y": 3.0}]
+    assert len(attempts) == 2
+    assert (
+        response.json()["proposals"][0]["x"],
+        response.json()["proposals"][0]["y"],
+    ) == (17.0, 19.0)
 
 
 def test_output_that_breaks_the_contract_is_repaired(client, use_model):
@@ -141,7 +190,7 @@ def test_output_that_breaks_the_contract_is_repaired(client, use_model):
         response = client.post("/extract", json=BODY)
     assert response.status_code == 200
     assert len(attempts) == 2
-    assert response.json()["proposals"][0]["x"] == 47.0
+    assert response.json()["proposals"][0]["x"] == 47.5
 
 
 def test_output_that_never_fits_the_contract_is_502(client, use_model):
@@ -269,18 +318,39 @@ def test_bad_input_is_422(client):
     assert client.post("/extract", json={"text": "bell\x07"}).status_code == 422
 
 
-def test_a_model_that_never_stops_calling_tools_is_cut_off(client, use_model):
+def test_every_request_is_run_with_the_usage_limit(client, use_model, monkeypatch):
+    from pydantic_ai import Agent
+
+    from app.routers.extract import LIMITS
+
+    passed: list[object] = []
+    real_run = Agent.run
+
+    async def spy(self, *args, **kwargs):
+        passed.append(kwargs.get("usage_limits"))
+        return await real_run(self, *args, **kwargs)
+
+    monkeypatch.setattr(Agent, "run", spy)
+    with use_model(TestModel(custom_output_args=GOOD)):
+        assert client.post("/extract", json=BODY).status_code == 200
+    assert passed == [LIMITS]
+    assert (LIMITS.request_limit, LIMITS.total_tokens_limit) == (6, 20_000)
+
+
+def test_a_model_that_keeps_calling_a_tool_that_does_not_exist_is_cut_off(
+    client, use_model
+):
     calls = 0
 
     def runaway(messages, info: AgentInfo) -> ModelResponse:
         nonlocal calls
         calls += 1
-        return ModelResponse(parts=[ToolCallPart("court_spot", {"spot": "left_elbow"})])
+        return ModelResponse(parts=[ToolCallPart("no_such_tool", {})])
 
     with use_model(FunctionModel(runaway)):
         response = client.post("/extract", json=BODY)
     assert response.status_code == 502
-    assert calls <= 6  # the request limit in app/routers/extract.py
+    assert calls <= 6
 
 
 EMPTY = {"proposals": [], "questions": [], "skipped": []}

@@ -12,7 +12,7 @@ from functools import lru_cache
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from app.schemas import ExtractionResult
+from app.schemas import AgentResult, ExtractionResult, ProposedShot
 from app.spots import court_spot
 
 INSTRUCTIONS = """\
@@ -23,9 +23,11 @@ Rules:
   shots), assists, rebounds and anything else go in `skipped`, one short line each.
   A jump shot taken FROM the free throw line is a normal shot (spot `free_throw_line`),
   not a free throw.
-- For a named place ("right corner three", "left elbow", "free throw line") never work
-  out coordinates yourself: call the `court_spot` tool and use its exact x and y.
-  When the notes give feet directly, use them as given.
+- Where a shot was taken: for a named place ("right corner three", "left elbow", "free
+  throw line") set `spot` to the matching name and leave `x` and `y` empty: the service
+  turns the name into exact feet. NEVER write coordinates for a named place yourself.
+  Only when the notes give feet directly ("x=30, y=10"), leave `spot` empty and set `x`
+  and `y` as given. If the place fits no name and no feet are given, ask in `questions`.
 - `made` is true only when the notes clearly say the shot went in. Do not guess it.
 - If something needed is unclear (where the shot was, whether it went in, which day),
   do not guess: add one short question to `questions` and leave that shot out.
@@ -65,13 +67,36 @@ def _never_silent(ctx: RunContext[None], result: ExtractionResult) -> Extraction
     return result.model_copy(update={"questions": [NOTHING_FOUND]})
 
 
-def build_agent(model: str) -> Agent[None, ExtractionResult]:
+def to_extraction(result: AgentResult) -> ExtractionResult:
+    """The model's answer as the contract: each spot becomes exact feet, in code."""
+    proposals = []
+    for shot in result.proposals:
+        if shot.spot is not None:
+            place = court_spot(shot.spot)
+            x, y = place["x"], place["y"]
+        else:
+            x, y = shot.x, shot.y
+        proposals.append(
+            ProposedShot(
+                x=x,
+                y=y,
+                made=shot.made,
+                game_date=shot.game_date,
+                note=shot.note,
+                quote=shot.quote,
+            )
+        )
+    return ExtractionResult(
+        proposals=proposals, questions=result.questions, skipped=result.skipped
+    )
+
+
+def build_agent(model: str) -> Agent[None, AgentResult]:
     """An agent for one model name. `retries` lets the model repair invalid output."""
     agent = Agent(
         model,
-        output_type=ExtractionResult,
+        output_type=AgentResult,
         instructions=INSTRUCTIONS,
-        tools=[court_spot],
         retries=2,
         defer_model_check=True,
         model_settings={"timeout": 30.0, "temperature": 0.0},
@@ -86,11 +111,11 @@ def configured_model() -> str | None:
 
 
 @lru_cache(maxsize=4)
-def _cached_agent(model: str) -> Agent[None, ExtractionResult]:
+def _cached_agent(model: str) -> Agent[None, AgentResult]:
     return build_agent(model)
 
 
-def get_agent() -> Agent[None, ExtractionResult] | None:
+def get_agent() -> Agent[None, AgentResult] | None:
     """FastAPI dependency: the agent for the configured model, or None."""
     model = configured_model()
     return _cached_agent(model) if model else None

@@ -17,8 +17,8 @@ from pydantic_ai.exceptions import (
     UserError,
 )
 
-from app.agent import get_agent
-from app.schemas import ExtractionResult, ExtractRequest, ExtractResponse
+from app.agent import get_agent, to_extraction
+from app.schemas import AgentResult, ExtractRequest, ExtractResponse
 
 router = APIRouter(tags=["extract"])
 log = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 # runaway: stop it instead of paying for it.
 LIMITS = UsageLimits(request_limit=6, total_tokens_limit=20_000)
 
-AgentDep = Annotated["Agent[None, ExtractionResult] | None", Depends(get_agent)]
+AgentDep = Annotated["Agent[None, AgentResult] | None", Depends(get_agent)]
 
 
 def _prompt(body: ExtractRequest) -> str:
@@ -90,5 +90,6 @@ async def extract(body: ExtractRequest, agent: AgentDep) -> ExtractResponse:
         log.exception("Unexpected error while asking the AI model")
         raise HTTPException(500, "The AI service had an unexpected problem.") from error
     return ExtractResponse(
-        **run.output.model_dump(), model=run.response.model_name or "unknown"
+        **to_extraction(run.output).model_dump(),
+        model=run.response.model_name or "unknown",
     )
