@@ -32,7 +32,8 @@ test.describe('the chat, with his AI helper there', () => {
     await expect(log(page).getByText('Right corner 3 · 3PT · made')).toBeVisible()
     await expect(log(page).getByText('Left elbow · 2PT · missed')).toBeVisible()
     await expect(log(page).getByText('caught and shot')).toBeVisible()
-    await expect(log(page).getByText('hit one from the right corner', { exact: true })).toBeVisible()
+    // The words are not repeated on the card: they are already in the player's own bubble above it.
+    await expect(log(page).locator('.shot-chip q')).toHaveCount(0)
     // Understanding is not saving.
     expect(await api.list()).toHaveLength(6)
 
