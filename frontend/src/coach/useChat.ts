@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, MAX_TURNS, sendChat } from '../api'
+import { ApiError, MAX_TURNS, deleteChatHistory, getChatHistory, sendChat } from '../api'
 import type { ChatTurn, Shot, ShotInput } from '../api'
 import type { MapShot } from '../court/stats'
 import { today } from '../today'
@@ -33,8 +33,9 @@ interface Options {
 }
 
 /**
- * The conversation with Deni. It lives as long as the page is open (a later step stores it in the backend), one
- * chat per player. Every message goes to the backend with the last few before it and the numbers the app worked
+ * The conversation with Deni, one chat per player. The backend keeps it (text only, never the cards), so when a
+ * player's chat is first needed the saved conversation is loaded, and "Start over" makes the backend forget it.
+ * Every message goes to the backend with the last few before it and the numbers the app worked
  * out from the log; Deni's reply comes back with any shots the player described, as cards. Nothing is saved until
  * the player presses Save on a card.
  */
@@ -56,6 +57,27 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
   // Shots saved from the cards, so a later reply that proposes the same shot can say so.
   const savedKeys = useRef<string[]>([])
   useEffect(() => () => pending.current?.abort(), [])
+
+  // Whose saved conversation was already asked for, and how many times "Start over" was pressed (an answer that
+  // arrives after one is old news and is dropped).
+  const asked = useRef(new Set<string>())
+  const startedOver = useRef(0)
+  useEffect(() => {
+    if (player === '' || asked.current.has(player)) return
+    asked.current.add(player)
+    const startedAt = startedOver.current
+    getChatHistory(player)
+      .then((lines) => {
+        if (lines.length === 0 || startedAt !== startedOver.current) return
+        // The saved lines come BEFORE anything said while they were loading.
+        const earlier: ChatMessage[] = lines.map((line) => ({ id: nextId.current++, role: line.role, text: line.text }))
+        setChats((all) => ({ ...all, [player]: [...earlier, ...(all[player] ?? [])] }))
+      })
+      .catch(() => {
+        // No saved conversation to show (the backend may be down): start empty, and ask again next time.
+        asked.current.delete(player)
+      })
+  }, [player])
 
   const messages = chats[player] ?? []
 
@@ -91,7 +113,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
       pending.current = controller
       setThinking(true)
       try {
-        const answer = await sendChat(turns, buildStats(shots, who), today(), controller.signal)
+        const answer = await sendChat(turns, buildStats(shots, who), today(), controller.signal, who === '' ? undefined : who)
         if (ticket !== latest.current) return
         const marks = markLookalikes(savingFor, answer.proposals, savedKeys.current)
         const cards: Card[] = answer.proposals.map((shot, i) => ({ shot, status: 'pending', lookalike: marks[i] }))
@@ -125,7 +147,9 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
 
   const reset = useCallback(() => {
     cancel()
+    startedOver.current++
     setChats((all) => ({ ...all, [player]: [] }))
+    if (player !== '') void deleteChatHistory(player).catch(() => {})
   }, [cancel, player])
 
   /** Create one proposed shot; the card shows how it went. Returns the saved shot, or null when it failed. */

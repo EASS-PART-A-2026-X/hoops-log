@@ -96,10 +96,10 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
         </button>
       </form>
       <p className="chat-note">
-        Your messages and the numbers from your log are sent to an AI model. Do not write anything private.{' '}
+        Your messages and the numbers from your log are sent to an AI model, and the conversation is saved with your log. Do not write anything private.{' '}
         {messages.length > 0 && (
           <button type="button" className="chat-clear" onClick={reset} disabled={thinking}>
-            Clear the chat
+            Start over
           </button>
         )}
       </p>

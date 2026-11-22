@@ -24,7 +24,9 @@ from app.ai import (
     status_cache,
 )
 from app.court import ShotType, Zone, shot_type_of, zone_of
-from app.models import CourtX, CourtY, GameDate, Note, printable_text
+from app.db import SessionDep
+from app.models import CourtX, CourtY, GameDate, Note, Player, printable_text
+from app.routers.history import HistoryLine, remember
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 log = logging.getLogger(__name__)
@@ -119,6 +121,9 @@ class ChatRequest(BaseModel):
     stats: StatsSummary | None = None
     # The player's today, so "yesterday" is theirs even when the server is elsewhere.
     today: date | None = None
+    # Whose conversation this is. When given, the player's message and Deni's reply are
+    # saved (see /chat/history). It is never sent on to the AI service.
+    player: Annotated[Player | None, Field()] = None
 
     @model_validator(mode="after")
     def _the_last_message_is_the_players(self) -> Self:
@@ -204,10 +209,13 @@ async def _ai_has_a_model(client: httpx.AsyncClient) -> bool:
         503: {"description": "The AI helper is not available"},
         504: {"description": "The AI helper took too long"},
     },
-    summary="Deni's reply to the player's last message (nothing is saved)",
+    summary="Deni's reply to the player's last message",
 )
-async def chat(body: ChatRequest, client: ClientDep) -> ChatReply:
-    """Ask the AI service for Deni's reply. It only PROPOSES shots: nothing is saved.
+async def chat(body: ChatRequest, client: ClientDep, session: SessionDep) -> ChatReply:
+    """Ask the AI service for Deni's reply. It only PROPOSES shots: no shot is saved.
+
+    With a `player`, the player's message and Deni's reply are kept in the saved
+    conversation (`/chat/history`), and only when the reply worked.
 
     To keep a proposed shot, the browser sends it to `POST /shots` like any other shot.
     """
@@ -218,7 +226,7 @@ async def chat(body: ChatRequest, client: ClientDep) -> ChatReply:
         async with client.stream(
             "POST",
             f"{ai_url()}/chat",
-            json=body.model_dump(mode="json", exclude_none=True),
+            json=body.model_dump(mode="json", exclude_none=True, exclude={"player"}),
             headers=ai_headers(),
         ) as reply:
             status = reply.status_code
@@ -251,7 +259,18 @@ async def chat(body: ChatRequest, client: ClientDep) -> ChatReply:
         raise HTTPException(502, UNUSABLE)
     try:
         # Never trust another program's answer: it must obey this backend's own rules.
-        return ChatReply.model_validate_json(content)
+        answer = ChatReply.model_validate_json(content)
     except ValidationError as error:
         log.error("AI service sent an answer that breaks the rules: %s", error)
         raise HTTPException(502, UNUSABLE) from error
+    if body.player is not None:
+        # Only a conversation that worked is kept: both lines, or neither.
+        remember(
+            session,
+            body.player,
+            [
+                HistoryLine(role="user", text=body.messages[-1].text),
+                HistoryLine(role="deni", text=answer.reply),
+            ],
+        )
+    return answer

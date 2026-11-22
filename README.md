@@ -86,7 +86,9 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, 404, or 422 (bad body, or an id below 1 or above 2147483647) |
 | `DELETE /shots/{id}` | Delete one | 204, 404, or 422 if the id is below 1 or above 2147483647 |
 | `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional. It ignores letter case and spaces around the name, so `yuly` and `Yuly` are the same player; it uses Unicode case folding, so `Straße` and `STRASSE` also match | 200, or 422 if `player` is empty or longer than 50 characters |
-| `POST /chat` | Body `{"messages": [{"role": "user", "text": "..."}, ...], "stats": {...}, "today": "2026-11-20"}`: the last 12 or fewer messages of the conversation with Deni (the last one is the player's), the numbers the app computed from the player's log (`stats`, optional) and the player's date. Asks the AI service for Deni's reply: `{"reply": "...", "proposals": [...], "model": "..."}`. Each proposed shot gets its `zone` and `shot_type` computed here. **Saves nothing**: to keep a proposal, send it to `POST /shots`. | 200, 422 (a message empty, over 2000 characters or with control characters, more than 12 messages, the last one not the player's, stats that do not add up), 429 (over the minute's limit, or the AI model is busy), 502 (no usable answer, including one that breaks this API's own rules or is over 200 KB), 503 (AI service not reachable), 504 (too slow: the AI service gives up after 60 s, this API after 70 s). The other endpoints never depend on it. |
+| `POST /chat` | Body `{"messages": [{"role": "user", "text": "..."}, ...], "stats": {...}, "today": "2026-11-20", "player": "Yuly"}`: the last 12 or fewer messages of the conversation with Deni (the last one is the player's), the numbers the app computed from the player's log (`stats`, optional) and the player's date. Asks the AI service for Deni's reply: `{"reply": "...", "proposals": [...], "model": "..."}`. Each proposed shot gets its `zone` and `shot_type` computed here. **Saves no shot**: to keep a proposal, send it to `POST /shots`. With a `player` (1-50 characters, any capitals) the player's message and Deni's reply are kept as that player's saved conversation, only when the reply worked; `player` is never sent to the AI service. | 200, 422 (a message empty, over 2000 characters or with control characters, more than 12 messages, the last one not the player's, stats that do not add up), 429 (over the minute's limit, or the AI model is busy), 502 (no usable answer, including one that breaks this API's own rules or is over 200 KB), 503 (AI service not reachable), 504 (too slow: the AI service gives up after 60 s, this API after 70 s). The other endpoints never depend on it. |
+| `GET /chat/history?player=Yuly` | The saved conversation of one player, oldest first: `{"lines": [{"role": "user"\|"deni", "text": "..."}]}` (the newest 100 lines are kept; "Yuly" and "yuly" are one player; text only, never proposed shots). | 200, 422 (no player, or longer than 50 characters) |
+| `DELETE /chat/history?player=Yuly` | **Start over**: forgets that player's saved conversation. Fine on an empty one. | 204, 422 |
 | `GET /chat/status` | `{"available": true}` only when the AI service answers its health check and has a model set. Remembered for 15 s; never fails (any trouble is `false`); the app shows the manual add-shot form when it is `false`. | 200 |
 | `GET /health` | Liveness check, returns `{"status":"ok"}` | 200 |
 
@@ -99,7 +101,7 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 466 passed
+uv run pytest                 # 487 passed
 uv run ruff check .
 uv run ruff format --check .
 ```

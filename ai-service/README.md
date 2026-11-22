@@ -180,6 +180,6 @@ chat with Deni is the screen that uses it. The browser never calls this service.
 
 ## Not here yet
 
-Saved conversations (the history lives in the page for now), the proposed shots drawn on the court,
+The proposed shots drawn on the court (saved conversations live in the backend, which keeps them),
 a Dockerfile and Docker Compose entry, the evaluation dataset with real-model results, and
 deployment.
