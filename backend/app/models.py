@@ -1,5 +1,5 @@
 import unicodedata
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 from pydantic import AfterValidator, ConfigDict, computed_field
@@ -96,3 +96,20 @@ class ShotPublic(ShotBase):
     @property
     def shot_type(self) -> ShotType:
         return shot_type_of(self.x, self.y)
+
+
+class ChatLine(SQLModel, table=True):
+    """One saved message of a player's conversation with Deni (text only).
+
+    The conversation is kept per player, whatever the capitals ("Yuly" and "yuly" are
+    one player, like everywhere else), so `player_key` is the case-folded name. Proposed
+    shots are not kept: a shot only exists once the player saved it.
+    """
+
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: int | None = Field(default=None, primary_key=True)
+    player_key: str = Field(index=True, max_length=200)
+    role: str = Field(max_length=4)  # "user" or "deni"
+    text: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

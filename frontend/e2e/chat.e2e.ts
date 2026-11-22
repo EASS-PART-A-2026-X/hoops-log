@@ -123,6 +123,35 @@ test.describe('the chat, with his AI helper there', () => {
     await expect(log(page).getByText(/You have made/)).toBeVisible()
   })
 
+  test('the conversation is saved: it is still there after a reload, and is part of what he is sent', async ({ page, api }) => {
+    await api.seed(makeShots('Yuly', 6, { seed: 91 }))
+    await openChat(page)
+    await say(page, 'How am I doing?')
+    await expect(log(page).getByText(/You have made/)).toBeVisible()
+    await expect.poll(async () => (await api.history('Yuly')).length).toBe(2)
+    await page.reload()
+    await page.getByRole('button', { name: /Open Deni/ }).click()
+    await expect(log(page).getByText('How am I doing?', { exact: true })).toBeVisible()
+    await expect(log(page).getByText(/You have made/)).toBeVisible()
+    // The stand-in counts the messages it is sent: the two saved ones and the new one.
+    await say(page, 'what is the context')
+    await expect(log(page).getByText('I can see 3 messages.')).toBeVisible()
+  })
+
+  test('Start over forgets the conversation, here and in the backend, and a reload stays empty', async ({ page, api }) => {
+    await api.seed(makeShots('Yuly', 6, { seed: 91 }))
+    await openChat(page)
+    await say(page, 'How am I doing?')
+    await expect(log(page).getByText(/You have made/)).toBeVisible()
+    await dialog(page).getByRole('button', { name: 'Start over' }).click()
+    await expect(log(page).getByText('How am I doing?', { exact: true })).toHaveCount(0)
+    await expect.poll(async () => (await api.history('Yuly')).length).toBe(0)
+    await page.reload()
+    await page.getByRole('button', { name: /Open Deni/ }).click()
+    await expect(log(page).getByText('How am I doing?', { exact: true })).toHaveCount(0)
+    await expect(dialog(page).getByRole('button', { name: 'Start over' })).toHaveCount(0)
+  })
+
   test('shots can be added from the shot list by opening the chat, and there is no manual form', async ({ page, api }) => {
     await api.seed(makeShots('Yuly', 6, { seed: 91 }))
     await openApp(page)

@@ -55,9 +55,25 @@ export class Api {
   }
 
   async clear(): Promise<void> {
-    for (const shot of await this.list()) {
+    const rows = await this.list()
+    // A player's saved conversation goes with them (a chat only exists for a player who has shots), so a test
+    // never starts with the talk of an earlier one.
+    for (const player of new Set(rows.map((shot) => shot.player))) await this.forget(player)
+    for (const shot of rows) {
       await this.remove(shot.id)
     }
+  }
+
+  /** The saved conversation with Deni for one player. */
+  async history(player: string): Promise<{ role: string; text: string }[]> {
+    const res = await this.request.get(`${BACKEND_URL}/chat/history`, { params: { player } })
+    expect(res.status()).toBe(200)
+    return ((await res.json()) as { lines: { role: string; text: string }[] }).lines
+  }
+
+  async forget(player: string): Promise<void> {
+    const res = await this.request.delete(`${BACKEND_URL}/chat/history`, { params: { player } })
+    expect(res.status(), `forgetting the chat of ${player}`).toBe(204)
   }
 }
 

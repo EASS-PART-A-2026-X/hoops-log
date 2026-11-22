@@ -166,15 +166,15 @@ describe('the conversation', () => {
   it('can clear the chat, but only when there is one and he is not busy', async () => {
     const empty = stubChat()
     const view = panel(empty)
-    expect(screen.queryByRole('button', { name: 'Clear the chat' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Start over' })).toBeNull()
     view.unmount()
     const chat = stubChat({ messages: [message({})] })
     const second = panel(chat)
-    await userEvent.click(screen.getByRole('button', { name: 'Clear the chat' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Start over' }))
     expect(chat.reset).toHaveBeenCalledTimes(1)
     second.unmount()
     panel(stubChat({ messages: [message({})], thinking: true }))
-    expect((screen.getByRole('button', { name: 'Clear the chat' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Start over' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })
 

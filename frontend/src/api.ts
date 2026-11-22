@@ -223,10 +223,15 @@ export async function sendChat(
   stats: StatsSummary | null,
   today: string,
   signal?: AbortSignal,
+  /** Whose conversation this is: when given, the backend keeps the message and the reply (see getChatHistory). */
+  player?: string,
 ): Promise<ChatReply> {
   const result = await request<ChatReply>(
     '/chat',
-    { method: 'POST', body: JSON.stringify({ messages, ...(stats ? { stats } : {}), today }) },
+    {
+      method: 'POST',
+      body: JSON.stringify({ messages, ...(stats ? { stats } : {}), today, ...(player ? { player } : {}) }),
+    },
     { timeoutMs: CHAT_TIMEOUT_MS, useDetail: true, signal },
   )
   if (!result || typeof result.reply !== 'string' || !Array.isArray(result.proposals)) {
@@ -246,4 +251,20 @@ export async function chatAvailable(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** The saved conversation of one player, oldest first. Throws an ApiError when it cannot be read. */
+export async function getChatHistory(player: string, signal?: AbortSignal): Promise<ChatTurn[]> {
+  const result = await request<{ lines?: unknown }>(`/chat/history?player=${encodeURIComponent(player)}`, {}, { signal })
+  if (!result || !Array.isArray(result.lines)) {
+    throw new ApiError('server', 'The server sent a reply this app could not read. Try again.')
+  }
+  return (result.lines as ChatTurn[]).filter(
+    (line) => (line?.role === 'user' || line?.role === 'deni') && typeof line.text === 'string' && line.text !== '',
+  )
+}
+
+/** Start over: the backend forgets the saved conversation of one player. */
+export async function deleteChatHistory(player: string): Promise<void> {
+  await request<void>(`/chat/history?player=${encodeURIComponent(player)}`, { method: 'DELETE' })
 }

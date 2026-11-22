@@ -8,13 +8,24 @@ import { today } from '../today'
 import { buildStats } from './chatStats'
 import { useChat } from './useChat'
 
-vi.mock('../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api')>()), sendChat: vi.fn() }))
-const { sendChat } = await import('../api')
+vi.mock('../api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api')>()),
+  sendChat: vi.fn(),
+  getChatHistory: vi.fn(),
+  deleteChatHistory: vi.fn(),
+}))
+const { sendChat, getChatHistory, deleteChatHistory } = await import('../api')
 const chatCall = vi.mocked(sendChat)
+const historyCall = vi.mocked(getChatHistory)
+const forgetCall = vi.mocked(deleteChatHistory)
 
 afterEach(cleanup)
 beforeEach(() => {
   chatCall.mockReset()
+  historyCall.mockReset()
+  historyCall.mockResolvedValue([])
+  forgetCall.mockReset()
+  forgetCall.mockResolvedValue(undefined)
 })
 
 const shots: MapShot[] = [1, 2, 3].map((id) => ({ id, player: 'Yuly', x: 25, y: 6, made: id !== 2, zone: 'paint', shot_type: '2PT' as const }))
@@ -60,7 +71,7 @@ describe('sending a message', () => {
     chatCall.mockResolvedValue(answer())
     const { send } = setup()
     await send('how am I doing?')
-    expect(chatCall).toHaveBeenCalledWith([{ role: 'user', text: 'how am I doing?' }], buildStats(shots, 'Yuly'), today(), expect.any(AbortSignal))
+    expect(chatCall).toHaveBeenCalledWith([{ role: 'user', text: 'how am I doing?' }], buildStats(shots, 'Yuly'), today(), expect.any(AbortSignal), 'Yuly')
   })
 
   it('shows the message and Deni\'s reply, makes him say it, and reports that the AI answered', async () => {
@@ -418,5 +429,121 @@ describe('a new log with no player chosen yet', () => {
     expect(result.current.savingFor).toBe('Yuly')
     await act(async () => result.current.save(result.current.messages[1]!.id, 0))
     expect(props.onCreate).toHaveBeenCalledWith(expect.objectContaining({ player: 'Yuly' }))
+  })
+})
+
+describe('the saved conversation', () => {
+  const flush = () => act(async () => {})
+
+  it('is loaded for the player when the chat is first needed, before anything new', async () => {
+    historyCall.mockResolvedValue([
+      { role: 'user', text: 'yesterday I hit one' },
+      { role: 'deni', text: 'Nice.' },
+    ])
+    const { result } = setup()
+    await flush()
+    expect(historyCall).toHaveBeenCalledWith('Yuly')
+    expect(result.current.messages.map((m) => [m.role, m.text])).toEqual([
+      ['user', 'yesterday I hit one'],
+      ['deni', 'Nice.'],
+    ])
+  })
+
+  it('is asked for once per player, and again for another player', async () => {
+    const { rerender, props } = setup()
+    await flush()
+    rerender({ ...props, player: 'Yuly' })
+    await flush()
+    expect(historyCall).toHaveBeenCalledTimes(1)
+    rerender({ ...props, player: 'Noam' })
+    await flush()
+    expect(historyCall).toHaveBeenLastCalledWith('Noam')
+    expect(historyCall).toHaveBeenCalledTimes(2)
+  })
+
+  it('is not asked for when no player is chosen yet (a new log)', async () => {
+    setup({ player: '' })
+    await flush()
+    expect(historyCall).not.toHaveBeenCalled()
+  })
+
+  it('is sent to the AI along with a new message, as the conversation so far', async () => {
+    historyCall.mockResolvedValue([
+      { role: 'user', text: 'one' },
+      { role: 'deni', text: 'two' },
+    ])
+    chatCall.mockResolvedValue(answer())
+    const { send } = setup()
+    await flush()
+    await send('three')
+    expect(chatCall.mock.calls[0]![0]).toEqual([
+      { role: 'user', text: 'one' },
+      { role: 'deni', text: 'two' },
+      { role: 'user', text: 'three' },
+    ])
+  })
+
+  it('goes before what was said while it was loading', async () => {
+    let arrive: (lines: { role: 'user' | 'deni'; text: string }[]) => void = () => {}
+    historyCall.mockReturnValue(new Promise((resolve) => (arrive = resolve)))
+    chatCall.mockResolvedValue(answer('new reply'))
+    const { result, send } = setup()
+    await send('new message')
+    await act(async () => arrive([{ role: 'user', text: 'old' }]))
+    expect(result.current.messages.map((m) => m.text)).toEqual(['old', 'new message', 'new reply'])
+  })
+
+  it('that cannot be read just means an empty chat, and is tried again the next time', async () => {
+    historyCall.mockRejectedValueOnce(new ApiError('unavailable', 'down'))
+    const { rerender, result, props } = setup()
+    await flush()
+    expect(result.current.messages).toEqual([])
+    rerender({ ...props, player: 'Noam' })
+    rerender({ ...props, player: 'Yuly' })
+    await flush()
+    expect(historyCall.mock.calls.filter(([who]) => who === 'Yuly')).toHaveLength(2)
+  })
+
+  it('Start over clears the chat and asks the backend to forget it', async () => {
+    historyCall.mockResolvedValue([{ role: 'user', text: 'old' }])
+    const { result } = setup()
+    await flush()
+    act(() => result.current.reset())
+    expect(result.current.messages).toEqual([])
+    expect(forgetCall).toHaveBeenCalledWith('Yuly')
+  })
+
+  it('Start over also drops a saved conversation that arrives late', async () => {
+    let arrive: (lines: { role: 'user' | 'deni'; text: string }[]) => void = () => {}
+    historyCall.mockReturnValue(new Promise((resolve) => (arrive = resolve)))
+    const { result } = setup()
+    act(() => result.current.reset())
+    await act(async () => arrive([{ role: 'user', text: 'old' }]))
+    expect(result.current.messages).toEqual([])
+  })
+
+  it('Start over still clears the chat when the backend cannot be reached, and says it could not forget', async () => {
+    forgetCall.mockRejectedValue(new ApiError('unavailable', 'down'))
+    chatCall.mockResolvedValue(answer())
+    const { result, send } = setup()
+    await send('hi')
+    act(() => result.current.reset())
+    await flush()
+    expect(result.current.messages).toHaveLength(1)
+    expect(result.current.messages[0]).toMatchObject({ role: 'deni', failed: true })
+    expect(result.current.messages[0]!.text).toMatch(/could not forget/)
+  })
+
+  it('Start over with no player chosen only clears the page', () => {
+    const { result } = setup({ player: '' })
+    act(() => result.current.reset())
+    expect(forgetCall).not.toHaveBeenCalled()
+  })
+
+  it('a message from a new log (no player) is not saved by the backend', async () => {
+    chatCall.mockResolvedValue(answer())
+    const { send } = setup({ player: '' })
+    await send('hi')
+    expect(chatCall.mock.calls[0]![4]).toBe('') // sendChat leaves an empty player out (see api.history.test.ts)
   })
 })
