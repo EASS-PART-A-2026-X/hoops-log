@@ -4072,7 +4072,8 @@ h3 {
 
 .coach-bubble {
   position: relative;
-  padding: 10px 30px 10px 12px;
+  /* The right side leaves room for the 40px dismiss button. */
+  padding: 10px 38px 10px 12px;
   border: 1px solid var(--orange);
   border-radius: 12px 12px 2px 12px;
   background: var(--panel);
@@ -4355,7 +4356,7 @@ h3 {
   color: var(--muted);
 }
 
-.shot-note {
+.shot-chip-note {
   font-size: 14px;
 }
 

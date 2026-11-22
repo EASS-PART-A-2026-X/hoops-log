@@ -122,48 +122,48 @@ function Message({ message, player, onSave, onDiscard, onSaveAll }: MessageProps
   const many = shown > 3 // a long session stays one line; the list opens on demand
   const list = (
     <ul className="chat-cards" aria-label="Shots Deni understood">
-          {cards.map((card, index) =>
-            card.status === 'discarded' ? null : (
-              <li key={index} className={card.status === 'saved' ? 'shot-chip saved' : 'shot-chip'}>
-                <span className="shot-chip-main">
-                  <strong>{describeShot(card.shot)}</strong>
-                  {card.shot.note && <span className="shot-note">{card.shot.note}</span>}
-                  {card.lookalike && card.status === 'pending' && <span className="shot-hint">Looks like a shot you just saved.</span>}
-                  {card.status === 'error' && (
-                    <span className="form-error" role="alert">
-                      {card.message}
-                    </span>
-                  )}
+      {cards.map((card, index) =>
+        card.status === 'discarded' ? null : (
+          <li key={index} className={card.status === 'saved' ? 'shot-chip saved' : 'shot-chip'}>
+            <span className="shot-chip-main">
+              <strong>{describeShot(card.shot)}</strong>
+              {card.shot.note && <span className="shot-chip-note">{card.shot.note}</span>}
+              {card.lookalike && card.status === 'pending' && <span className="shot-hint">Looks like a shot you just saved.</span>}
+              {card.status === 'error' && (
+                <span className="form-error" role="alert">
+                  {card.message}
                 </span>
-                <span className="shot-chip-actions">
-                  {card.status === 'saved' ? (
-                    <span className="shot-saved">Saved ✓</span>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="chip-btn save"
-                        aria-label={`Save shot ${index + 1}`}
-                        disabled={card.status === 'saving' || !player}
-                        onClick={() => void onSave(message.id, index)}
-                      >
-                        {card.status === 'saving' ? 'Saving…' : card.status === 'error' ? 'Retry' : card.lookalike ? 'Save again' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        className="chip-btn"
-                        aria-label={`Discard shot ${index + 1}`}
-                        disabled={card.status === 'saving'}
-                        onClick={() => onDiscard(message.id, index)}
-                      >
-                        ✕
-                      </button>
-                    </>
-                  )}
-                </span>
-              </li>
-            ),
-          )}
+              )}
+            </span>
+            <span className="shot-chip-actions">
+              {card.status === 'saved' ? (
+                <span className="shot-saved">Saved ✓</span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="chip-btn save"
+                    aria-label={`Save shot ${index + 1}`}
+                    disabled={card.status === 'saving' || !player}
+                    onClick={() => void onSave(message.id, index)}
+                  >
+                    {card.status === 'saving' ? 'Saving…' : card.status === 'error' ? 'Retry' : card.lookalike ? 'Save again' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    className="chip-btn"
+                    aria-label={`Discard shot ${index + 1}`}
+                    disabled={card.status === 'saving'}
+                    onClick={() => onDiscard(message.id, index)}
+                  >
+                    ✕
+                  </button>
+                </>
+              )}
+            </span>
+          </li>
+        ),
+      )}
     </ul>
   )
   const busy = cards.some((card) => card.status === 'saving')
