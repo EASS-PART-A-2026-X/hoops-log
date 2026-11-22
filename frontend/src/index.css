@@ -4072,7 +4072,8 @@ h3 {
 
 .coach-bubble {
   position: relative;
-  padding: 10px 30px 10px 12px;
+  /* The right side leaves room for the 40px dismiss button. */
+  padding: 10px 38px 10px 12px;
   border: 1px solid var(--orange);
   border-radius: 12px 12px 2px 12px;
   background: var(--panel);
@@ -4088,10 +4089,11 @@ h3 {
 
 .coach-bubble-close {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 24px;
-  height: 24px;
+  top: 0;
+  right: 0;
+  /* A fingertip-sized target (the cross itself stays small). */
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: 0;
   background: none;
@@ -4347,106 +4349,18 @@ h3 {
   }
 }
 
-/* Paste notes: an AI reads them and proposes shots (NotesImport.tsx). */
-.field textarea {
-  min-height: 120px;
-  padding: 10px 12px;
-  font: inherit;
-  line-height: 1.4;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  resize: vertical;
-}
-
-.field textarea:focus {
-  border-color: var(--orange);
-}
-
-.notes {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.notes-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.notes-help,
-.notes-privacy,
-.notes-hint,
-.notes-model {
+/* Small text lines used on the shot rows of the chat and in the shot drawer. */
+.shot-hint {
   margin: 0;
   font-size: 13px;
   color: var(--muted);
 }
 
-.notes-model.warn {
-  color: var(--orange-soft);
-}
-
-.notes-count {
-  align-self: flex-end;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.notes-result h3 {
-  margin: 16px 0 8px;
-  font-family: var(--display);
-  font-size: 16px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.notes-list,
-.notes-questions,
-.notes-skipped {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.notes-questions li,
-.notes-skipped li {
-  padding: 8px 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-.notes-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-}
-
-.notes-card.saved {
-  border-color: var(--green);
-}
-
-.notes-note {
+.shot-chip-note {
   font-size: 14px;
 }
 
-.notes-quote {
-  font-size: 13px;
-  font-style: italic;
-  color: var(--muted);
-}
-
-.notes-saved {
+.shot-saved {
   color: var(--green);
   font-weight: 600;
 }
@@ -4474,12 +4388,6 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.28);
-}
-
-.chat-hint {
-  font-size: 0.86rem;
-  line-height: 1.4;
-  color: var(--muted);
 }
 
 .chat-msg {

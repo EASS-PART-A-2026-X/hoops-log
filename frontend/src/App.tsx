@@ -475,7 +475,7 @@ export default function App() {
             <div className="drawer-body">
               <section hidden={view !== 'add'} aria-labelledby="add-title">
                 <h2 id="add-title">Add a shot</h2>
-                <p className="notes-hint">Deni's AI helper is not available right now, so add the shot by hand.</p>
+                <p className="shot-hint">Deni's AI helper is not available right now, so add the shot by hand.</p>
                 <ShotForm submitLabel="Add shot" onSubmit={add} />
               </section>
 
