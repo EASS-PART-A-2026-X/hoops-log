@@ -52,7 +52,8 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
 
   return (
     <div className="chat">
-      <ol className="chat-log" ref={logRef} role="log" aria-label="Conversation with Deni">
+      {/* Not live: each reply is already announced by the caption's live region (Coach.tsx), and both would read it twice. */}
+      <ol className="chat-log" ref={logRef} role="log" aria-live="off" aria-label="Conversation with Deni">
         {/* His first words, in his own bubble. They are not part of the conversation sent to the AI. */}
         <li className="chat-msg deni">
           <span className="chat-bubble">{offline ? GREETING_OFFLINE : GREETING}</span>

@@ -306,3 +306,10 @@ describe('many shots at once', () => {
     expect(screen.queryByText(/^Review \d+ shots$/)).toBeNull()
   })
 })
+
+describe('screen readers', () => {
+  it('the log is not live: the caption announces each reply, so a reader hears it once', () => {
+    panel(stubChat())
+    expect(screen.getByRole('log', { name: 'Conversation with Deni' }).getAttribute('aria-live')).toBe('off')
+  })
+})
