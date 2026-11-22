@@ -7,7 +7,7 @@ from sqlalchemy import Engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
-from app.ai import get_ai_client, notes_limiter, status_cache
+from app.ai import chat_limiter, get_ai_client, status_cache
 from app.db import get_session
 from app.main import app
 
@@ -46,10 +46,10 @@ def _clean_ai_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """No developer setting and no earlier test may leak into a notes test."""
     monkeypatch.delenv("AI_SERVICE_URL", raising=False)
     monkeypatch.delenv("AI_SERVICE_TOKEN", raising=False)
-    notes_limiter.reset()
+    chat_limiter.reset()
     status_cache.reset()
     yield
-    notes_limiter.reset()
+    chat_limiter.reset()
     status_cache.reset()
 
 

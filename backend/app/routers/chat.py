@@ -20,7 +20,7 @@ from app.ai import (
     ai_headers,
     ai_url,
     get_ai_client,
-    limit_notes,
+    limit_chat,
     status_cache,
 )
 from app.court import ShotType, Zone, shot_type_of, zone_of
@@ -212,7 +212,7 @@ async def chat(body: ChatRequest, client: ClientDep) -> ChatReply:
     To keep a proposed shot, the browser sends it to `POST /shots` like any other shot.
     """
     # Here, after the body was checked, so a request that ends in a 422 is not counted.
-    limit_notes()
+    limit_chat()
     content = bytearray()
     try:
         async with client.stream(

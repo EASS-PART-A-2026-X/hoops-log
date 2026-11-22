@@ -110,17 +110,6 @@ export function welcomeBack(name: string, days: number): Line {
   return { text: `Welcome back, ${who}. ${days} days since your last shot, so ease in with a few warm-up ones.`, mood: 'happy' }
 }
 
-/** Fun facts that do not change with a season, so they stay true. */
-export const FACTS: readonly string[] = [
-  'Fun fact: Deni Avdija was born on January 3, 2001, in Beit Zera, in Israel.',
-  'Fun fact: Deni was picked 9th overall in the 2020 NBA draft, the highest an Israeli has ever been drafted.',
-  'Fun fact: before the NBA, Deni played for Maccabi Tel Aviv, and he plays for the Israeli national team.',
-]
-
-export function fact(n: number): Line {
-  return { text: pick(FACTS, n), mood: 'happy' }
-}
-
 const POKES = ['Hey, careful, I am dribbling here.', 'Yes? I am right here, coach.', 'That tickles. Focus on your shot.', 'You can keep poking, the ball does not stop.']
 
 export function poke(n: number): Line {

@@ -26,6 +26,7 @@ function stubChat(over: Partial<ChatApi> = {}): ChatApi {
     messages: [],
     thinking: false,
     savingFor: 'Yuly',
+    typedPlayer: '',
     setTypedPlayer: vi.fn(),
     send: vi.fn(async () => {}),
     cancel: vi.fn(),
@@ -180,11 +181,11 @@ describe('the conversation', () => {
 describe('the shots he understood', () => {
   const withCards = (cards: Card[], over: Partial<ChatApi> = {}) => stubChat({ messages: [message({ id: 7, cards })], ...over })
 
-  it('shows each one with its zone, result, date, note and the words it came from', () => {
+  it('shows each one with its zone, result, date, and note (the words are already in the chat above)', () => {
     panel(withCards([card(), card({ shot: elbow })]))
     expect(screen.getByText('Right corner 3 · 3PT · made · 2026-11-19')).toBeTruthy()
     expect(screen.getByText('caught and shot')).toBeTruthy()
-    expect(screen.getByText('hit one from the right corner')).toBeTruthy()
+    expect(screen.queryByText('hit one from the right corner')).toBeNull()
     expect(screen.getByText('Left elbow · 2PT · missed · 2026-11-19')).toBeTruthy()
   })
 
@@ -218,10 +219,10 @@ describe('the shots he understood', () => {
     expect((screen.getByRole('button', { name: 'Discard shot 1' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('shows why a save failed and offers Try again', () => {
+  it('shows why a save failed and offers Retry', () => {
     panel(withCards([card({ status: 'error', message: "Can't reach the backend" })]))
     expect(screen.getByText("Can't reach the backend")).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Save shot 1' }).textContent).toBe('Try again')
+    expect(screen.getByRole('button', { name: 'Save shot 1' }).textContent).toBe('Retry')
   })
 
   it('marks a look-alike of a shot just saved, offers Save again, and leaves it out of Save all', () => {
@@ -260,6 +261,12 @@ describe('a new log with no player yet', () => {
     expect(chat.setTypedPlayer).toHaveBeenCalledWith('N')
   })
 
+  it('shows the name as typed, spaces and all, so a two-word name can be written', async () => {
+    const chat = stubChat({ savingFor: 'Noam', typedPlayer: 'Noam ' })
+    panel(chat, { player: '' })
+    expect((screen.getByLabelText('Save my shots under the name') as HTMLInputElement).value).toBe('Noam ')
+  })
+
   it('cannot save until there is a name, and says why', () => {
     const chat = stubChat({ savingFor: '', messages: [message({ cards: [card(), card({ shot: elbow })] })] })
     panel(chat, { player: '' })
@@ -278,5 +285,24 @@ describe('a new log with no player yet', () => {
   it('does not ask for a name when a player is chosen', () => {
     panel(stubChat())
     expect(screen.queryByLabelText('Save my shots under the name')).toBeNull()
+  })
+})
+
+describe('many shots at once', () => {
+  const withCards = (cards: Card[]) => stubChat({ messages: [message({ id: 7, cards })] })
+
+  it('keeps a long list to one line until it is opened', async () => {
+    const five = [card(), card({ shot: elbow }), card(), card(), card()]
+    panel(withCards(five))
+    const summary = screen.getByText('Review 5 shots')
+    expect(summary.closest('details')!.open).toBe(false)
+    expect(screen.getByRole('button', { name: 'Save all (5)' })).toBeTruthy()
+    await userEvent.click(summary)
+    expect(summary.closest('details')!.open).toBe(true)
+  })
+
+  it('shows a short list straight away', () => {
+    panel(withCards([card(), card({ shot: elbow }), card()]))
+    expect(screen.queryByText(/^Review \d+ shots$/)).toBeNull()
   })
 })

@@ -4456,18 +4456,19 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* Its natural height, never squeezed: the panel scrolls instead, so nothing is drawn over anything else. */
-  flex: 0 0 auto;
+  /* It takes the room the panel has, so the conversation is the main thing; the log scrolls inside. */
+  flex: 1 1 260px;
+  min-height: 260px;
 }
 
 .chat-log {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  flex: 0 0 auto;
-  height: clamp(200px, 38vh, 380px);
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0;
-  padding: 10px;
+  padding: 12px 10px;
   list-style: none;
   overflow-y: auto;
   border: 1px solid var(--line);
@@ -4499,8 +4500,8 @@ h3 {
 }
 
 .chat-bubble {
-  padding: 8px 11px;
-  border-radius: 12px;
+  padding: 8px 12px;
+  border-radius: 18px;
   font-size: 0.92rem;
   line-height: 1.35;
   white-space: pre-wrap;
@@ -4510,7 +4511,12 @@ h3 {
   color: var(--text);
 }
 
+.chat-msg.deni .chat-bubble {
+  border-bottom-left-radius: 4px;
+}
+
 .chat-msg.user .chat-bubble {
+  border-bottom-right-radius: 4px;
   border-color: #e03a3e;
   background: #e03a3e;
   color: #fff;
@@ -4538,8 +4544,87 @@ h3 {
   list-style: none;
 }
 
+/* A shot Deni understood: one slim row under his bubble, the actions small and on the right. */
+.shot-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 8px 7px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--orange);
+  border-radius: 12px;
+}
+
+.shot-chip.saved {
+  border-left-color: var(--green);
+}
+
+.shot-chip-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.shot-chip-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-btn {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip-btn.save {
+  color: #1a0f05;
+  background: var(--orange);
+  border-color: var(--orange);
+}
+
+.chip-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-review {
+  width: 100%;
+}
+
+.chat-review summary {
+  cursor: pointer;
+  padding: 6px 12px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--orange-soft);
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+}
+
+.chat-review .chat-cards {
+  max-height: 220px;
+  margin-top: 6px;
+  overflow-y: auto;
+}
+
 .chat-save-all {
   align-self: flex-start;
+  margin-top: 2px;
 }
 
 .chat-name {
@@ -4630,10 +4715,34 @@ h3 {
 
   /* A phone: his figure takes less, so the chat has the room. */
   .coach-dialog-body {
-    grid-template-rows: minmax(130px, 24%) minmax(0, 1fr);
+    grid-template-rows: minmax(110px, 18%) minmax(0, 1fr);
   }
 
-  .chat-log {
-    height: clamp(160px, 28vh, 260px);
+  /* The conversation gets most of the screen; the panel scrolls for the toggles and the footnote below it. */
+  .chat {
+    min-height: 380px;
+  }
+
+  .coach-panel {
+    padding: 14px 14px 14px;
+    gap: 8px;
+  }
+
+  .coach-panel h2 {
+    font-size: 24px;
+  }
+
+  .coach-panel-sub {
+    display: none;
+  }
+
+  /* The same words are in the chat right below, so the stage keeps just him. */
+  .coach-caption {
+    display: none;
+  }
+
+  .coach-dialog-close {
+    top: 8px;
+    right: 8px;
   }
 }

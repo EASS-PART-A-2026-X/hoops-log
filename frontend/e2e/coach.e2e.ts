@@ -289,35 +289,4 @@ test.describe('Deni’s voice', () => {
     await expect.poll(async () => (await spoken(page)).some((t) => /Nice/.test(t))).toBe(true)
     for (const text of await spoken(page)) expect(text).not.toMatch(/[*_`#]|\p{Extended_Pictographic}/u)
   })
-
-  test('the HD voice offers a download, and when the model cannot be fetched he says so and keeps talking with the browser voice', async ({ page }) => {
-    test.setTimeout(120_000)
-    await stubSpeech(page)
-    await openApp(page)
-    await face(page).click()
-    const hd = dialog(page).getByRole('button', { name: /^HD voice:/ })
-    await expect(hd).toContainText('off (one-time 90 MB download)')
-    await expect(hd).toHaveAttribute('aria-pressed', 'false')
-    await hd.click()
-    await expect(hd).toContainText('could not load, tap to try again', { timeout: 90_000 })
-    await talk(page, 'How am I doing?')
-    await expect.poll(async () => (await spoken(page)).some((t) => /no numbers/.test(t))).toBe(true)
-  })
-
-  test('the HD button is hidden while the voice is off', async ({ page }) => {
-    await openApp(page)
-    await face(page).click()
-    await dialog(page).getByRole('button', { name: /^Voice:/ }).click()
-    await expect(dialog(page).getByRole('button', { name: /^HD voice:/ })).toHaveCount(0)
-  })
-
-  test('"Let him chime in" is a switch that is remembered', async ({ page }) => {
-    await openApp(page)
-    await face(page).click()
-    const chime = dialog(page).getByRole('button', { name: /^Let him chime in:/ })
-    await expect(chime).toContainText('on')
-    await chime.click()
-    await expect(chime).toContainText('off')
-    expect(await page.evaluate(() => window.localStorage.getItem('coach-chatter'))).toBe('0')
-  })
 })

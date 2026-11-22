@@ -2,8 +2,9 @@
 
 The service is Deni's brain. It gets a conversation and a summary of the player's
 numbers, and answers with Deni's reply and, when the player described shots,
-PROPOSED shots. It never saves anything and it never knows who the shooter is: the
-backend adds the player and decides what is stored. The limits on coordinates and
+PROPOSED shots. It never saves anything, and it sees the player's name only as a
+label on the numbers: the backend adds the player to proposals and decides what is
+stored. The limits on coordinates and
 text match the backend's own shot rules (feet, 0-50 across, 0-47 from the baseline),
 so a proposal that passes here is not rejected there for its shape.
 """

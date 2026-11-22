@@ -133,13 +133,4 @@ describe('Coach', () => {
     press(['ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'B', 'A'])
     expect(document.querySelector('.coach-live')!.textContent).toMatch(/Cheat code accepted/)
   })
-
-  it('lets the visitor turn the unprompted remarks off', () => {
-    render(<Harness />)
-    openIt()
-    const toggle = screen.getByRole('button', { name: /Let him chime in: on/ })
-    fireEvent.click(toggle)
-    expect(screen.getByRole('button', { name: /Let him chime in: off/ }).getAttribute('aria-pressed')).toBe('false')
-    fireEvent.click(screen.getByRole('button', { name: /Let him chime in: off/ }))
-  })
 })

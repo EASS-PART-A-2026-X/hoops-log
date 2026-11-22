@@ -4,8 +4,6 @@ import DeniAvatar from './DeniAvatar'
 import ChatPanel from './ChatPanel'
 import { POKE_SPAM, poke } from './lines'
 import type { AnswerContext } from './lines'
-import { isChatterOn, setChatterOn, subscribeChatter } from './prefs'
-import { hdSnapshot, hdSupported, setHdWanted, subscribeHd } from './hdVoice'
 import { isVoiceOn, setVoiceOn, speechSupported, subscribeVoice } from './speech'
 import type { CoachApi } from './useCoach'
 import type { ChatApi } from './useChat'
@@ -41,9 +39,7 @@ export default function CoachDialog({ coach, chat, aiAvailable, context, onClose
   const bodyRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const voiceOn = useSyncExternalStore(subscribeVoice, isVoiceOn, () => true)
-  const hd = useSyncExternalStore(subscribeHd, hdSnapshot, hdSnapshot)
   const muted = useSyncExternalStore(subscribeMuted, isMuted, () => false)
-  const chatterOn = useSyncExternalStore(subscribeChatter, isChatterOn, () => true)
   const mood = talking || visible ? (said?.mood ?? 'idle') : 'idle'
   const asked = useRef(0)
   const pokes = useRef<number[]>([])
@@ -118,29 +114,12 @@ export default function CoachDialog({ coach, chat, aiAvailable, context, onClose
           <p className="coach-panel-sub">Forward, number 8. Your coach here.</p>
           <ChatPanel chat={chat} aiAvailable={aiAvailable} player={context.shooter} />
           <div className="coach-toggles">
-          {(speechSupported() || hdSupported()) && (
+          {speechSupported() && (
             <button type="button" className="coach-voice" aria-pressed={voiceOn} onClick={() => setVoiceOn(!voiceOn)}>
               Voice: {voiceOn ? 'on' : 'off'}
               {voiceOn && muted ? ' (the sound button is off)' : ''}
             </button>
           )}
-          {hdSupported() && voiceOn && (
-            <button
-              type="button"
-              className="coach-voice"
-              aria-pressed={hd.state === 'ready' || hd.state === 'loading'}
-              onClick={() => setHdWanted(hd.state === 'off' || hd.state === 'failed')}
-              title="A more human voice made on your own device. One-time download of about 90 MB (model from Hugging Face, runtime from a public CDN); what he says is never sent anywhere."
-            >
-              {hd.state === 'off' && 'HD voice: off (one-time 90 MB download)'}
-              {hd.state === 'loading' && `HD voice: downloading ${hd.progress}%`}
-              {hd.state === 'ready' && 'HD voice: on'}
-              {hd.state === 'failed' && 'HD voice: could not load, tap to try again'}
-            </button>
-          )}
-          <button type="button" className="coach-voice" aria-pressed={chatterOn} onClick={() => setChatterOn(!chatterOn)}>
-            Let him chime in: {chatterOn ? 'on' : 'off'}
-          </button>
           </div>
           <p className="coach-note">
             A fan-made coach inspired by Deni Avdija, not the real Deni. His answers come from an AI that is given the numbers from your log, so check anything important.

@@ -9,8 +9,8 @@ browser -> frontend (:5173) -> backend (:8000) -> ai-service (:8001)
 ```
 
 It never saves anything and never talks to the database: the backend owns all stored data,
-calls this service over HTTP, and only the player pressing Save writes a shot. The service does
-not know who the shooter is either; the backend adds the player.
+calls this service over HTTP, and only the player pressing Save writes a shot. It sees the
+player's name only as a label on the numbers (in its own data block); the backend adds the player to what is saved.
 
 What the model is allowed to do, and what it is not:
 
@@ -124,7 +124,7 @@ Error messages are plain sentences; provider details go to the server log only.
 ## Test it
 
 ```bash
-uv run pytest          # 96 tests, about a second
+uv run pytest          # 97 tests, about a second
 uv run ruff check . && uv run ruff format --check .
 ```
 

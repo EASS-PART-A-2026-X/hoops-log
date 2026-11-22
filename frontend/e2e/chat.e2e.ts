@@ -137,10 +137,10 @@ test.describe('the chat, with his AI helper there', () => {
     await expect(log(page).getByText('Restricted area · 2PT · made')).toBeVisible()
     // Nobody to save for yet.
     await expect(log(page).getByRole('button', { name: 'Save shot 1' })).toBeDisabled()
-    await dialog(page).getByLabel('Save my shots under the name').fill('Noam')
+    await dialog(page).getByLabel('Save my shots under the name').pressSequentially('Noam Cohen')
     await log(page).getByRole('button', { name: 'Save shot 1' }).click()
     await expect(log(page).getByText('Saved ✓')).toBeVisible()
-    expect((await api.list()).map((s) => s.player)).toEqual(['Noam'])
+    expect((await api.list()).map((s) => s.player)).toEqual(['Noam Cohen'])
     // What was said is still in the chat now that Noam is the chosen player.
     await expect(log(page).locator('.chat-msg.user .chat-bubble', { hasText: 'made a layup' })).toBeVisible()
   })

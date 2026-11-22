@@ -14,8 +14,6 @@ export interface ChatMessage {
   text: string
   /** Not Deni: the app saying it could not reach the AI. Never sent to the AI as part of the conversation. */
   failed?: boolean
-  /** Said from his written lines: the AI was not used. */
-  scripted?: boolean
   /** The shots Deni proposed with this reply, for the player to Save or Discard. */
   cards?: Card[]
 }
@@ -200,7 +198,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
     [adopt, create, onSaved, player],
   )
 
-  return { messages, thinking, savingFor, setTypedPlayer, send, cancel, reset, save, discard, saveAll }
+  return { messages, thinking, savingFor, typedPlayer, setTypedPlayer, send, cancel, reset, save, discard, saveAll }
 }
 
 export type ChatApi = ReturnType<typeof useChat>

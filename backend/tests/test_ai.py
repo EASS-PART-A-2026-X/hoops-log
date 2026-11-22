@@ -143,13 +143,13 @@ def test_a_limiter_asks_for_its_limit_on_every_call():
     assert not limiter.allow()
 
 
-def test_the_notes_limiter_follows_ai_rate_limit_without_a_restart(monkeypatch):
-    from app.ai import notes_limiter
+def test_the_chat_limiter_follows_ai_rate_limit_without_a_restart(monkeypatch):
+    from app.ai import chat_limiter
 
     monkeypatch.setenv("AI_RATE_LIMIT", "2")
-    assert [notes_limiter.allow() for _ in range(3)] == [True, True, False]
+    assert [chat_limiter.allow() for _ in range(3)] == [True, True, False]
     monkeypatch.setenv("AI_RATE_LIMIT", "4")
-    assert [notes_limiter.allow() for _ in range(3)] == [True, True, False]
+    assert [chat_limiter.allow() for _ in range(3)] == [True, True, False]
 
 
 def test_the_reply_size_cap_is_generous_for_a_real_answer_but_finite():

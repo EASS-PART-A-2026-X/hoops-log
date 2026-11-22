@@ -23,7 +23,7 @@ const GREETING_OFFLINE = 'My AI helper is offline right now, so I cannot chat. Y
  * (he shows them as cards, and nothing is saved until you press Save) or asking about your numbers (he answers).
  */
 export default function ChatPanel({ chat, aiAvailable, player }: Props) {
-  const { messages, thinking, savingFor, setTypedPlayer, send, cancel, reset, save, discard, saveAll } = chat
+  const { messages, thinking, savingFor, typedPlayer, setTypedPlayer, send, cancel, reset, save, discard, saveAll } = chat
   const [draft, setDraft] = useState('')
   const logRef = useRef<HTMLOListElement>(null)
   const offline = aiAvailable === false
@@ -73,7 +73,7 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
       {player === '' && (
         <div className="chat-name">
           <label htmlFor="chat-name">Save my shots under the name</label>
-          <input id="chat-name" value={savingFor} onChange={(e) => setTypedPlayer(e.target.value)} maxLength={50} autoComplete="off" />
+          <input id="chat-name" value={typedPlayer} onChange={(e) => setTypedPlayer(e.target.value)} maxLength={50} autoComplete="off" />
         </div>
       )}
 
@@ -117,6 +117,8 @@ interface MessageProps {
 function Message({ message, player, onSave, onDiscard, onSaveAll }: MessageProps) {
   const cards = message.cards ?? []
   const open = cards.filter(isOpen).length
+  const shown = cards.filter((card) => card.status !== 'discarded').length
+  const many = shown > 3 // a long session stays one line; the list opens on demand
   const busy = cards.some((card) => card.status === 'saving')
   return (
     <li className={`chat-msg ${message.role}${message.failed ? ' failed' : ''}`}>
@@ -127,42 +129,45 @@ function Message({ message, player, onSave, onDiscard, onSaveAll }: MessageProps
       ) : (
         <span className="chat-bubble">{message.text}</span>
       )}
-      {cards.length > 0 && (
+      {cards.length > 0 && (many ? (
+        <details className="chat-review">
+          <summary>Review {shown} shots</summary>
         <ul className="chat-cards" aria-label="Shots Deni understood">
           {cards.map((card, index) =>
             card.status === 'discarded' ? null : (
-              <li key={index} className={card.status === 'saved' ? 'notes-card saved' : 'notes-card'}>
-                <strong>{describeShot(card.shot)}</strong>
-                {card.shot.note && <span className="notes-note">{card.shot.note}</span>}
-                {card.shot.quote && <q className="notes-quote">{card.shot.quote}</q>}
-                {card.lookalike && card.status === 'pending' && <span className="notes-hint">Looks like a shot you just saved.</span>}
-                {card.status === 'error' && (
-                  <span className="form-error" role="alert">
-                    {card.message}
-                  </span>
-                )}
-                <span className="actions">
+              <li key={index} className={card.status === 'saved' ? 'shot-chip saved' : 'shot-chip'}>
+                <span className="shot-chip-main">
+                  <strong>{describeShot(card.shot)}</strong>
+                  {card.shot.note && <span className="notes-note">{card.shot.note}</span>}
+                  {card.lookalike && card.status === 'pending' && <span className="notes-hint">Looks like a shot you just saved.</span>}
+                  {card.status === 'error' && (
+                    <span className="form-error" role="alert">
+                      {card.message}
+                    </span>
+                  )}
+                </span>
+                <span className="shot-chip-actions">
                   {card.status === 'saved' ? (
                     <span className="notes-saved">Saved ✓</span>
                   ) : (
                     <>
                       <button
                         type="button"
-                        className="btn primary"
+                        className="chip-btn save"
                         aria-label={`Save shot ${index + 1}`}
                         disabled={card.status === 'saving' || !player}
                         onClick={() => void onSave(message.id, index)}
                       >
-                        {card.status === 'saving' ? 'Saving…' : card.status === 'error' ? 'Try again' : card.lookalike ? 'Save again' : 'Save'}
+                        {card.status === 'saving' ? 'Saving…' : card.status === 'error' ? 'Retry' : card.lookalike ? 'Save again' : 'Save'}
                       </button>
                       <button
                         type="button"
-                        className="btn"
+                        className="chip-btn"
                         aria-label={`Discard shot ${index + 1}`}
                         disabled={card.status === 'saving'}
                         onClick={() => onDiscard(message.id, index)}
                       >
-                        Discard
+                        ✕
                       </button>
                     </>
                   )}
@@ -171,9 +176,55 @@ function Message({ message, player, onSave, onDiscard, onSaveAll }: MessageProps
             ),
           )}
         </ul>
-      )}
+        </details>
+      ) : (
+        <ul className="chat-cards" aria-label="Shots Deni understood">
+          {cards.map((card, index) =>
+            card.status === 'discarded' ? null : (
+              <li key={index} className={card.status === 'saved' ? 'shot-chip saved' : 'shot-chip'}>
+                <span className="shot-chip-main">
+                  <strong>{describeShot(card.shot)}</strong>
+                  {card.shot.note && <span className="notes-note">{card.shot.note}</span>}
+                  {card.lookalike && card.status === 'pending' && <span className="notes-hint">Looks like a shot you just saved.</span>}
+                  {card.status === 'error' && (
+                    <span className="form-error" role="alert">
+                      {card.message}
+                    </span>
+                  )}
+                </span>
+                <span className="shot-chip-actions">
+                  {card.status === 'saved' ? (
+                    <span className="notes-saved">Saved ✓</span>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="chip-btn save"
+                        aria-label={`Save shot ${index + 1}`}
+                        disabled={card.status === 'saving' || !player}
+                        onClick={() => void onSave(message.id, index)}
+                      >
+                        {card.status === 'saving' ? 'Saving…' : card.status === 'error' ? 'Retry' : card.lookalike ? 'Save again' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        className="chip-btn"
+                        aria-label={`Discard shot ${index + 1}`}
+                        disabled={card.status === 'saving'}
+                        onClick={() => onDiscard(message.id, index)}
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
+                </span>
+              </li>
+            ),
+          )}
+        </ul>
+      ))}
       {open > 1 && (
-        <button type="button" className="btn primary chat-save-all" disabled={!player || busy} onClick={() => void onSaveAll(message.id)}>
+        <button type="button" className="chip-btn save chat-save-all" disabled={!player || busy} onClick={() => void onSaveAll(message.id)}>
           Save all ({open})
         </button>
       )}

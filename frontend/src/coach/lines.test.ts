@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FACTS, KONAMI_CODE, MILESTONES, chatter, dayOf, daysBetween, fact, greet, milestone, poke, saved, tip, welcomeBack } from './lines'
+import { KONAMI_CODE, MILESTONES, chatter, dayOf, daysBetween, greet, milestone, poke, saved, tip, welcomeBack } from './lines'
 
 let n = 0
 const shot = (over: Record<string, unknown> = {}) => ({
@@ -120,7 +120,7 @@ describe('unprompted lines', () => {
   })
 })
 
-describe('milestones, facts and eggs', () => {
+describe('milestones and eggs', () => {
   it('counts whole days between dates, and says so for a bad date', () => {
     expect(daysBetween('2026-11-01', '2026-11-12')).toBe(11)
     expect(daysBetween('2026-11-12', '2026-11-12')).toBe(0)
@@ -136,13 +136,6 @@ describe('milestones, facts and eggs', () => {
     expect([...MILESTONES]).toEqual([...MILESTONES].sort((a, b) => a - b))
     expect(milestone(100).text).toContain('100')
     expect(milestone(100).mood).toBe('hype')
-  })
-
-  it('rotates through the facts, each a complete sentence about the real Deni', () => {
-    const texts = FACTS.map((_, i) => fact(i).text)
-    expect(new Set(texts).size).toBe(FACTS.length)
-    expect(fact(FACTS.length).text).toBe(fact(0).text)
-    for (const t of texts) expect(t).toMatch(/Deni/)
   })
 
   it('invites a new player to tell him about the first shot', () => {

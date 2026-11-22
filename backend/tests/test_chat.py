@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.ai import DEFAULT_RATE_LIMIT as RATE_LIMIT
-from app.ai import MAX_REPLY_BYTES, STATUS_TTL_SECONDS, notes_limiter, status_cache
+from app.ai import MAX_REPLY_BYTES, STATUS_TTL_SECONDS, chat_limiter, status_cache
 
 SHOT = {
     "x": 47.5,
@@ -471,7 +471,7 @@ def test_ai_rate_limit_is_read_when_a_request_arrives(client, fake_ai, monkeypat
 def test_a_minute_later_requests_are_allowed_again(client, fake_ai, monkeypatch):
     fake_ai(answer())
     now = [1000.0]
-    monkeypatch.setattr(notes_limiter, "clock", lambda: now[0])
+    monkeypatch.setattr(chat_limiter, "clock", lambda: now[0])
     assert [post(client).status_code for _ in range(RATE_LIMIT + 1)][-1] == 429
     now[0] += 60.0
     assert post(client).status_code == 200

@@ -380,6 +380,7 @@ describe('a new log with no player chosen yet', () => {
     await act(async () => result.current.save(id, 0))
     expect(props.onCreate).not.toHaveBeenCalled()
     act(() => result.current.setTypedPlayer('  Noam  '))
+    expect(result.current.typedPlayer).toBe('  Noam  ') // what the box shows is not trimmed
     expect(result.current.savingFor).toBe('Noam')
     await act(async () => result.current.save(id, 0))
     expect(props.onCreate).toHaveBeenCalledWith(expect.objectContaining({ player: 'Noam' }))
