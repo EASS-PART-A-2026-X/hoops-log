@@ -101,7 +101,7 @@ curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/sho
 From `backend/`:
 
 ```bash
-uv run pytest                 # 487 passed
+uv run pytest                 # 493 passed
 uv run ruff check .
 uv run ruff format --check .
 ```

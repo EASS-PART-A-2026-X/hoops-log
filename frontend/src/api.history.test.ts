@@ -53,9 +53,10 @@ describe('sendChat with a player', () => {
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body).player).toBe('Yuly')
   })
 
-  it('leaves the player out when there is none', async () => {
-    fetchMock.mockResolvedValue(json(reply))
+  it('leaves the player out when there is none, or it is empty (a new log)', async () => {
+    fetchMock.mockImplementation(async () => json(reply))
     await sendChat([{ role: 'user', text: 'x' }], null, '2026-11-22')
-    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).not.toHaveProperty('player')
+    await sendChat([{ role: 'user', text: 'x' }], null, '2026-11-22', undefined, '')
+    for (const call of fetchMock.mock.calls) expect(JSON.parse(call[1].body)).not.toHaveProperty('player')
   })
 })

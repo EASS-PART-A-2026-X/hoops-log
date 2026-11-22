@@ -173,3 +173,66 @@ def test_the_rate_limit_still_applies_to_saved_chats(client, fake_ai):
         assert say(client, fake_ai, "hi").status_code == 200
     assert say(client, fake_ai, "hi").status_code == 429
     assert len(lines(client)) == DEFAULT_RATE_LIMIT * 2  # the refused one is not saved
+
+
+def test_a_failing_database_does_not_lose_the_reply(client, fake_ai, monkeypatch):
+    def broken(session, player, lines):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr("app.routers.chat.remember", broken)
+    response = say(client, fake_ai, "hit one", reply="Nice one.")
+    assert response.status_code == 200
+    assert response.json()["reply"] == "Nice one."
+    assert lines(client) == []
+
+
+def test_start_over_while_a_chat_is_on_its_way_means_that_chat_is_not_saved(
+    client, fake_ai
+):
+    def answer_after_start_over(request):
+        # The player presses Start over while the AI is still thinking.
+        assert (
+            client.delete("/chat/history", params={"player": "Yuly"}).status_code == 204
+        )
+        return httpx.Response(200, json=REPLY)
+
+    fake_ai(answer_after_start_over)
+    body = {"messages": [{"role": "user", "text": "hi"}], "player": "Yuly"}
+    assert (
+        client.post("/chat", json=body).status_code == 200
+    )  # the player still gets it
+    assert lines(client) == []  # but the erased conversation did not come back
+
+
+def test_start_over_for_one_player_does_not_stop_another_players_chat_saving(
+    client, fake_ai
+):
+    def answer_after_start_over(request):
+        client.delete("/chat/history", params={"player": "Noam"})
+        return httpx.Response(200, json=REPLY)
+
+    fake_ai(answer_after_start_over)
+    body = {"messages": [{"role": "user", "text": "hi"}], "player": "Yuly"}
+    client.post("/chat", json=body)
+    assert len(lines(client)) == 2
+
+
+def test_a_chat_after_start_over_is_saved_again(client, fake_ai):
+    client.delete("/chat/history", params={"player": "Yuly"})
+    say(client, fake_ai, "fresh")
+    assert [line["text"] for line in lines(client)] == ["fresh", "Got it."]
+
+
+def test_a_name_of_only_spaces_or_control_characters_is_refused_everywhere(
+    client, fake_ai
+):
+    for bad in ["   ", "\t", "bell\x07"]:
+        assert client.get("/chat/history", params={"player": bad}).status_code == 422
+        assert client.delete("/chat/history", params={"player": bad}).status_code == 422
+        body = {"messages": [{"role": "user", "text": "hi"}], "player": bad}
+        assert client.post("/chat", json=body).status_code == 422
+
+
+def test_the_name_is_saved_trimmed(client, fake_ai):
+    say(client, fake_ai, "hi", player="  Yuly  ")
+    assert len(lines(client, "Yuly")) == 2

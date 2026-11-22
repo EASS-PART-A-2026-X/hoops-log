@@ -113,7 +113,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
       pending.current = controller
       setThinking(true)
       try {
-        const answer = await sendChat(turns, buildStats(shots, who), today(), controller.signal, who === '' ? undefined : who)
+        const answer = await sendChat(turns, buildStats(shots, who), today(), controller.signal, who)
         if (ticket !== latest.current) return
         const marks = markLookalikes(savingFor, answer.proposals, savedKeys.current)
         const cards: Card[] = answer.proposals.map((shot, i) => ({ shot, status: 'pending', lookalike: marks[i] }))
@@ -149,8 +149,14 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
     cancel()
     startedOver.current++
     setChats((all) => ({ ...all, [player]: [] }))
-    if (player !== '') void deleteChatHistory(player).catch(() => {})
-  }, [cancel, player])
+    if (player !== '') {
+      const who = player
+      deleteChatHistory(who).catch(() => {
+        // The page is empty but the backend still has the conversation: say so, instead of looking done.
+        append(who, { role: 'deni', failed: true, text: 'I could not forget our earlier chat just now. It may come back when you reopen this. Try Start over again.' })
+      })
+    }
+  }, [append, cancel, player])
 
   /** Create one proposed shot; the card shows how it went. Returns the saved shot, or null when it failed. */
   const create = useCallback(

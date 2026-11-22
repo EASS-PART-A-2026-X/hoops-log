@@ -522,14 +522,16 @@ describe('the saved conversation', () => {
     expect(result.current.messages).toEqual([])
   })
 
-  it('Start over still clears the chat when the backend cannot be reached', async () => {
+  it('Start over still clears the chat when the backend cannot be reached, and says it could not forget', async () => {
     forgetCall.mockRejectedValue(new ApiError('unavailable', 'down'))
     chatCall.mockResolvedValue(answer())
     const { result, send } = setup()
     await send('hi')
     act(() => result.current.reset())
     await flush()
-    expect(result.current.messages).toEqual([])
+    expect(result.current.messages).toHaveLength(1)
+    expect(result.current.messages[0]).toMatchObject({ role: 'deni', failed: true })
+    expect(result.current.messages[0]!.text).toMatch(/could not forget/)
   })
 
   it('Start over with no player chosen only clears the page', () => {
@@ -542,6 +544,6 @@ describe('the saved conversation', () => {
     chatCall.mockResolvedValue(answer())
     const { send } = setup({ player: '' })
     await send('hi')
-    expect(chatCall.mock.calls[0]![4]).toBeUndefined()
+    expect(chatCall.mock.calls[0]![4]).toBe('') // sendChat leaves an empty player out (see api.history.test.ts)
   })
 })
