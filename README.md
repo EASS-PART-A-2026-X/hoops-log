@@ -2,6 +2,15 @@
 
 Repository: https://github.com/EASS-PART-A-2026-X/hoops-log
 
+## Versions handed in
+Each hand-in is pinned by a git tag, so the link keeps showing exactly what was submitted even after `main` moves on.
+
+| Hand-in | Tag | Commit | What it is |
+|---|---|---|---|
+| EX1 | [`ex1`](https://github.com/EASS-PART-A-2026-X/hoops-log/tree/ex1) | `401568d` | Backend only, tested on 6 Nov 2026 |
+| EX2 | [`ex2`](https://github.com/EASS-PART-A-2026-X/hoops-log/tree/ex2) | `2555278` | Backend and browser frontend |
+| EX3 | `ex3` (added on submission) | | Three services, AI service, Compose, evals |
+
 A shot-chart tracker for basketball players and coaches: log shots on a court, see where you score, and turn a messy game recap into structured shots.
 
 **Purpose:** shots recorded in notes apps and chat messages cannot be mapped or compared, so players never see where they are actually efficient.
