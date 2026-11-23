@@ -2,10 +2,10 @@
 """factory: run a work order through the software factory, and decide what happens to the result.
 
     python3 factory/factory.py run     factory/workorders/WO-001-case-insensitive-picker.md
-    python3 factory/factory.py watch   wo-001-r1            # live dashboard on http://127.0.0.1:5180/
+    python3 factory/factory.py watch   wo-001-r1            # live dashboard, with the GM's buttons, on http://127.0.0.1:5180/
     python3 factory/factory.py status  [wo-001-r1]
     python3 factory/factory.py stop    wo-001-r1            # kills the agent's process group
-    python3 factory/factory.py approve wo-001-r1 [--open-pr]   # the GM's decision; nothing else publishes
+    python3 factory/factory.py approve wo-001-r1 [--open-pr]   # the GM's decision (the live page's buttons do the same)
     python3 factory/factory.py reject  wo-001-r1 --reason "..."
     python3 factory/factory.py export  wo-001-r1            # rebuild report.html
 
@@ -14,8 +14,8 @@ Runs are saved in factory/runs/<run-id>/ (see factory/README.md for what is in t
 
 import argparse
 import os
-import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -25,8 +25,9 @@ sys.path.insert(0, str(HERE))
 
 from factory_lib import agents, report, workorder  # noqa: E402
 from factory_lib.controller import Controller, Options  # noqa: E402
-from factory_lib.events import append_event, read_run, update_run  # noqa: E402
-from factory_lib.serve import serve  # noqa: E402
+from factory_lib.decide import DecisionError, decide, deliver  # noqa: E402
+from factory_lib.events import read_run  # noqa: E402
+from factory_lib.serve import make_server, serve  # noqa: E402
 
 RUNS = Path(os.environ.get("FACTORY_RUNS", HERE / "runs"))  # tests point this at a temp folder
 DASHBOARD = HERE / "dashboard" / "dashboard.html"
@@ -52,6 +53,32 @@ def _dry_run_agents():
     return agents.ScriptedBuilder([build]), agents.ScriptedReviewer([verdict])
 
 
+def _start_server(run_dir: Path, port: int):
+    if not port:
+        return None
+    try:
+        server = make_server(run_dir, port, REPO, DASHBOARD)
+    except OSError as error:
+        print(f"Could not serve the live page on port {port} ({error}). The run goes on without it.")
+        return None
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    print(f"Live page, with the GM's buttons: http://127.0.0.1:{port}/")
+    return server
+
+
+def _wait_for_the_gm(server, run_dir: Path, port: int) -> None:
+    """Keep the page up until the GM has decided (or Ctrl-C), so it never closes before you can click."""
+    print(f"Waiting for the GM: open http://127.0.0.1:{port}/ and press Approve or Reject. Ctrl-C to stop serving.")
+    try:
+        while read_run(run_dir)["status"] == "waiting":
+            time.sleep(1)
+        time.sleep(10)  # let the page show the result before the server goes
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.shutdown()
+
+
 def cmd_run(args) -> int:
     wo = workorder.parse(Path(args.work_order))
     run_id = args.run_id or next_run_id(wo.id)
@@ -73,11 +100,20 @@ def cmd_run(args) -> int:
         mode="scripted" if args.agents == "scripted" else "live",
         dashboard=DASHBOARD,
     )
-    print(f"Run {run_id}: watch it with  python3 factory/factory.py watch {run_id}")
-    status = Controller(wo, opts, builder, reviewer, commentator).run()
+    server = _start_server(opts.run_dir, args.serve_port)
+    try:
+        status = Controller(wo, opts, builder, reviewer, commentator).run()
+    except BaseException:
+        if server:
+            server.shutdown()
+        raise
     run = read_run(opts.run_dir)
     print(f"{run_id}: {status}. {run.get('reason', '')}")
     print(f"Report: {opts.run_dir / 'report.html'}")
+    if server and status == "waiting":
+        _wait_for_the_gm(server, opts.run_dir, args.serve_port)
+    elif server:
+        server.shutdown()
     return 0 if status == "waiting" else 1
 
 
@@ -85,7 +121,7 @@ def cmd_watch(args) -> int:
     folder = RUNS / args.run_id
     if not (folder / "index.html").exists():  # the live page is rebuilt, not stored with the evidence
         report.write_live_page(folder, DASHBOARD)
-    serve(folder, args.port)
+    serve(folder, args.port, REPO, DASHBOARD)
     return 0
 
 
@@ -123,65 +159,29 @@ def cmd_stop(args) -> int:
     return 0
 
 
-def _decide(args, decision: str, text: str) -> dict:
-    folder = RUNS / args.run_id
-    run = read_run(folder)
-    if run["status"] != "waiting":
-        sys.exit(f"{args.run_id} is {run['status']}: only a run waiting for the GM can be decided.")
-    append_event(folder, {"actor": "gm", "kind": "decision", "text": text.format(sha=run["final_candidate"][:7])})
-    run = update_run(folder, status=decision, decided_at=time.time())
-    report.export(folder, DASHBOARD)
-    return run
-
-
 def cmd_approve(args) -> int:
-    run = _decide(args, "approved", "The GM approved candidate {sha}.")
-    print(f"Approved {run['final_candidate'][:7]} on branch {run['branch']}.")
-    if args.open_pr:
-        print(f"Pushing only that branch, and opening a PR into {run['base_ref']}:")
-        _open_pr(run)
+    folder = RUNS / args.run_id
+    try:
+        if read_run(folder)["status"] == "approved" and args.open_pr:  # approved earlier, never delivered
+            print(f"Delivered: {deliver(folder, REPO, DASHBOARD)}")
+            return 0
+        result = decide(folder, REPO, DASHBOARD, "approve", open_pr=args.open_pr)
+    except DecisionError as error:
+        sys.exit(str(error))
+    print(f"Approved {result['candidate']} on branch {result['branch']}.")
+    if result["pr_url"]:
+        print(f"Pushed that branch only, and opened: {result['pr_url']}")
     else:
         print("Nothing was pushed.")
-        print(
-            f"To deliver it: git push -u origin {run['branch']}, then open a PR into {run['base_ref']} (or re-run with --open-pr)."
-        )
+        print(f"To deliver it: approve again with --open-pr, or git push -u origin {result['branch']} and open a PR.")
     return 0
 
 
-def _open_pr(run: dict) -> None:
-    subprocess.run(["git", "push", "-u", "origin", run["branch"]], cwd=REPO, check=True)
-    remote = subprocess.run(
-        ["git", "remote", "get-url", "origin"], cwd=REPO, capture_output=True, text=True, check=True
-    ).stdout.strip()
-    slug = remote.removesuffix(".git").split("github.com")[-1].lstrip(":/")
-    body = (
-        f"Delivered by the factory from work order {run['work_order']['id']}.\n\n"
-        f"Candidate {run['final_candidate'][:7]} on base {run['base'][:7]}; the GM approved it.\n"
-        f"Evidence: factory/runs/{run['id']}/ (events.jsonl, receipts/, report.html)."
-    )
-    subprocess.run(
-        [
-            "gh",
-            "api",
-            f"repos/{slug}/pulls",
-            "-f",
-            f"title={run['work_order']['id']}: {run['work_order']['title']}",
-            "-f",
-            f"head={run['branch']}",
-            "-f",
-            f"base={run['base_ref']}",
-            "-f",
-            f"body={body}",
-            "--jq",
-            ".html_url",
-        ],
-        cwd=REPO,
-        check=True,
-    )
-
-
 def cmd_reject(args) -> int:
-    _decide(args, "rejected", "The GM rejected candidate {sha}: " + (args.reason or "no reason given") + ".")
+    try:
+        decide(RUNS / args.run_id, REPO, DASHBOARD, "reject", reason=args.reason)
+    except DecisionError as error:
+        sys.exit(str(error))
     print("Rejected. The branch and the evidence stay for the record.")
     return 0
 
@@ -199,6 +199,7 @@ def main() -> int:
     run.add_argument("--commentator", choices=["off", "templates", "haiku"], default="templates")
     run.add_argument("--max-turns", type=int, default=40)
     run.add_argument("--builder-budget-usd", type=float, default=4.0)
+    run.add_argument("--serve-port", type=int, default=5180, help="the live page and the GM's buttons; 0 = no page")
     run.set_defaults(func=cmd_run)
     watch = sub.add_parser("watch", help="serve the live dashboard")
     watch.add_argument("run_id")

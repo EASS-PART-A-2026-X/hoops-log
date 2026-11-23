@@ -427,7 +427,7 @@ def test_watch_rebuilds_the_live_page_when_it_is_missing(repo, tmp_path, write_o
     cli_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cli_module)
     monkeypatch.setattr(cli_module, "RUNS", tmp_path / "runs")
-    monkeypatch.setattr(cli_module, "serve", lambda folder, port: None)
+    monkeypatch.setattr(cli_module, "serve", lambda *args: None)
     args = type("A", (), {"run_id": "r1", "port": 1})()
     cli_module.cmd_watch(args)
     assert "window.RUN_DATA = null" in (run_dir / "index.html").read_text()

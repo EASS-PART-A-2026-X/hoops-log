@@ -268,6 +268,15 @@ tr.link:hover td { background: rgba(255, 255, 255, 0.04); }
 dialog { width: min(720px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line-2); border-radius: 12px; background: #0b1322; color: var(--chalk); }
 dialog::backdrop { background: rgba(3, 6, 12, 0.7); }
 dialog header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.dc { padding: 20px 22px 22px; display: grid; gap: 10px; }
+.dc h2 { font-size: 24px; }
+.dc p { margin: 0; line-height: 1.5; }
+.dc-note { color: var(--muted); }
+.dc-error { color: var(--red); min-height: 0; }
+.dc-error:empty { display: none; }
+.dc-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.dc textarea { width: 100%; padding: 8px 10px; font: inherit; color: var(--chalk); background: #0d1628; border: 1px solid var(--line-2); border-radius: 8px; resize: vertical; }
+.result-line a { color: var(--cyan); overflow-wrap: anywhere; }
 dialog pre { margin: 0; padding: 16px 18px 20px; max-height: 56vh; overflow: auto; font: 400 13.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: pre-wrap; }
 dialog .foot { padding: 0 18px 16px; color: var(--muted); font-size: 14px; }
 
@@ -359,7 +368,7 @@ dialog .foot { padding: 0 18px 16px; color: var(--muted); font-size: 14px; }
           <li>The shot clock counts the run's budget down. When it reaches zero the controller kills the running agent.</li>
           <li>Play-by-play lines with a file name are evidence: click the name to read the saved file. Lines tagged commentary are narration only.</li>
           <li>The referee blocks edits outside the work order's files. The announcer, referee and gate are plain code, not AI.</li>
-          <li>Only the GM's command approves a run. The buttons on this page display the decision; they do not make it.</li>
+          <li>Only the GM approves a run: with the buttons on the live page (after a confirmation) or with the command. Nothing is pushed or merged before that.</li>
         </ul>
       </details>
     </section>
@@ -410,6 +419,8 @@ dialog .foot { padding: 0 18px 16px; color: var(--muted); font-size: 14px; }
   <div class="tinfo"><span id="pos">Event 0 of 0</span> <label>Speed <select id="speed" aria-label="Replay speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select></label></div>
 </footer>
 
+<dialog id="decideDlg" aria-labelledby="dcTitle"><div id="dcBody" class="dc"></div></dialog>
+
 <dialog id="receiptDlg" aria-labelledby="rcTitle">
   <header><h2 id="rcTitle">Receipt</h2><button class="btn" id="rcClose" type="button">Close</button></header>
   <pre id="rcBody"></pre>
@@ -418,6 +429,7 @@ dialog .foot { padding: 0 18px 16px; color: var(--muted); font-size: 14px; }
 
 <script>
 /*RUN_DATA*/
+window.FACTORY_TOKEN = null;
 /*
   Event contract (one JSON object per line in factory/runs/<id>/events.jsonl):
     { t: seconds since the run started, actor: 'announcer'|'builder'|'reviewer'|'gate'|'referee'|'commentator'|'gm',
@@ -755,14 +767,64 @@ function renderGM(st) {
   box.append(row(st.files.size ? 'ok' : 'wait', st.files.size ? '✓' : '', 'Scope', st.files.size ? `${st.files.size} ${st.files.size === 1 ? 'file' : 'files'} changed, all inside the work order${st.fouls ? `; ${st.fouls} ${st.fouls === 1 ? 'edit' : 'edits'} blocked` : ''}.` : 'No files changed yet.'));
   const reachedGM = !RUNINFO || RUNINFO.status === 'waiting' || RUNINFO.status === 'demo';
   const ready = st.stage === 'decision' && !st.decision && reachedGM;
-  const approve = h('button', { class: 'btn go' + (ready ? ' ready' : ''), type: 'button', text: 'Approve' });
+  const live = SOURCE === 'served' && !!window.FACTORY_TOKEN && RUNINFO && RUNINFO.status === 'waiting';
+  const canDecide = ready && live;
+  const approve = h('button', { class: 'btn go' + (canDecide ? ' ready' : ''), type: 'button', text: 'Approve' });
   const reject = h('button', { class: 'btn', type: 'button', text: 'Reject' });
-  approve.disabled = reject.disabled = !ready;
+  approve.disabled = reject.disabled = !canDecide;
+  approve.addEventListener('click', () => askDecision('approve'));
+  reject.addEventListener('click', () => askDecision('reject'));
   const cmd = h('div', { class: 'cmd' }, [h('span', { text: approveCmd() })]);
   const copy = h('button', { type: 'button', text: 'Copy' }); copy.addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(approveCmd()); copy.textContent = 'Copied'; setTimeout(() => (copy.textContent = 'Copy'), 1400); });
   cmd.append(copy);
-  box.append(h('div', { class: 'decide' }, [approve, reject, cmd]));
-  box.append(h('p', { class: 'note', text: st.decision || (reachedGM ? 'These buttons only show the decision. The command above makes it: nothing is pushed or merged until the GM runs it.' : 'This run did not reach the GM, so there is nothing to approve. ' + (RUNINFO.reason || '')) }));
+  box.append(h('div', { class: 'decide' }, [approve, reject, canDecide ? null : cmd]));
+  const note = st.decision ? st.decision
+    : canDecide ? 'Pressing a button asks you to confirm first. Nothing is pushed or merged until you do.'
+    : ready ? `This copy cannot decide. Open the live page to use the buttons: python3 factory/factory.py watch ${(RUNINFO || DEMO_RUN).id}`
+    : (reachedGM ? 'The buttons work on the live page once the run reaches the GM.' : 'This run did not reach the GM, so there is nothing to approve. ' + (RUNINFO.reason || ''));
+  box.append(h('p', { class: 'note', text: note }));
+  if (RUNINFO && RUNINFO.pr_url) box.append(h('p', { class: 'note result-line' }, [document.createTextNode('Pull request: '), h('a', { href: RUNINFO.pr_url, target: '_blank', rel: 'noopener', text: RUNINFO.pr_url })]));
+  if (decideMessage) box.append(h('p', { class: 'note result-line', role: 'status', text: decideMessage }));
+}
+let decideMessage = '';
+async function sendDecision(body) {
+  const res = await fetch('decide', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Factory-Token': window.FACTORY_TOKEN }, body: JSON.stringify(body) });
+  let data = {};
+  try { data = await res.json(); } catch (err) { /* not JSON */ }
+  if (!res.ok || !data.ok) throw new Error(data.error || `The server answered ${res.status}.`);
+  return data;
+}
+function askDecision(kind) {
+  const info = RUNINFO, sha = (info.final_candidate || '').slice(0, 7), dlg = $('decideDlg'), body = $('dcBody');
+  body.replaceChildren();
+  const error = h('p', { class: 'dc-error', role: 'alert' });
+  const buttons = [];
+  const go = (label, payload, cls = 'btn') => {
+    const b = h('button', { class: cls, type: 'button', text: label });
+    b.addEventListener('click', async () => {
+      buttons.forEach((x) => (x.disabled = true)); error.textContent = ''; b.textContent = 'Working…';
+      try {
+        const reasonBox = $('dcReason');
+        const result = await sendDecision(reasonBox ? { ...payload, reason: reasonBox.value } : payload);
+        decideMessage = result.message; dlg.close(); await refresh(); render(false); renderWhere();
+      } catch (err) { error.textContent = err.message; b.textContent = label; buttons.forEach((x) => (x.disabled = false)); }
+    });
+    buttons.push(b); return b;
+  };
+  const cancel = h('button', { class: 'btn', type: 'button', text: 'Cancel' }); cancel.addEventListener('click', () => dlg.close()); buttons.push(cancel);
+  if (kind === 'approve') {
+    body.append(h('h2', { id: 'dcTitle', text: `Approve candidate ${sha}?` }));
+    body.append(h('p', { class: 'dc-note', text: `It is on the branch ${info.branch}, started from ${info.base.slice(0, 7)} on ${info.base_ref}. The gate passed on this exact commit and the reviewer approved it.` }));
+    body.append(h('p', {}, [h('strong', { text: 'Approve and open the PR ' }), document.createTextNode(`pushes only that branch to GitHub and opens a pull request into ${info.base_ref}. You review and merge it there; nothing is merged for you.`)]));
+    body.append(h('p', {}, [h('strong', { text: 'Approve only ' }), document.createTextNode('records your decision here and pushes nothing.')]));
+    body.append(error, h('div', { class: 'dc-actions' }, [go('Approve and open the PR', { decision: 'approve', open_pr: true }, 'btn go'), go('Approve only', { decision: 'approve' }), cancel]));
+  } else {
+    const reason = h('textarea', { id: 'dcReason', rows: '3', maxlength: '300', placeholder: 'Why? (optional, kept in the run record)' });
+    body.append(h('h2', { id: 'dcTitle', text: `Reject candidate ${sha}?` }));
+    body.append(h('p', { class: 'dc-note', text: 'The branch and the evidence stay for the record. Nothing is pushed.' }), h('label', { for: 'dcReason', class: 'sr-only', text: 'Reason' }), reason);
+    body.append(error, h('div', { class: 'dc-actions' }, [go('Reject', { decision: 'reject' }), cancel]));
+  }
+  dlg.showModal();
 }
 function render(animate) {
   const st = derive(idx), e = st.last;
@@ -889,7 +951,7 @@ function renderWhere() {
     ['Who runs what', `builder ${whoRuns('builder')}, reviewer ${whoRuns('reviewer')}, commentator ${whoRuns('commentator')}; announcer, referee and gate are plain code`, 'The controller is code, not an AI.'],
     ['Budget', `${Math.round(run.budget_seconds / 60)} minutes and ${run.max_repairs} repair attempts`, 'When the shot clock hits zero the agent process group is killed.'],
     ['Watch live', `python3 factory/factory.py watch ${run.id}`, 'Serves this page on http://127.0.0.1:5180/ and follows the log.'],
-    ['Decide', `python3 factory/factory.py approve ${run.id}`, 'Only this command (or reject) goes further. The buttons on this page only display it.'],
+    ['Decide', `the Approve and Reject buttons on the live page, or: python3 factory/factory.py approve ${run.id}`, 'Both make the same decision, and nothing is pushed or merged until one of them is used and confirmed. An offline copy of this page cannot decide.'],
     ['Stop', `python3 factory/factory.py stop ${run.id}`, 'Writes a STOP file; the controller kills the running agent.'],
     ['This report', w.report, 'The same page with the whole run inside it: opens from a file, offline.'],
   ];
@@ -899,17 +961,21 @@ function renderWhere() {
 }
 let pollTimer = null;
 let autoTimer = null;   // the pending autoplay: any move by the viewer cancels it
+async function refresh() {
+  const [r1, r2] = await Promise.all([fetch('run.json', { cache: 'no-store' }), fetch('events.jsonl', { cache: 'no-store' })]);
+  if (!r1.ok || !r2.ok) return null;
+  const run = await r1.json(), all = parseLines(await r2.text());
+  RUNINFO = run;
+  if (all.length > events.length) { const follow = idx >= events.length; events = all; buildTicks(); if (follow) { idx = events.length; render(true); } else render(false); }
+  renderWhere();
+  return run;
+}
 function poll() {
   clearInterval(pollTimer);
   pollTimer = setInterval(async () => {
     try {
-      const [r1, r2] = await Promise.all([fetch('run.json', { cache: 'no-store' }), fetch('events.jsonl', { cache: 'no-store' })]);
-      if (!r1.ok || !r2.ok) return;
-      const run = await r1.json(), all = parseLines(await r2.text());
-      RUNINFO = run;
-      if (all.length > events.length) { const follow = idx >= events.length; events = all; buildTicks(); if (follow) { idx = events.length; render(true); } else render(false); }
-      renderWhere();
-      if (run.status !== 'running') { clearInterval(pollTimer); setMode('replay'); render(false); }
+      const run = await refresh();
+      if (run && run.status !== 'running') { clearInterval(pollTimer); setMode('replay'); render(false); }
     } catch (err) { /* the server is busy or gone: try again next second */ }
   }, 1000);
 }

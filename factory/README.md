@@ -1,7 +1,8 @@
 # The software factory
 
 A factory that turns a **work order** into a **checked candidate change**, and then stops and waits for a
-human. Nothing it makes is merged, pushed or released unless the person in charge (the "GM") runs one command.
+human. Nothing it makes is merged, pushed or released until the person in charge (the "GM") decides: with the
+Approve button on the live page (after a confirmation) or with one command.
 
 ![A real run: the gate failed, the builder is repairing](../docs/factory/game-night-red-gate.png)
 
@@ -20,7 +21,7 @@ work order (9 fields) ─► controller records the base commit
          green? ─► REVIEWER reads the diff and the code, read only    (a separate AI process)
                     gap?      ─► repair (at most 2) or stop
                     approved? ─► ready: waiting for the GM
-   ─► the GM runs `factory approve`  (only this goes further)
+   ─► the GM decides on the live page, or with `factory approve`  (only this goes further)
 ```
 
 The controller and the announcer that decides who goes next are **plain Python**, not an AI. An AI that decides
@@ -38,7 +39,7 @@ write code, review code, and narrate.
 | Builder | `claude -p` (Sonnet) | read, search, edit, write files. **No shell.** |
 | Reviewer | a separate `claude -p` (Haiku) | read only. Cannot change what it reviews |
 | Commentator | `claude -p` (Haiku), optional | one sentence of narration; decides nothing; labelled *commentary, not evidence* |
-| GM | you | `factory approve` or `factory reject` |
+| GM | you | the Approve / Reject buttons on the live page, or `factory approve` / `factory reject` |
 
 ## Enforced, or only advice?
 
@@ -51,7 +52,8 @@ The course asks to say which rules the system really enforces. Here is the hones
 | The gate runs on the exact candidate | a clean checkout of the commit, made by the controller | **Yes** |
 | The new tests must fail without the change | the gate's `fails-first` check runs them on the original code | **Yes** |
 | Time is limited; STOP works | the controller owns the process group and kills it (`runner.py`) | **Yes**: a real kill, not a message |
-| Nothing is pushed or merged | no push code on the run path; only `factory approve --open-pr`, run by a person | **Yes** by construction; **not** by GitHub (`main` and `ex3` have no branch protection) |
+| Nothing is pushed or merged | no push code on the run path; only a decision by a person (the page's "Approve and open the PR" after a confirmation, or `factory approve --open-pr`) | **Yes** by construction; **not** by GitHub (`main` and `ex3` have no branch protection) |
+| Only the page the server gave you can decide | the server (`127.0.0.1` only) puts a secret token in the page it serves and checks it, the Host and the Origin on every decision | **Yes**: another website, or a copy of the page, cannot decide |
 | "Do not use git", "keep the change small" | the builder's prompt | **Advice only** |
 | The reviewer's verdict | a small model's reading | **Evidence, not proof** |
 
@@ -94,21 +96,40 @@ exact commands to watch, stop and decide.
 
 ![Where this run lives](../docs/factory/where-this-run-lives.png)
 
+## The GM's call, from the page
+
+`factory run` serves the live page itself and **keeps it up after the run until you decide**, so it never closes
+before you can click. (`factory watch <run-id>` serves a finished or running run's page later.) When the run is
+waiting for the GM, the panel *The GM's call* has real buttons:
+
+- **Approve**: asks you to confirm first. *Approve and open the PR* pushes only that candidate branch and opens a
+  pull request into the base, where you review and merge it. *Approve only* records the decision and pushes nothing.
+- **Reject**: asks for an optional reason and records it. Nothing is pushed.
+
+![The confirmation before an approval](../docs/factory/gm-confirm.png)
+
+The buttons and `factory approve` call the same code (`factory_lib/decide.py`), so they cannot disagree. A run
+can be decided once. An offline copy (`report.html` opened from a file) cannot decide: it shows the command.
+If pushing fails (for example, no network), the approval stays recorded, the page says delivery failed, and
+`factory approve <run-id> --open-pr` retries only the delivery.
+
 ## Run it
 
 ```bash
-python3 factory/factory.py run factory/workorders/WO-002-same-person-everywhere.md   # a real run (uses your claude login)
-python3 factory/factory.py watch wo-002-r1          # live page on http://127.0.0.1:5180/ (follows events.jsonl)
+python3 factory/factory.py run factory/workorders/WO-002-same-person-everywhere.md   # a real run (uses your claude login);
+                                                    # serves http://127.0.0.1:5180/ and waits there for your decision
+python3 factory/factory.py watch wo-002-r1          # the same page for an existing run
 python3 factory/factory.py status                   # every run; says "died" if a controller vanished
 python3 factory/factory.py stop wo-002-r1           # kills the running agent's process group
 python3 factory/factory.py approve wo-002-r1        # the GM's decision; add --open-pr to push the branch and open a PR
+                                                    # (the page's buttons do the same)
 python3 factory/factory.py reject wo-002-r1 --reason "too broad"
 ```
 
 `--agents scripted` runs the same pipeline with scripted stand-ins (no model, no cost). The tests use only those,
 and the page says **Scripted agents, not AI** when a run used them.
 
-Needs `claude` (Claude Code) on the PATH and a logged-in account; `git`; the frontend's `node_modules` for the
+Port 5180 can be changed with `--serve-port` (0 = no page). Needs `claude` (Claude Code) on the PATH and a logged-in account; `git`; the frontend's `node_modules` for the
 gate (the gate's checkouts share them through a symlink). `--builder-budget-usd` caps the builder's spend per
 attempt.
 
@@ -145,8 +166,9 @@ reviewer approved. The candidate `835739f` changes 12 files (+138, -37), all ins
 The full 27-second replay: [factory-run.mp4](../docs/factory/factory-run.mp4) (the README shows a GIF of its
 first part).
 
-**Not decided yet.** The WO-002 candidate is on the local branch `factory-run/wo-002-r1`. Nobody has approved
-it. It is not in `ex3` or `main`.
+**Decided.** The GM approved WO-002's candidate with `factory approve --open-pr`, which pushed only the branch
+`factory-run/wo-002-r1` and opened a pull request into `ex3`. It is for review there; nothing was merged by the
+factory.
 
 ## Limits, said plainly
 

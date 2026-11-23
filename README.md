@@ -164,7 +164,8 @@ A controller written in plain Python owns the clock, the commits and the checks;
 edit hook) writes the change, the **gate** runs the checks on a clean checkout of that exact commit (including
 "the new tests must fail without the change"), and a separate read-only AI reviewer looks for gaps. Repairs are
 limited to two, the run can be stopped for real (the agent's process group is killed), and nothing is pushed or
-merged unless the GM runs `factory approve`.
+merged until the GM decides: the live page stays up after the run, and its Approve and Reject buttons (after a
+confirmation) or `factory approve` are the only way forward.
 
 ![A real factory run, replayed on the live page](docs/factory/factory-run.gif)
 
