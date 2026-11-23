@@ -40,11 +40,11 @@ SPOT_WORDS = (
     ("at the rim", "at_the_rim"),
     ("הפינה הימנית", "right_corner_three"),
     ("הפינה השמאלית", "left_corner_three"),
-    ("האגף הימני", "right_wing_three"),
-    ("ראש הקשת", "top_of_key_three"),
+    ("45 ימין", "right_wing_three"),
+    ("מהאמצע", "top_of_key_three"),
     ("קו העונשין", "free_throw_line"),
-    ("המרפק השמאלי", "left_elbow"),
-    ("מתחת לסל", "at_the_rim"),
+    ("חצי מרחק ב45 שמאל", "left_elbow"),
+    ("לייאפ", "at_the_rim"),
 )
 MISSED_WORDS = ("missed", "miss", "החטאתי")
 DATE_WORDS = ("yesterday",)
