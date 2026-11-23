@@ -82,7 +82,10 @@ def cmd_run(args) -> int:
 
 
 def cmd_watch(args) -> int:
-    serve(RUNS / args.run_id, args.port)
+    folder = RUNS / args.run_id
+    if not (folder / "index.html").exists():  # the live page is rebuilt, not stored with the evidence
+        report.write_live_page(folder, DASHBOARD)
+    serve(folder, args.port)
     return 0
 
 
@@ -95,8 +98,23 @@ def cmd_status(args) -> int:
     runs = [RUNS / args.run_id] if args.run_id else sorted(p for p in RUNS.glob("*") if (p / "run.json").exists())
     for folder in runs:
         run = read_run(folder)
-        print(f"{run['id']:<14} {run['status']:<9} {run['work_order']['title']}  {run.get('reason', '')}")
+        status = run["status"]
+        if status == "running" and not _alive(run.get("pid")):
+            status = "died"  # the controller is gone but the run never finished
+        print(f"{run['id']:<14} {status:<9} {run['work_order']['title']}  {run.get('reason', '')}")
     return 0
+
+
+def _alive(pid: int | None) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 def cmd_stop(args) -> int:

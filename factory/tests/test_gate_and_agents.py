@@ -200,3 +200,17 @@ def test_the_fixed_line_commentator_says_something_for_every_moment():
     for key in ("order", "foul", "candidate", "gate_green", "gate_red", "gap", "approved", "failed"):
         assert c.say(key, [])
     assert c.say("unknown", []) is None
+
+
+@pytest.mark.parametrize(
+    ("raw", "clean"),
+    [
+        ('"The coach is calling for a review." (16 words)', "The coach is calling for a review."),
+        ("**Gate is green.**", "Gate is green."),
+        ("First line.\nSecond line.", "First line."),
+        ("", ""),
+        ("A plain sentence.", "A plain sentence."),
+    ],
+)
+def test_commentary_is_one_plain_line(raw, clean):
+    assert agents.clean_commentary(raw) == clean

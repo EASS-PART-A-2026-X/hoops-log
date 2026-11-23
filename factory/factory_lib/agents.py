@@ -293,6 +293,13 @@ class TemplateCommentator:
         return TEMPLATE_LINES.get(key)
 
 
+def clean_commentary(text: str) -> str:
+    """One plain line: no quotes, no markdown, and no word count a small model sometimes adds."""
+    line = text.strip().splitlines()[0] if text.strip() else ""
+    line = re.sub(r"\s*\(\d+\s+words?\)\s*$", "", line, flags=re.IGNORECASE)
+    return line.strip().strip("\"'*_` ").strip()
+
+
 class ClaudeCommentator:
     """A small model that narrates in one sentence. It never sees more than the last events."""
 
@@ -328,9 +335,9 @@ class ClaudeCommentator:
         env["PATH"] = gitwork.tool_path()
         outcome = run_bounded(argv, Path.cwd(), env, 60)
         result = _last_json(outcome.output)
-        text = str((result or {}).get("result") or "").strip().strip('"').splitlines()[0:1]
-        if outcome.ok and text and 8 <= len(text[0]) <= 200:
-            return text[0]
+        text = clean_commentary(str((result or {}).get("result") or ""))
+        if outcome.ok and 8 <= len(text) <= 200:
+            return text
         return self.fallback.say(key, recent)
 
 

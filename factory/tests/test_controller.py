@@ -408,3 +408,26 @@ def test_the_factory_version_ignores_run_folders_but_not_edited_factory_code(rep
     (repo / "factory" / "factory_lib" / "x.py").write_text("x = 2\n")  # edited, not committed
     _, run_dir, *_ = play(repo, tmp_path, write_order, [fix], run_id="dirty")
     assert read_run(run_dir)["factory_version"].endswith("+uncommitted")
+
+
+def test_status_says_when_a_running_run_has_lost_its_controller(repo, tmp_path, write_order):
+    _, run_dir, *_ = play(repo, tmp_path, write_order, [fix])
+    from factory_lib.events import update_run
+
+    update_run(run_dir, status="running", pid=2**22 + 1)  # no such process
+    assert "died" in cli(tmp_path / "runs", "status").stdout
+
+
+def test_watch_rebuilds_the_live_page_when_it_is_missing(repo, tmp_path, write_order, monkeypatch):
+    _, run_dir, *_ = play(repo, tmp_path, write_order, [fix])
+    (run_dir / "index.html").unlink()
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("factory_cli", HERE / "factory.py")
+    cli_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli_module)
+    monkeypatch.setattr(cli_module, "RUNS", tmp_path / "runs")
+    monkeypatch.setattr(cli_module, "serve", lambda folder, port: None)
+    args = type("A", (), {"run_id": "r1", "port": 1})()
+    cli_module.cmd_watch(args)
+    assert "window.RUN_DATA = null" in (run_dir / "index.html").read_text()
