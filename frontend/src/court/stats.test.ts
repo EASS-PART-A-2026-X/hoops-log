@@ -57,9 +57,10 @@ describe('applyFilters', () => {
     expect(applyFilters(shots, { ...ALL, result: 'missed' })).toHaveLength(3)
   })
 
-  it('player filter matches the exact name and an empty name means everyone', () => {
+  it('player filter ignores capitals and an empty name means everyone', () => {
     expect(applyFilters(shots, { ...ALL, player: 'Bob' })).toHaveLength(3)
-    expect(applyFilters(shots, { ...ALL, player: 'bob' })).toHaveLength(0)
+    expect(applyFilters(shots, { ...ALL, player: 'bob' })).toHaveLength(3)
+    expect(applyFilters(shots, { ...ALL, player: ' BOB ' })).toHaveLength(3)
     expect(applyFilters(shots, { ...ALL, player: '' })).toHaveLength(6)
   })
 
