@@ -55,6 +55,26 @@ describe('useCelebrations', () => {
     expect(result.current.pop?.player).toBe('B')
   })
 
+  it('one person stays one person when another spelling becomes the most used', () => {
+    // 'yuly' has 6 shots (3 made, 3 missed: no level yet), then 'YULY' overtakes it with 4 more.
+    const first = [
+      ...Array.from({ length: 3 }, () => shot('yuly', { made: false })),
+      ...Array.from({ length: 3 }, () => shot('YULY', { made: false })),
+      shot('yuly', { made: false }),
+    ]
+    const { result, rerender } = setup(first)
+    const more = [shot('YULY', { made: false }), shot('YULY', { made: false })]
+    rerender({ shots: [...first, ...more], truncated: false })
+    // The display spelling flipped to 'YULY', but nothing is celebrated: misses earn no level or trophy.
+    expect(result.current.toasts).toEqual([])
+    // Only the two new shots' XP (a few points), never the person's whole total.
+    expect(result.current.pop?.amount ?? 0).toBeLessThanOrEqual(4)
+    // A made shot now earns only its own XP, not the person's whole total.
+    rerender({ shots: [...first, ...more, shot('YULY')], truncated: false })
+    expect(result.current.pop).toMatchObject({ amount: 10, player: 'YULY' })
+    expect(result.current.toasts.some((t) => t.kind === 'level')).toBe(false)
+  })
+
   it('does not announce a trophy twice when it is lost and won again', () => {
     const base = Array.from({ length: 4 }, (_, i) => shot('A', { game_date: `2026-10-0${i + 1}` }))
     const { result, rerender } = setup(base)
