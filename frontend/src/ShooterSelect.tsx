@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import Picker from './Picker'
 import type { PickerOption } from './Picker'
-import { listShooters } from './shooter'
+import { listShooters, shooterKey } from './shooter'
 import { initials } from './court/players'
 
 interface Props {
@@ -20,7 +20,7 @@ const shotsLabel = (n: number) => `${n} ${n === 1 ? 'shot' : 'shots'}`
 export default function ShooterSelect({ shots, value, onChange, compact = false }: Props) {
   const options = useMemo<PickerOption[]>(() => {
     const counts = new Map<string, number>()
-    for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
+    for (const s of shots ?? []) counts.set(shooterKey(s.player), (counts.get(shooterKey(s.player)) ?? 0) + 1)
     return [
       {
         id: '',
@@ -36,7 +36,7 @@ export default function ShooterSelect({ shots, value, onChange, compact = false 
       ...listShooters(shots).map((name) => ({
         id: name,
         name,
-        sub: shotsLabel(counts.get(name) ?? 0),
+        sub: shotsLabel(counts.get(shooterKey(name)) ?? 0),
         thumb: (
           <span className="pp-thumb pp-me" aria-hidden="true">
             {initials(name)}

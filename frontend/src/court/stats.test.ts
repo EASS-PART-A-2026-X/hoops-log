@@ -9,6 +9,14 @@ function shot(over: Partial<MapShot> = {}): MapShot {
 
 const ALL: Filters = { area: 'all', result: 'all', player: '' }
 
+describe('applyFilters by player', () => {
+  it('treats capitals and edge spaces as the same person', () => {
+    const mk = (id: number, player: string): MapShot => ({ id, player, x: 25, y: 8, made: true, zone: 'paint', shot_type: '2PT' })
+    const list = [mk(1, 'yuly'), mk(2, 'YULY'), mk(3, ' Yuly '), mk(4, 'Ben')]
+    expect(applyFilters(list, { area: 'all', result: 'all', player: 'Yuly' }).map((s) => s.id)).toEqual([1, 2, 3])
+  })
+})
+
 describe('applyFilters', () => {
   const shots = [
     shot({ player: 'Ann', made: true, zone: 'paint', shot_type: '2PT' }),

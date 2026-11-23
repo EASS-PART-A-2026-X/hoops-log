@@ -9,6 +9,7 @@ import { FilmHud, FilmSummaryCard } from './FilmHud'
 import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneShare, zoneStats } from './court/stats'
 import { lastName } from './court/players'
 import StyleSelect from './StyleSelect'
+import { sameShooter } from './shooter'
 import { play } from './game/audio'
 import type { HexCell, Typical } from './court/stats'
 import type { AreaFilter, ResultFilter } from './court/stats'
@@ -252,7 +253,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   // "Show on map" for a shot the map hides: either its player is not the shown shooter, or the
   // area/result filters hide it.
   const selectedShot = selectedId === null ? undefined : (shots ?? []).find((s) => s.id === selectedId)
-  const hiddenByPlayer = !!selectedShot && !!activePlayer && selectedShot.player !== activePlayer
+  const hiddenByPlayer = !!selectedShot && !!activePlayer && !sameShooter(selectedShot.player, activePlayer)
   const hiddenSelected = !!selectedShot && !filtered.some((s) => s.id === selectedId)
   // Only the map's own filters; "Shots of" is shared with the other tabs and is not touched.
   const clearFilters = () => {
