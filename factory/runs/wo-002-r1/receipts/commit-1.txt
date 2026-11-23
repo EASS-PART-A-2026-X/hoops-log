@@ -1,0 +1,13 @@
+candidate e74f669fd3c04079021c84e7d0563bd1d832e284
+parent ca5710993b3f32b99a2a23546a8ebf8dc758dc68
+files changed: 10
+frontend/e2e/validation.e2e.ts
+frontend/src/App.tsx
+frontend/src/ShooterSelect.tsx
+frontend/src/ShotMap.tsx
+frontend/src/coach/useCoachEvents.ts
+frontend/src/court/stats.test.ts
+frontend/src/court/stats.ts
+frontend/src/game/celebrate.ts
+frontend/src/shooter.test.ts
+frontend/src/shooter.ts

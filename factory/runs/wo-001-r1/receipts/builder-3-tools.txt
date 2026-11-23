@@ -1,0 +1,7 @@
+Grep shooter|ShotMap|shooterShots
+Read frontend/src/App.tsx
+Grep activePlayer|player
+Grep selectedShot|shots\b
+Grep selectedId|pickFromMap
+Edit frontend/src/App.tsx
+Edit frontend/src/App.tsx

@@ -1,0 +1,5 @@
+candidate 835739f08ffe057b8f38216c30b0ce8371d2f050
+parent 2fcf4e2c618dbaa8b932a5be0206df55d1d933ee
+files changed: 2
+frontend/src/game/useCelebrations.test.ts
+frontend/src/game/useCelebrations.ts

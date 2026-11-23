@@ -1,0 +1,25 @@
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 48aa1fd..3394419 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -256,7 +256,10 @@ export default function App() {
+     }
+   }
+   const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => sameShooter(s.player, shooter))), [shots, shooter])
+-  const shooterPicker = <ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
++  // The map filters by exact spelling, so it gets the shooter's shots under the one listed spelling
++  // ("yuly" and "YULY" are one person). Only this copy is renamed; what is stored is not touched.
++  const mapShots = useMemo(() => (shooterShots === null || !shooter ? shots : shooterShots.map((s) => (s.player === shooter ? s : { ...s, player: shooter }))), [shooterShots, shots, shooter])
++  const shooterPicker =<ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
+ 
+   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
+   const baseline = useMemo(
+@@ -427,7 +430,7 @@ export default function App() {
+             The map's scene stops drawing while hidden and re-measures when shown again. */}
+         <div className="log-view" hidden={tab !== 'log'}>
+           <ShotMap
+-            shots={shots}
++            shots={mapShots}
+             player={shooter}
+             onPlayerChange={setShooterChoice}
+             loadError={loadError}

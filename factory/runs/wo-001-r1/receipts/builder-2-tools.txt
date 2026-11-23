@@ -1,0 +1,3 @@
+Read frontend/src/shooter.ts
+Read frontend/src/shooter.test.ts
+Edit frontend/src/shooter.test.ts

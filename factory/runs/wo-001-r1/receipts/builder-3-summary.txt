@@ -1,0 +1,7 @@
+I fixed both reviewer findings in `frontend/src/App.tsx` only. I couldn't run anything, so none of this is tested.
+
+- **Change:** `stats.ts` and `ShotMap.tsx` aren't on the allowed list, so I couldn't edit them. App now gives the map only the chosen person's shots, all under the listed spelling, in a new `mapShots` copy. The stored `player` field is unchanged.
+- **Map and stats:** the exact `applyFilters` comparison now matches every spelling, so a "yuly" shot shows up when "YULY" is chosen. The shooter record is built from the same list, so it includes them too.
+- **Selected shot:** `selectedShot` now comes from that same list, so a "yuly" shot is no longer reported as another player's. A shot from a different person isn't in the list at all, so the "Shot #N is by X, not Y" message and its "Show X's shots" button can no longer appear. Picking such a shot already switches the shooter in `App.tsx:237`.
+- **Side effect:** the map's hover tooltip now shows the listed spelling ("YULY") instead of the shot's own.
+- **Tests:** I added none this round, so the earlier unit tests and the rewritten e2e test are as before. Nothing covers `mapShots` directly.

@@ -1,0 +1,331 @@
+diff --git a/frontend/e2e/validation.e2e.ts b/frontend/e2e/validation.e2e.ts
+index a682b54..5cc4390 100644
+--- a/frontend/e2e/validation.e2e.ts
++++ b/frontend/e2e/validation.e2e.ts
+@@ -179,21 +179,18 @@ test.describe('odd but valid text is stored as typed and drawn as text, never ru
+     expect(await api.list()).toHaveLength(1)
+   })
+ 
+-  test('KNOWN GAP: names that differ only in capital letters are listed as two people in the picker', async ({ page, api }) => {
+-    // The backend's player filter ignores case, so "yuly" and "YULY" should be one person. The picker still lists them
+-    // separately. This test pins today's behaviour so that fixing the gap fails it on purpose: when the picker shows one
+-    // person, the list below becomes two entries (Every player and the one person), the count at the end 2, and the test
+-    // loses its KNOWN GAP name.
++  test('names that differ only in capital letters are ONE person in the picker', async ({ page, api }) => {
++    // The backend's player filter ignores case, so "yuly" and "YULY" are one person: listed once, with both shots counted.
+     await api.seed([
+       { player: 'yuly', x: 25, y: 8, made: true },
+       { player: 'YULY', x: 20, y: 20, made: false },
+     ])
+     await openApp(page)
+     await page.getByRole('combobox', { name: /^Shots of:/ }).click()
+-    await expect(page.getByRole('option')).toHaveText([/Every player/, /yuly/i, /yuly/i])
++    await expect(page.getByRole('option')).toHaveText([/Every player/, /yuly/i])
+     await page.keyboard.press('Escape')
+-    // The same gap shows in the numbers: each spelling counts as its own person (1 shot each), not 2 shots for one.
+-    await expect(kpi(page, 'SHOTS')).toHaveText('1')
++    // The numbers agree: 2 shots for one person.
++    await expect(kpi(page, 'SHOTS')).toHaveText('2')
+   })
+ })
+ 
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 46a1f5d..e3746a2 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -8,7 +8,7 @@ import Logo from './Logo'
+ import ShooterSelect from './ShooterSelect'
+ import { tabTarget } from './focusTrap'
+ import { deletedText, withShooterSwitch } from './notices'
+-import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
++import { listShooters, pickDefaultShooter, resolveShooter, sameShooter } from './shooter'
+ import PlayersPage from './PlayersPage'
+ import ShotForm from './ShotForm'
+ import { useChat } from './coach/useChat'
+@@ -234,7 +234,7 @@ export default function App() {
+     if (id === null) return
+     // A shot by someone else is hidden on the map, so show that player's shots.
+     const player = shots?.find((s) => s.id === id)?.player
+-    if (player !== undefined && shooter !== '' && player !== shooter) setShooterChoice(player)
++    if (player !== undefined && shooter !== '' && !sameShooter(player, shooter)) setShooterChoice(player)
+     setDrawerOpen(false) // the drawer would cover the map
+     setScrollTarget({ id: 'map-title', block: 'start' })
+   }
+@@ -255,7 +255,7 @@ export default function App() {
+       }))
+     }
+   }
+-  const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
++  const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => sameShooter(s.player, shooter))), [shots, shooter])
+   const shooterPicker = <ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
+ 
+   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
+diff --git a/frontend/src/ShooterSelect.tsx b/frontend/src/ShooterSelect.tsx
+index a8c10c2..d4f850b 100644
+--- a/frontend/src/ShooterSelect.tsx
++++ b/frontend/src/ShooterSelect.tsx
+@@ -1,7 +1,7 @@
+ import { useMemo } from 'react'
+ import Picker from './Picker'
+ import type { PickerOption } from './Picker'
+-import { listShooters } from './shooter'
++import { listShooters, shooterKey } from './shooter'
+ import { initials } from './court/players'
+ 
+ interface Props {
+@@ -20,7 +20,7 @@ const shotsLabel = (n: number) => `${n} ${n === 1 ? 'shot' : 'shots'}`
+ export default function ShooterSelect({ shots, value, onChange, compact = false }: Props) {
+   const options = useMemo<PickerOption[]>(() => {
+     const counts = new Map<string, number>()
+-    for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
++    for (const s of shots ?? []) counts.set(shooterKey(s.player), (counts.get(shooterKey(s.player)) ?? 0) + 1)
+     return [
+       {
+         id: '',
+@@ -36,7 +36,7 @@ export default function ShooterSelect({ shots, value, onChange, compact = false
+       ...listShooters(shots).map((name) => ({
+         id: name,
+         name,
+-        sub: shotsLabel(counts.get(name) ?? 0),
++        sub: shotsLabel(counts.get(shooterKey(name)) ?? 0),
+         thumb: (
+           <span className="pp-thumb pp-me" aria-hidden="true">
+             {initials(name)}
+diff --git a/frontend/src/ShotMap.tsx b/frontend/src/ShotMap.tsx
+index 8184b00..a71b9a6 100644
+--- a/frontend/src/ShotMap.tsx
++++ b/frontend/src/ShotMap.tsx
+@@ -9,6 +9,7 @@ import { FilmHud, FilmSummaryCard } from './FilmHud'
+ import { applyFilters, heatGrid, hexBins, hottestZone, summarize, TYPICAL_FG, zoneLabel, zoneShare, zoneStats } from './court/stats'
+ import { lastName } from './court/players'
+ import StyleSelect from './StyleSelect'
++import { sameShooter } from './shooter'
+ import { play } from './game/audio'
+ import type { HexCell, Typical } from './court/stats'
+ import type { AreaFilter, ResultFilter } from './court/stats'
+@@ -252,7 +253,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
+   // "Show on map" for a shot the map hides: either its player is not the shown shooter, or the
+   // area/result filters hide it.
+   const selectedShot = selectedId === null ? undefined : (shots ?? []).find((s) => s.id === selectedId)
+-  const hiddenByPlayer = !!selectedShot && !!activePlayer && selectedShot.player !== activePlayer
++  const hiddenByPlayer = !!selectedShot && !!activePlayer && !sameShooter(selectedShot.player, activePlayer)
+   const hiddenSelected = !!selectedShot && !filtered.some((s) => s.id === selectedId)
+   // Only the map's own filters; "Shots of" is shared with the other tabs and is not touched.
+   const clearFilters = () => {
+diff --git a/frontend/src/coach/useCoachEvents.ts b/frontend/src/coach/useCoachEvents.ts
+index f9e9962..fe34743 100644
+--- a/frontend/src/coach/useCoachEvents.ts
++++ b/frontend/src/coach/useCoachEvents.ts
+@@ -1,6 +1,7 @@
+ import { useEffect, useRef } from 'react'
+ import type { GameToast } from '../game/useCelebrations'
+ import { chronological } from '../game/xp'
++import { sameShooter } from '../shooter'
+ import { MILESTONES, daysBetween, dayOf, greet, levelUp, milestone, saved, streak, tip, trophy, welcomeBack } from './lines'
+ import type { TabName } from './lines'
+ import type { CoachApi } from './useCoach'
+@@ -64,7 +65,7 @@ export function useCoachEvents({ coach, shots, truncated, ready, tab, name, shot
+     if (greeted.current || !ready || shots === null) return
+     greeted.current = true
+     // Away for a few days: say so instead of the usual greeting.
+-    const dates = shots.filter((x) => x.player === name).map((x) => x.game_date)
++    const dates = shots.filter((x) => sameShooter(x.player, name)).map((x) => x.game_date)
+     const last = dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null
+     const away = last === null ? null : daysBetween(last, dayOf(new Date()))
+     say(away !== null && away >= AWAY_DAYS ? welcomeBack(name, away) : greet(name, shotCount, rank, variant.current++))
+@@ -86,10 +87,10 @@ export function useCoachEvents({ coach, shots, truncated, ready, tab, name, shot
+     if (before === null || quiet || maxId <= before || !greeted.current) return
+     const latest = shots.find((s) => s.id === maxId)
+     if (!latest) return
+-    const mine = shots.filter((s) => s.player === latest.player)
++    const mine = shots.filter((s) => sameShooter(s.player, latest.player))
+     const run = currentStreak(mine)
+     // A batch can jump over a round number, so look at every number it passed, not only where it ended.
+-    const added = shots.filter((s) => s.id > before && s.player === latest.player).length
++    const added = shots.filter((s) => s.id > before && sameShooter(s.player, latest.player)).length
+     const passed = (MILESTONES as readonly number[]).filter((m) => mine.length - added < m && m <= mine.length)
+     const reached = passed[passed.length - 1]
+     // A round number of shots beats a streak, which beats the plain line.
+diff --git a/frontend/src/court/stats.test.ts b/frontend/src/court/stats.test.ts
+index f629b99..cb9cd40 100644
+--- a/frontend/src/court/stats.test.ts
++++ b/frontend/src/court/stats.test.ts
+@@ -9,6 +9,14 @@ function shot(over: Partial<MapShot> = {}): MapShot {
+ 
+ const ALL: Filters = { area: 'all', result: 'all', player: '' }
+ 
++describe('applyFilters by player', () => {
++  it('treats capitals and edge spaces as the same person', () => {
++    const mk = (id: number, player: string): MapShot => ({ id, player, x: 25, y: 8, made: true, zone: 'paint', shot_type: '2PT' })
++    const list = [mk(1, 'yuly'), mk(2, 'YULY'), mk(3, ' Yuly '), mk(4, 'Ben')]
++    expect(applyFilters(list, { area: 'all', result: 'all', player: 'Yuly' }).map((s) => s.id)).toEqual([1, 2, 3])
++  })
++})
++
+ describe('applyFilters', () => {
+   const shots = [
+     shot({ player: 'Ann', made: true, zone: 'paint', shot_type: '2PT' }),
+diff --git a/frontend/src/court/stats.ts b/frontend/src/court/stats.ts
+index 6887be0..9ddfd7a 100644
+--- a/frontend/src/court/stats.ts
++++ b/frontend/src/court/stats.ts
+@@ -1,4 +1,5 @@
+ import { COURT_L, COURT_W } from './geometry'
++import { sameShooter } from '../shooter'
+ 
+ /** The few fields the map needs. A `Shot` from the API fits this. */
+ export interface MapShot {
+@@ -25,7 +26,7 @@ const PAINT_ZONES = new Set(['paint', 'restricted_area'])
+ 
+ export function applyFilters<T extends MapShot>(shots: T[], f: Filters): T[] {
+   return shots.filter((s) => {
+-    if (f.player && s.player !== f.player) return false
++    if (f.player && !sameShooter(s.player, f.player)) return false
+     if (f.result === 'made' && !s.made) return false
+     if (f.result === 'missed' && s.made) return false
+     if (f.area === 'threes') return s.shot_type === '3PT'
+diff --git a/frontend/src/game/celebrate.ts b/frontend/src/game/celebrate.ts
+index e80d6ef..3a04419 100644
+--- a/frontend/src/game/celebrate.ts
++++ b/frontend/src/game/celebrate.ts
+@@ -2,6 +2,7 @@
+ import { unlockedIds } from './achievements'
+ import type { TrophyShot } from './achievements'
+ import { levelInfo, totalXp } from './xp'
++import { shooterKey, shooterNames } from '../shooter'
+ 
+ export interface Snap {
+   xp: number
+@@ -32,13 +33,15 @@ export function diffSnap(prev: Snap, next: Snap): Change {
+   }
+ }
+ 
+-/** The shots of each player, in the order the players first appear. */
++/** The shots of each person (names that differ only in capitals or edge spaces are one), in the order the players first appear. */
+ export function byPlayer<T extends { player: string }>(shots: T[]): Map<string, T[]> {
+   const map = new Map<string, T[]>()
++  const names = shooterNames(shots)
+   for (const s of shots) {
+-    const list = map.get(s.player)
++    const name = names.get(shooterKey(s.player)) ?? s.player
++    const list = map.get(name)
+     if (list) list.push(s)
+-    else map.set(s.player, [s])
++    else map.set(name, [s])
+   }
+   return map
+ }
+diff --git a/frontend/src/shooter.test.ts b/frontend/src/shooter.test.ts
+index bf27b68..390ca7e 100644
+--- a/frontend/src/shooter.test.ts
++++ b/frontend/src/shooter.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from 'vitest'
+-import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
++import { listShooters, pickDefaultShooter, resolveShooter, sameShooter } from './shooter'
+ 
+ const shots = (...players: string[]) => players.map((player) => ({ player }))
+ 
+@@ -14,6 +14,29 @@ describe('listShooters', () => {
+   })
+ })
+ 
++describe('one person whatever the capitals', () => {
++  it('lists names that differ in case or edge spaces once, with the most used spelling', () => {
++    expect(listShooters(shots('yuly', 'Yuly', 'Yuly', ' yuly ', 'Ben'))).toEqual(['Ben', 'Yuly'])
++  })
++
++  it('breaks a tie by the first spelling alphabetically', () => {
++    expect(listShooters(shots('yuly', 'YULY'))).toEqual(['YULY'])
++  })
++
++  it('folds like the backend: Straße and STRASSE are one', () => {
++    expect(sameShooter('Straße', 'STRASSE')).toBe(true)
++    expect(listShooters(shots('Straße', 'STRASSE', 'STRASSE'))).toEqual(['STRASSE'])
++  })
++
++  it('counts the default shooter across spellings', () => {
++    expect(pickDefaultShooter(shots('ana', 'ANA', 'Ben', 'Ben'))).toBe('ANA')
++  })
++
++  it('keeps a choice made with another spelling', () => {
++    expect(resolveShooter('yuly', ['Yuly'], 'Ben')).toBe('Yuly')
++  })
++})
++
+ describe('pickDefaultShooter', () => {
+   it('picks the player with the most shots', () => {
+     expect(pickDefaultShooter(shots('Ana', 'Ben', 'Ben', 'Ben', 'Mia', 'Mia'))).toBe('Ben')
+diff --git a/frontend/src/shooter.ts b/frontend/src/shooter.ts
+index 8cd1cc5..5dbfe34 100644
+--- a/frontend/src/shooter.ts
++++ b/frontend/src/shooter.ts
+@@ -4,18 +4,53 @@ interface HasPlayer {
+   player: string
+ }
+ 
+-/** Everyone who has at least one shot, sorted by name. */
++/** The identity of a name, as the backend sees it: stripped and case-folded ("Straße" and "STRASSE" match). */
++export function shooterKey(name: string): string {
++  return name.trim().toUpperCase().toLowerCase()
++}
++
++/** True when two names are the same person. */
++export function sameShooter(a: string, b: string): boolean {
++  return shooterKey(a) === shooterKey(b)
++}
++
++/** Each person's key with the spelling to show: the one with the most shots; a tie goes to the first alphabetically. */
++export function shooterNames(shots: HasPlayer[] | null): Map<string, string> {
++  const spellings = new Map<string, Map<string, number>>()
++  for (const s of shots ?? []) {
++    const key = shooterKey(s.player)
++    const counts = spellings.get(key) ?? new Map<string, number>()
++    counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
++    spellings.set(key, counts)
++  }
++  const names = new Map<string, string>()
++  for (const [key, counts] of spellings) {
++    let best = ''
++    let bestCount = 0
++    for (const name of [...counts.keys()].sort()) {
++      const n = counts.get(name) ?? 0
++      if (n > bestCount) {
++        best = name
++        bestCount = n
++      }
++    }
++    names.set(key, best)
++  }
++  return names
++}
++
++/** Everyone who has at least one shot, once each, sorted by name. */
+ export function listShooters(shots: HasPlayer[] | null): string[] {
+-  return [...new Set((shots ?? []).map((s) => s.player))].sort()
++  return [...shooterNames(shots).values()].sort()
+ }
+ 
+ /** The player with the most shots; a tie goes to the first name alphabetically. '' when there are no shots. */
+ export function pickDefaultShooter(shots: HasPlayer[] | null): string {
+   const counts = new Map<string, number>()
+-  for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
++  for (const s of shots ?? []) counts.set(shooterKey(s.player), (counts.get(shooterKey(s.player)) ?? 0) + 1)
+   let best = ''
+   for (const name of listShooters(shots)) {
+-    if (best === '' || (counts.get(name) ?? 0) > (counts.get(best) ?? 0)) best = name
++    if (best === '' || (counts.get(shooterKey(name)) ?? 0) > (counts.get(shooterKey(best)) ?? 0)) best = name
+   }
+   return best
+ }
+@@ -26,6 +61,9 @@ export function pickDefaultShooter(shots: HasPlayer[] | null): string {
+  */
+ export function resolveShooter(choice: string | null, shooters: string[], fallback: string): string {
+   if (choice === '') return ''
+-  if (choice !== null && shooters.includes(choice)) return choice
++  if (choice !== null) {
++    const found = shooters.find((name) => sameShooter(name, choice))
++    if (found !== undefined) return found
++  }
+   return fallback
+ }

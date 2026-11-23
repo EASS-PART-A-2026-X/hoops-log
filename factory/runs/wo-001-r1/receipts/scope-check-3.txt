@@ -1,0 +1,2 @@
+allowed paths: frontend/src/shooter.ts, frontend/src/shooter.test.ts, frontend/src/ShooterSelect.tsx, frontend/src/ShooterSelect.test.tsx, frontend/src/App.tsx, frontend/e2e/validation.e2e.ts
+changed: frontend/src/App.tsx

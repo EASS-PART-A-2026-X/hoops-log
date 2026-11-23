@@ -1,0 +1,6 @@
+work/
+__pycache__/
+*.pyc
+runs/*/index.html
+runs/*/STOP
+runs/*/.decision.lock

@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Factory game night</title>
+<style>
+/*FONTS*/
+:root {
+  --tunnel: #070b14;
+  --tunnel-2: #0d1526;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-2: rgba(255, 255, 255, 0.2);
+  --chalk: #eef2f7;
+  --muted: #94a1b5;
+  --orange: #ff7a1a;
+  --orange-soft: #ffb072;
+  --cyan: #4cc9ff;
+  --red: #e5454e;
+  --green: #3ddc84;
+  --amber: #f5b942;
+  --violet: #b79cff;
+  --gold: #ffd36b;
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --text: 'Barlow', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--chalk);
+  font: 400 15px/1.45 var(--text);
+  background:
+    radial-gradient(1100px 520px at 50% -12%, rgba(76, 201, 255, 0.11), transparent 62%),
+    radial-gradient(800px 520px at 92% 108%, rgba(255, 122, 26, 0.09), transparent 62%),
+    var(--tunnel);
+  padding-bottom: 92px;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+h1, h2 { margin: 0; font-family: var(--display); font-weight: 700; letter-spacing: 0.01em; }
+h2 { font-size: 21px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- scoreboard ---------- */
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px 10px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+.board h1 { font-size: 30px; line-height: 1.05; margin-bottom: 9px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border: 1px solid var(--line-2); border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: var(--muted); background: rgba(255, 255, 255, 0.03);
+}
+.chip b { color: var(--chalk); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip[hidden] { display: none; }
+.chip.mode { color: var(--amber); border-color: rgba(245, 185, 66, 0.5); }
+.chip.mode.live { color: var(--red); border-color: rgba(229, 69, 78, 0.6); }
+.chip.mode.live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: 0.25; } }
+
+.board-mid { text-align: center; }
+.clock {
+  font: 800 68px/0.92 var(--display);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--orange);
+  text-shadow: 0 0 22px rgba(255, 122, 26, 0.45);
+}
+.clock.low { color: var(--red); text-shadow: 0 0 22px rgba(229, 69, 78, 0.55); }
+.clock-note { margin-top: 3px; font-size: 13px; color: var(--muted); }
+.pips { display: flex; justify-content: center; gap: 6px; list-style: none; margin: 8px 0 0; padding: 0; }
+.pips li {
+  min-width: 66px; padding: 4px 6px; border-radius: 6px;
+  font: 600 14px/1 var(--display); letter-spacing: 0.03em; text-align: center;
+  color: var(--muted); border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02);
+  transition: background 0.3s, color 0.3s, border-color 0.3s;
+}
+.pips li.done { color: var(--chalk); border-color: var(--line-2); }
+.pips li.on { color: #1a0f05; background: var(--orange); border-color: var(--orange); }
+.board-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; }
+.tabs button {
+  padding: 6px 16px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  font: 700 17px/1 var(--display); color: var(--muted);
+}
+.tabs button[aria-pressed='true'] { background: var(--chalk); color: #0a1020; }
+.outcome { font: 700 20px/1.1 var(--display); text-align: right; color: var(--chalk); }
+.outcome small { display: block; margin-top: 3px; font: 500 13px/1.3 var(--text); color: var(--muted); }
+
+.demo-strip {
+  margin: 0; padding: 5px 24px; font-size: 13px; color: var(--amber);
+  background: rgba(245, 185, 66, 0.08); border-bottom: 1px solid rgba(245, 185, 66, 0.25);
+}
+.demo-strip[hidden] { display: none; }
+
+body[data-view='season'] .board-mid { visibility: hidden; }
+body[data-view='season'] .run-only { display: none; }
+
+/* ---------- layout ---------- */
+.view[hidden] { display: none; }
+.game { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); gap: 18px; padding: 18px 24px; align-items: start; }
+.stage, .rail { display: grid; gap: 18px; min-width: 0; }
+.panel { border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.025); }
+.panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px 10px; border-bottom: 1px solid var(--line); }
+
+/* ---------- the court (the one loud thing) ---------- */
+.court-panel { position: relative; overflow: hidden; background: #0a0f1b; }
+.court-panel svg { display: block; width: 100%; height: auto; max-height: calc(100vh - 330px); min-height: 330px; }
+.ln { fill: none; stroke: rgba(238, 242, 247, 0.62); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ln.dash { stroke-dasharray: 7 8; }
+.intro .ln { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.5s cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+.intro .ln.dash { stroke-dasharray: 1; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.node .disc { fill: #0d1628; stroke: var(--line-2); stroke-width: 2.5; transition: stroke 0.3s, filter 0.3s; }
+.node .jersey { font: 800 34px var(--display); fill: var(--chalk); text-anchor: middle; dominant-baseline: central; }
+.node .name { font: 600 15px var(--text); fill: var(--chalk); text-anchor: middle; paint-order: stroke; stroke: rgba(7, 11, 20, 0.85); stroke-width: 4px; }
+.node.on .disc { stroke-width: 4; filter: url(#glow); }
+.intro .node { opacity: 0; animation: drop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+@keyframes drop { from { opacity: 0; transform: translateY(-26px); } to { opacity: 1; transform: none; } }
+.pass { fill: none; stroke: var(--cyan); stroke-width: 3.4; stroke-linecap: round; stroke-dasharray: 2 9; filter: url(#glow); }
+.mark-made { fill: rgba(61, 220, 132, 0.16); stroke: var(--green); stroke-width: 3.4; }
+.mark-miss { stroke: var(--red); stroke-width: 4; stroke-linecap: round; }
+.mark { transform-box: fill-box; transform-origin: center; }
+.mark.fresh { animation: pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes pop { from { transform: scale(0.2); opacity: 0; } }
+.ball-body { fill: var(--orange); stroke: #2a1405; stroke-width: 2; }
+.ball-seam { fill: none; stroke: #2a1405; stroke-width: 1.8; }
+.flash { animation: flash 0.9s ease-out; }
+@keyframes flash { 0% { filter: drop-shadow(0 0 0 rgba(229, 69, 78, 0)); } 25% { filter: drop-shadow(0 0 14px rgba(229, 69, 78, 1)); } 100% { filter: drop-shadow(0 0 0 rgba(229, 69, 78, 0)); } }
+.lower {
+  display: flex; align-items: stretch; min-height: 54px; margin: 0 14px 14px;
+  border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; background: rgba(7, 11, 20, 0.9);
+}
+.lower .who { display: flex; align-items: center; gap: 8px; padding: 0 14px; min-width: 150px; font: 700 20px/1 var(--display); color: #0a1020; }
+.lower .what { padding: 8px 14px; font-size: 15px; line-height: 1.35; align-self: center; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.lower.comm .what { font-style: italic; color: var(--muted); }
+.legend { position: absolute; top: 12px; right: 14px; margin: 0; font-size: 13px; color: var(--muted); max-width: 250px; text-align: right; }
+.legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 0; vertical-align: -1px; }
+.legend .m { border: 2px solid var(--green); border-radius: 50%; }
+.legend .x { position: relative; }
+.legend .x::before, .legend .x::after { content: ''; position: absolute; left: 4px; top: -1px; width: 2px; height: 12px; background: var(--red); transform: rotate(45deg); }
+.legend .x::after { transform: rotate(-45deg); }
+
+/* ---------- feed and huddle ---------- */
+.feed-list, .huddle-list { list-style: none; margin: 0; padding: 6px 0; overflow-y: auto; }
+.feed-list { max-height: 392px; }
+.ev { display: grid; grid-template-columns: 54px 28px 1fr; gap: 10px; padding: 9px 16px; border-left: 3px solid transparent; }
+.ev + .ev { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.ev .t { font: 600 15px/1.5 var(--text); color: var(--muted); font-variant-numeric: tabular-nums; }
+.badge { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 800 14px/1 var(--display); color: #0a1020; }
+.ev .body { min-width: 0; }
+.ev .body p { margin: 0; }
+.ev .tag { margin-right: 6px; font-weight: 600; color: var(--muted); }
+.ev.commentary .body p { font-style: italic; color: var(--muted); }
+.ev.foul { border-left-color: var(--red); background: rgba(229, 69, 78, 0.07); }
+.ev.foul .tag { color: var(--red); }
+.ev.fresh { animation: fresh 1.4s ease-out; }
+@keyframes fresh { from { background: rgba(255, 122, 26, 0.22); } }
+.receipts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.receipt {
+  padding: 2px 10px; border: 1px solid var(--line-2); border-radius: 999px; background: transparent; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--cyan);
+}
+.receipt:hover { background: rgba(76, 201, 255, 0.1); }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.toggle input { accent-color: var(--orange); width: 16px; height: 16px; }
+.empty { padding: 22px 16px; color: var(--muted); }
+
+.huddle-list { max-height: 360px; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+.msg { display: flex; flex-direction: column; gap: 4px; max-width: 92%; }
+.msg.builder { align-self: flex-start; }
+.msg.reviewer { align-self: flex-end; align-items: flex-end; }
+.msg .from { font-size: 13px; font-weight: 600; color: var(--muted); }
+.msg .bubble { padding: 9px 13px; border: 1px solid var(--line-2); border-radius: 16px; background: #0d1628; }
+.msg.builder .bubble { border-bottom-left-radius: 4px; border-color: rgba(255, 122, 26, 0.5); }
+.msg.reviewer .bubble { border-bottom-right-radius: 4px; border-color: rgba(76, 201, 255, 0.5); }
+.msg.announcer { align-self: center; max-width: 100%; }
+.msg.announcer .bubble { border-radius: 999px; padding: 5px 14px; font-size: 14px; color: var(--amber); border-color: rgba(245, 185, 66, 0.35); background: rgba(245, 185, 66, 0.06); text-align: center; }
+.typing { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.typing .dots { display: inline-flex; gap: 5px; padding: 11px 13px; border: 1px solid var(--line-2); border-radius: 16px; background: #0d1628; }
+.typing .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--orange-soft); opacity: 0.35; animation: bounce 1.2s infinite ease-in-out; }
+.typing .dots i:nth-child(2) { animation-delay: 0.18s; }
+.typing .dots i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes bounce { 0%, 60%, 100% { transform: none; opacity: 0.35; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+/* ---------- box score and GM ---------- */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 9px 16px; text-align: right; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font: 600 14px var(--text); color: var(--muted); border-bottom: 1px solid var(--line); }
+tbody tr + tr td { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+tfoot td { border-top: 1px solid var(--line-2); font-weight: 700; }
+.who-cell { display: flex; align-items: center; gap: 10px; }
+td.zero { color: rgba(148, 161, 181, 0.5); }
+td.hot { color: var(--red); font-weight: 700; }
+.gm-body { display: grid; gap: 12px; padding: 14px 16px 16px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; }
+.check .ico { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 800 13px/1 var(--text); color: #07110c; background: var(--muted); }
+.check.ok .ico { background: var(--green); }
+.check.bad .ico { background: var(--red); color: #fff; }
+.check.wait .ico { background: transparent; border: 2px dashed var(--muted); }
+.check strong { font-weight: 600; }
+.check span.d { display: block; color: var(--muted); font-size: 14px; }
+.decide { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+.btn { padding: 9px 20px; border-radius: 8px; border: 1px solid var(--line-2); background: transparent; cursor: pointer; font: 700 18px/1 var(--display); }
+.btn.go { background: var(--green); border-color: var(--green); color: #05140c; }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn.go.ready { animation: ready 1.8s ease-out 2; }
+@keyframes ready { 0% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.7); } 100% { box-shadow: 0 0 0 16px rgba(61, 220, 132, 0); } }
+.cmd { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border: 1px dashed var(--line-2); border-radius: 8px; font: 500 14px ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--chalk); }
+.cmd button { margin-left: auto; padding: 3px 10px; border: 1px solid var(--line-2); border-radius: 6px; background: transparent; cursor: pointer; font: 600 13px var(--text); color: var(--muted); }
+.note { margin: 0; font-size: 14px; color: var(--muted); }
+.sub { display: block; font-size: 12px; font-weight: 500; color: var(--muted); line-height: 1.2; }
+.where { margin: 0; padding: 4px 16px 6px; }
+.where-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 9px 0; }
+.where-row + .where-row { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.where dt { font-weight: 600; color: var(--muted); }
+.where dd { margin: 0; min-width: 0; }
+.where .val { display: block; font: 500 13.5px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--chalk); overflow-wrap: anywhere; }
+.where .why { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
+.how { padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+.how summary { cursor: pointer; font-weight: 600; color: var(--cyan); }
+.how ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; display: grid; gap: 4px; }
+
+/* ---------- season ---------- */
+.season { padding: 22px 24px; display: grid; gap: 22px; }
+.season-line { display: flex; flex-wrap: wrap; gap: 44px; align-items: flex-end; }
+.stat .big { font: 800 58px/0.95 var(--display); font-variant-numeric: tabular-nums; }
+.stat .cap { font-size: 14px; color: var(--muted); }
+.season-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
+.result { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; border: 1px solid; }
+.result.delivered { color: var(--green); border-color: rgba(61, 220, 132, 0.5); }
+.result.waiting { color: var(--amber); border-color: rgba(245, 185, 66, 0.5); }
+.result.stopped { color: var(--red); border-color: rgba(229, 69, 78, 0.5); }
+tr.link { cursor: pointer; }
+tr.link:hover td { background: rgba(255, 255, 255, 0.04); }
+.mini { padding: 10px; }
+.mini svg { display: block; width: 100%; height: auto; }
+
+/* ---------- transport ---------- */
+.transport {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center;
+  padding: 12px 24px; border-top: 1px solid var(--line-2); background: rgba(7, 11, 20, 0.94); backdrop-filter: blur(6px);
+}
+.tbtns { display: flex; align-items: center; gap: 6px; }
+.tbtn { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line-2); background: transparent; cursor: pointer; display: grid; place-items: center; }
+.tbtn.play { width: 50px; height: 50px; background: var(--orange); border-color: var(--orange); color: #1a0f05; }
+.tbtn svg { width: 18px; height: 18px; fill: currentColor; }
+.scrub { position: relative; height: 42px; }
+.ticks { position: absolute; left: 8px; right: 8px; top: 6px; height: 10px; display: flex; gap: 2px; pointer-events: none; }
+.ticks i { flex: 1; border-radius: 2px; opacity: 0.55; }
+.ticks i.past { opacity: 1; }
+.scrub input[type='range'] { position: absolute; inset: 14px 0 0 0; width: 100%; margin: 0; accent-color: var(--orange); background: transparent; }
+.tinfo { display: flex; align-items: center; justify-content: flex-end; gap: 16px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tinfo select { margin-left: 4px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line-2); background: #0d1628; color: var(--chalk); font: inherit; }
+
+dialog { width: min(720px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line-2); border-radius: 12px; background: #0b1322; color: var(--chalk); }
+dialog::backdrop { background: rgba(3, 6, 12, 0.7); }
+dialog header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.dc { padding: 20px 22px 22px; display: grid; gap: 10px; }
+.dc h2 { font-size: 24px; }
+.dc p { margin: 0; line-height: 1.5; }
+.dc-note { color: var(--muted); }
+.dc-error { color: var(--red); min-height: 0; }
+.dc-error:empty { display: none; }
+.dc-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.dc textarea { width: 100%; padding: 8px 10px; font: inherit; color: var(--chalk); background: #0d1628; border: 1px solid var(--line-2); border-radius: 8px; resize: vertical; }
+.result-line a { color: var(--cyan); overflow-wrap: anywhere; }
+dialog pre { margin: 0; padding: 16px 18px 20px; max-height: 56vh; overflow: auto; font: 400 13.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: pre-wrap; }
+dialog .foot { padding: 0 18px 16px; color: var(--muted); font-size: 14px; }
+
+@media (max-width: 1100px) {
+  .game, .season-grid { grid-template-columns: minmax(0, 1fr); }
+  .board { grid-template-columns: 1fr; gap: 14px; }
+  .board-right { align-items: flex-start; }
+  .outcome { text-align: left; }
+}
+@media (max-width: 640px) {
+  body { padding-bottom: 150px; }
+  .board, .game, .season { padding-left: 14px; padding-right: 14px; }
+  .board h1 { font-size: 25px; }
+  .clock { font-size: 60px; }
+  .pips li { min-width: 0; flex: 1; font-size: 12px; padding: 4px 2px; }
+  .lower .who { min-width: 0; padding: 0 10px; font-size: 17px; }
+  .legend { display: none; }
+  .node .name { font-size: 34px; stroke-width: 9px; }
+  .node .jersey { font-size: 44px; }
+  .court-panel svg { min-height: 0; }
+  .ev { grid-template-columns: 46px 26px 1fr; padding-left: 12px; padding-right: 12px; }
+  th, td { padding: 8px 8px; font-size: 14px; }
+  .where-row { grid-template-columns: 1fr; gap: 2px; }
+  .transport { grid-template-columns: 1fr; gap: 6px; padding: 10px 14px; }
+  .tinfo { text-align: left; }
+  .stat .big { font-size: 46px; }
+  .season-line { gap: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="board">
+  <div>
+    <h1 id="runTitle">Case-insensitive player picker</h1>
+    <div class="chips">
+      <span class="chip run-only"><b id="chipOrder">WO-001</b></span>
+      <span class="chip mode" id="chipMode">Demo data</span>
+      <span class="chip run-only" id="chipAgents" hidden>Scripted agents, not AI</span>
+      <span class="chip run-only">base <b id="chipBase">0c25ddd</b></span>
+      <span class="chip run-only">candidate <b id="chipCand">none yet</b></span>
+    </div>
+  </div>
+  <div class="board-mid">
+    <div class="clock num" id="clock" role="timer" aria-label="Shot clock: time left in this run's budget">30:00</div>
+    <div class="clock-note">left in this run's budget</div>
+    <ol class="pips" id="pips"></ol>
+  </div>
+  <div class="board-right">
+    <div class="tabs" role="group" aria-label="View">
+      <button type="button" data-view="game" aria-pressed="true">Game night</button>
+      <button type="button" data-view="season" aria-pressed="false">Season</button>
+    </div>
+    <div class="outcome" id="outcome" aria-live="polite">Run starting</div>
+  </div>
+</header>
+<p class="demo-strip" id="demoStrip">This is demo data. A real run fills this page from <b>factory/runs/…/events.jsonl</b>, and every receipt opens a file from that run.</p>
+
+<main class="view game" id="game">
+  <div class="stage">
+    <section class="panel court-panel" aria-label="The play">
+      <svg id="court" viewBox="0 56 940 626" role="img" aria-label="Half court showing who has the ball"></svg>
+      <p class="legend"><i class="m"></i>check passed <i class="x" style="margin-left:10px"></i>check failed<br>The outer ring is the first candidate, the inner rings are repairs.</p>
+      <div class="lower" id="lower" aria-hidden="true"></div>
+      <p class="sr-only" id="sr" role="status"></p>
+    </section>
+    <section class="panel" aria-labelledby="boxH">
+      <header><h2 id="boxH">Box score</h2><span class="note" id="boxNote">Counts come from the run's log.</span></header>
+      <table>
+        <thead><tr><th scope="col">Player</th><th scope="col">Turns</th><th scope="col">Tokens</th><th scope="col">Files</th><th scope="col">Fouls</th></tr></thead>
+        <tbody id="boxBody"></tbody>
+        <tfoot id="boxFoot"></tfoot>
+      </table>
+    </section>
+    <section class="panel" aria-labelledby="gmH">
+      <header><h2 id="gmH">The GM's call</h2></header>
+      <div class="gm-body" id="gmBody"></div>
+    </section>
+    <section class="panel" aria-labelledby="whereH">
+      <header><h2 id="whereH">Where this run lives</h2><span class="note">What was written, and where</span></header>
+      <dl class="where" id="where"></dl>
+      <details class="how">
+        <summary>How to read this page</summary>
+        <ul>
+          <li>The court is the play. Each pass is a hand-off between the builder, the stat crew (the gate), the reviewer and the GM.</li>
+          <li>Each mark near the top of the key is one gate check on one candidate: a ring passed, a cross failed. The outer ring is the first candidate, inner rings are repairs.</li>
+          <li>The shot clock counts the run's budget down. When it reaches zero the controller kills the running agent.</li>
+          <li>Play-by-play lines with a file name are evidence: click the name to read the saved file. Lines tagged commentary are narration only.</li>
+          <li>The referee blocks edits outside the work order's files. The announcer, referee and gate are plain code, not AI.</li>
+          <li>Only the GM approves a run: with the buttons on the live page (after a confirmation) or with the command. Nothing is pushed or merged before that.</li>
+        </ul>
+      </details>
+    </section>
+  </div>
+  <aside class="rail">
+    <section class="panel" aria-labelledby="feedH">
+      <header>
+        <h2 id="feedH">Play-by-play</h2>
+        <label class="toggle"><input type="checkbox" id="onlyEvidence"> Evidence only</label>
+      </header>
+      <ol class="feed-list" id="feed"></ol>
+    </section>
+    <section class="panel" aria-labelledby="huddleH">
+      <header><h2 id="huddleH">Huddle</h2><span class="note">Builder and reviewer, with the announcer's calls</span></header>
+      <ol class="huddle-list" id="huddle"></ol>
+    </section>
+  </aside>
+</main>
+
+<main class="view season" id="season" hidden>
+  <div class="season-line" id="seasonLine"></div>
+  <div class="season-grid">
+    <section class="panel" aria-labelledby="runsH">
+      <header><h2 id="runsH">Runs</h2><span class="note">Select a run to watch it</span></header>
+      <table>
+        <thead><tr><th scope="col">Work order</th><th scope="col">Result</th><th scope="col">First gate</th><th scope="col">Repairs</th><th scope="col">Turns</th></tr></thead>
+        <tbody id="runsBody"></tbody>
+      </table>
+    </section>
+    <section class="panel mini" aria-labelledby="chartH">
+      <h2 id="chartH" style="padding: 4px 6px 8px">Where the gate misses</h2>
+      <svg id="miniCourt" viewBox="0 56 940 544" role="img" aria-label="Gate results of every run as marks on a half court"></svg>
+      <p class="note" style="padding: 8px 6px 2px">Every check of every candidate is one mark. Red crosses show which checks fail first.</p>
+    </section>
+  </div>
+</main>
+
+<footer class="transport" aria-label="Replay controls">
+  <div class="tbtns">
+    <button class="tbtn" id="prev" type="button" aria-label="Previous event"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+    <button class="tbtn play" id="play" type="button" aria-label="Play"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+    <button class="tbtn" id="next" type="button" aria-label="Next event"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5l11 7L4 19z"/></svg></button>
+  </div>
+  <div class="scrub">
+    <div class="ticks" id="ticks" aria-hidden="true"></div>
+    <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Replay position">
+  </div>
+  <div class="tinfo"><span id="pos">Event 0 of 0</span> <label>Speed <select id="speed" aria-label="Replay speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select></label></div>
+</footer>
+
+<dialog id="decideDlg" aria-labelledby="dcTitle"><div id="dcBody" class="dc"></div></dialog>
+
+<dialog id="receiptDlg" aria-labelledby="rcTitle">
+  <header><h2 id="rcTitle">Receipt</h2><button class="btn" id="rcClose" type="button">Close</button></header>
+  <pre id="rcBody"></pre>
+  <p class="foot" id="rcFoot"></p>
+</dialog>
+
+<script>
+/*RUN_DATA*/
+window.FACTORY_TOKEN = null;
+/*
+  Event contract (one JSON object per line in factory/runs/<id>/events.jsonl):
+    { t: seconds since the run started, actor: 'announcer'|'builder'|'reviewer'|'gate'|'referee'|'commentator'|'gm',
+      kind: 'say' | 'evidence' | 'foul' | 'commentary' | 'shot' | 'decision', text: string,
+      stage?: 'order'|'build'|'gate'|'review'|'repair1'|'repair2'|'decision', huddle?: true,
+      pass?: {from, to}, cand?: sha, newAttempt?: true, shot?: {made, label}, gate?: {status, text},
+      review?: {status, text}, receipt?: [file names], files?: [paths], box?: {actor: {turns, tokens, files, fouls}} }
+  Served by `factory watch`, the page follows the file while the run is happening. Opened as a plain file, it plays the demo below.
+*/
+let BUDGET = 1800;
+let RUN = { id: 'WO-001', title: 'Case-insensitive player picker', base: '0c25ddd' };
+let CHECKS = ['backend lint', 'backend format', 'backend tests', 'ai-service tests', 'frontend lint', 'frontend tests', 'frontend build'];
+const STAGES = [['order', 'Order'], ['build', 'Build'], ['gate', 'Gate'], ['review', 'Review'], ['repair1', 'Repair 1'], ['repair2', 'Repair 2']];
+
+const CAST = {
+  order:       { name: 'Work order', jersey: 'WO', x: 110, y: 140, color: '#eef2f7', row: false },
+  builder:     { name: 'Builder', jersey: '11', x: 250, y: 360, color: '#ff7a1a', row: true },
+  gate:        { name: 'Stat crew', jersey: '00', x: 470, y: 118, color: '#eef2f7', row: true },
+  reviewer:    { name: 'Reviewer', jersey: '7', x: 690, y: 360, color: '#4cc9ff', row: true },
+  gm:          { name: 'GM', jersey: 'GM', x: 470, y: 530, color: '#ffd36b', row: false },
+  announcer:   { name: 'Announcer', jersey: 'A', x: 290, y: 604, color: '#f5b942', row: true },
+  commentator: { name: 'Commentator', jersey: 'C', x: 650, y: 604, color: '#b79cff', row: true },
+  referee:     { name: 'Referee', jersey: 'R', x: 878, y: 236, color: '#e5454e', row: true },
+};
+const PLAYERS = ['builder', 'reviewer', 'commentator', 'announcer', 'referee', 'gate'];
+
+/* ---------- demo run ---------- */
+const DEMO = [];
+const add = (t, actor, kind, text, o = {}) => DEMO.push({ t, actor, kind, text, ...o });
+add(0, 'announcer', 'say', 'Work order WO-001 is on the floor: make the player picker treat Yuly and YULY as one person. Builder, you are up.', { huddle: true, stage: 'order', pass: { from: 'order', to: 'builder' }, box: { announcer: { turns: 1 } } });
+add(6, 'commentator', 'commentary', 'Tip-off. The builder takes the order and heads for the frontend.', { box: { commentator: { turns: 1, tokens: 380 } } });
+add(22, 'builder', 'evidence', 'Read Picker.tsx and the pinned test that is meant to fail the day this is fixed.', { stage: 'build', receipt: ['read-files.txt'], box: { builder: { turns: 3, tokens: 9400 } } });
+add(58, 'builder', 'evidence', 'Edited players.ts and Picker.tsx so names are grouped without regard to capitals.', { receipt: ['diff-1.patch'], files: ['frontend/src/players.ts', 'frontend/src/Picker.tsx'], box: { builder: { turns: 4, tokens: 11800, files: 2 } } });
+add(71, 'referee', 'foul', 'Edit blocked: backend/app/db.py is not one of the files this work order allows.', { receipt: ['scope-check-1.txt'], box: { referee: { turns: 1 }, builder: { fouls: 1 } } });
+add(74, 'commentator', 'commentary', 'Whistle. The builder reached outside the lane and the referee sent it back.', { box: { commentator: { turns: 1, tokens: 410 } } });
+add(121, 'builder', 'evidence', 'Committed candidate 7f3a1c2.', { cand: '7f3a1c2', newAttempt: true, pass: { from: 'builder', to: 'gate' }, stage: 'gate', receipt: ['commit-1.txt'], box: { builder: { turns: 2, tokens: 5200 } } });
+add(124, 'announcer', 'say', 'Candidate 7f3a1c2 is posted. Stat crew, run the gate.', { huddle: true, box: { announcer: { turns: 1 } } });
+const gateRun = (t0, outcome) => CHECKS.forEach((label, i) => {
+  const made = outcome[i] === 1;
+  add(t0 + i * 5, 'gate', 'shot', made ? `${label} passed.` : 'Frontend tests missed: 530 passed, 1 failed.', { shot: { made, label } });
+});
+gateRun(130, [1, 1, 1, 1, 1, 0, 1]);
+add(190, 'gate', 'evidence', 'Gate is red on 7f3a1c2: 6 of 7 checks passed.', { gate: { status: 'red', text: '6 of 7 checks passed on 7f3a1c2' }, receipt: ['gate-1.txt'], box: { gate: { turns: 1 } } });
+add(192, 'announcer', 'say', 'Gate failed on 7f3a1c2. Builder, repair attempt 1 of 2.', { huddle: true, stage: 'repair1', pass: { from: 'gate', to: 'builder' }, box: { announcer: { turns: 1 } } });
+add(230, 'builder', 'say', 'The failing test is the pinned known gap. It should now pass the other way, so I am rewriting it to expect one person instead of two.', { huddle: true, box: { builder: { turns: 2, tokens: 7300 } } });
+add(290, 'builder', 'evidence', 'Updated the pinned test in validation.e2e.ts and added a unit test for the grouping.', { receipt: ['diff-2.patch'], files: ['frontend/e2e/validation.e2e.ts', 'frontend/src/players.test.ts'], box: { builder: { turns: 3, tokens: 9100, files: 2 } } });
+add(330, 'builder', 'evidence', 'Committed candidate 9be41d0.', { cand: '9be41d0', newAttempt: true, pass: { from: 'builder', to: 'gate' }, stage: 'gate', box: { builder: { turns: 1, tokens: 3100 } } });
+add(333, 'announcer', 'say', 'Candidate 9be41d0 is posted. Stat crew, run the gate.', { huddle: true, box: { announcer: { turns: 1 } } });
+gateRun(340, [1, 1, 1, 1, 1, 1, 1]);
+add(420, 'gate', 'evidence', 'Gate is green on 9be41d0: 7 of 7 checks passed, 532 tests.', { gate: { status: 'green', text: '7 of 7 checks passed on 9be41d0' }, receipt: ['gate-2.txt'], box: { gate: { turns: 1 } } });
+add(422, 'announcer', 'say', 'Gate passed. Coach, review it.', { huddle: true, stage: 'review', pass: { from: 'gate', to: 'reviewer' }, box: { announcer: { turns: 1 } } });
+add(470, 'reviewer', 'say', 'The picker groups names with the same case rules as the backend. One gap: the Compare page still lists Yuly and YULY separately.', { huddle: true, receipt: ['review-1.md'], review: { status: 'gap', text: 'Found a gap on the Compare page' }, box: { reviewer: { turns: 2, tokens: 6400 } } });
+add(474, 'announcer', 'say', 'The coach found a gap. Builder, repair attempt 2 of 2.', { huddle: true, stage: 'repair2', pass: { from: 'reviewer', to: 'builder' }, box: { announcer: { turns: 1 } } });
+add(520, 'builder', 'evidence', 'Fixed Compare.tsx to group names the same way and added a test for it.', { receipt: ['diff-3.patch'], files: ['frontend/src/Compare.tsx', 'frontend/src/Compare.test.tsx'], box: { builder: { turns: 3, tokens: 8800, files: 2 } } });
+add(580, 'builder', 'evidence', 'Committed candidate c4e8a19.', { cand: 'c4e8a19', newAttempt: true, pass: { from: 'builder', to: 'gate' }, stage: 'gate', box: { builder: { turns: 1, tokens: 2900 } } });
+add(583, 'announcer', 'say', 'Candidate c4e8a19 is posted. Stat crew, run the gate.', { huddle: true, box: { announcer: { turns: 1 } } });
+gateRun(590, [1, 1, 1, 1, 1, 1, 1]);
+add(690, 'gate', 'evidence', 'Gate is green on c4e8a19: 7 of 7 checks passed, 534 tests.', { gate: { status: 'green', text: '7 of 7 checks passed on c4e8a19' }, receipt: ['gate-3.txt'], box: { gate: { turns: 1 } } });
+add(693, 'announcer', 'say', 'Gate passed. Coach, review it.', { huddle: true, stage: 'review', pass: { from: 'gate', to: 'reviewer' }, box: { announcer: { turns: 1 } } });
+add(740, 'reviewer', 'say', 'Approved. Both screens group the names the same way, and the new tests fail if either one stops doing it.', { huddle: true, receipt: ['review-2.md'], review: { status: 'approved', text: 'Approved on c4e8a19' }, box: { reviewer: { turns: 2, tokens: 5200 } } });
+add(743, 'announcer', 'say', 'Ready for the GM. The call is yours.', { huddle: true, stage: 'decision', pass: { from: 'reviewer', to: 'gm' }, box: { announcer: { turns: 1 } } });
+add(744, 'commentator', 'commentary', 'Everything now rests on the GM.', { box: { commentator: { turns: 1, tokens: 300 } } });
+
+const RECEIPTS = {
+  'read-files.txt': 'builder read 2 files, 0 written\n  frontend/src/Picker.tsx        212 lines\n  frontend/e2e/validation.e2e.ts  KNOWN GAP test at line 182',
+  'diff-1.patch': '--- a/frontend/src/players.ts\n+++ b/frontend/src/players.ts\n@@\n-export const key = (name: string) => name.trim()\n+export const key = (name: string) => name.trim().toLocaleLowerCase()\n',
+  'scope-check-1.txt': 'controller: edit rejected\n  path    backend/app/db.py\n  rule    path is not in the work order\'s Files field\n  effect  file left untouched, attempt counted as a foul',
+  'commit-1.txt': 'candidate 7f3a1c2 (parent 0c25ddd)\nfiles changed: 2, all inside the work order',
+  'gate-1.txt': '$ scripts/ci.sh --fast   (clean worktree at 7f3a1c2)\nPASS  backend lint\nPASS  backend format\nPASS  backend tests\nPASS  ai-service tests\nPASS  frontend lint\nFAIL  frontend tests\n      validation.e2e.ts  KNOWN GAP: names that differ only in capitals\n      expected 2 players, received 1: the pinned test now fails, as designed\nPASS  frontend build\n6 of 7 checks passed',
+  'diff-2.patch': '--- a/frontend/e2e/validation.e2e.ts\n+++ b/frontend/e2e/validation.e2e.ts\n@@\n-  test(\'KNOWN GAP: names that differ only in capital letters are listed as two people\'\n+  test(\'names that differ only in capital letters are one person in the picker\'\n',
+  'gate-2.txt': '$ scripts/ci.sh --fast   (clean worktree at 9be41d0)\nPASS  7 of 7 checks\n532 tests passed',
+  'review-1.md': 'Verdict: gap\n- Compare.tsx builds its own player list and still groups by exact spelling.\n- Suggest: use the same key function as the picker.\nEvidence read: diff-2.patch, gate-2.txt',
+  'diff-3.patch': '--- a/frontend/src/Compare.tsx\n+++ b/frontend/src/Compare.tsx\n@@\n-const players = [...new Set(shots.map((s) => s.player))]\n+const players = uniqueByKey(shots.map((s) => s.player))\n',
+  'gate-3.txt': '$ scripts/ci.sh --fast   (clean worktree at c4e8a19)\nPASS  7 of 7 checks\n534 tests passed',
+  'review-2.md': 'Verdict: approved\n- Both screens use one key function.\n- New tests fail if either screen goes back to exact spelling (checked by reverting each change).',
+};
+const SEASON = [
+  { id: 'WO-000', title: 'Fix the README test count', result: 'delivered', first: true, repairs: 0, turns: 9, attempts: [[1, 1, 1, 1, 1, 1, 1]] },
+  { id: 'WO-001', title: 'Case-insensitive player picker', result: 'waiting', first: false, repairs: 2, turns: 20, attempts: [[1, 1, 1, 1, 1, 0, 1], [1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1]], open: true },
+  { id: 'WO-002', title: 'A broken model still shows as available', result: 'stopped', first: null, repairs: 0, turns: 4, attempts: [] },
+  { id: 'WO-003', title: 'Dry run with a scripted builder', result: 'delivered', first: false, repairs: 1, turns: 0, attempts: [[1, 1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1]] },
+];
+
+/* ---------- helpers ---------- */
+const $ = (id) => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const mmss = (s) => `${String(Math.floor(Math.max(0, s) / 60)).padStart(2, '0')}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
+function h(tag, attrs = {}, kids = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else e.setAttribute(k, v); }
+  for (const k of [].concat(kids)) if (k) e.append(k);
+  return e;
+}
+function s(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.append(e);
+  return e;
+}
+const color = (a) => (CAST[a] || {}).color || '#eef2f7';
+// The log keeps the agent's words as written (clipped at 600 characters by the controller); the page only tidies them.
+const shown = (t) => String(t).replace(/\*\*/g, '') + (String(t).length >= 598 ? '…' : '');
+const badge = (a) => { const b = h('span', { class: 'badge', text: CAST[a].jersey.length > 2 ? '' : CAST[a].jersey }); b.style.background = color(a); b.setAttribute('aria-hidden', 'true'); return b; };
+
+/* ---------- court drawing ---------- */
+const LINES = `
+  <path class="ln" pathLength="1" d="M20 20 V560 H920 V20"/>
+  <path class="ln" pathLength="1" d="M326 560 V218 H614 V560"/>
+  <path class="ln" pathLength="1" d="M362 218 A108 108 0 0 1 578 218"/>
+  <path class="ln dash" d="M362 218 A108 108 0 0 0 578 218"/>
+  <path class="ln" pathLength="1" d="M398 465.5 A72 72 0 0 1 542 465.5"/>
+  <path class="ln" pathLength="1" d="M416 488 H524"/>
+  <path class="ln" pathLength="1" d="M74 560 V304.5 A427.5 427.5 0 0 1 866 304.5 V560"/>
+  <circle class="ln" cx="470" cy="465.5" r="13.5" stroke="#ff7a1a" stroke-width="3.4"/>`;
+function courtBase(svg, h2) {
+  svg.innerHTML = `
+  <defs>
+    <radialGradient id="floor" cx="50%" cy="78%" r="85%"><stop offset="0" stop-color="#704622"/><stop offset=".55" stop-color="#3b2514"/><stop offset="1" stop-color="#1b110a"/></radialGradient>
+    <pattern id="planks" width="64" height="40" patternUnits="userSpaceOnUse"><path d="M0 0V40M32 0V40" stroke="rgba(0,0,0,.28)" stroke-width="2"/><path d="M0 20H64" stroke="rgba(0,0,0,.12)" stroke-width="1"/></pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a0f1b"/><stop offset="1" stop-color="#0a0f1b" stop-opacity="0"/></linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4cc9ff"/></marker>
+  </defs>
+  <rect width="940" height="${h2}" fill="#0a0f1b"/>
+  <rect x="20" y="20" width="900" height="540" fill="url(#floor)"/>
+  <rect x="20" y="20" width="900" height="540" fill="url(#planks)"/>
+  <rect x="326" y="218" width="288" height="342" fill="rgba(229,69,78,.30)"/>
+  ${LINES}
+  <rect x="20" y="20" width="900" height="95" fill="url(#fade)"/>`;
+}
+const markPos = (attempt, i) => {
+  const r = 285 - attempt * 38, th = (-140 + i * (100 / Math.max(1, CHECKS.length - 1))) * Math.PI / 180;
+  return [470 + r * Math.cos(th), 465.5 + r * Math.sin(th)];
+};
+function drawMark(parent, x, y, made, cls, dim) {
+  const g = s('g', { class: 'mark ' + cls, opacity: dim ? 0.4 : 1 }, parent);
+  if (made) s('circle', { class: 'mark-made', cx: x, cy: y, r: 10 }, g);
+  else { s('path', { class: 'mark-miss', d: `M${x - 9} ${y - 9}L${x + 9} ${y + 9}M${x + 9} ${y - 9}L${x - 9} ${y + 9}` }, g); }
+  return g;
+}
+
+/* ---------- state ---------- */
+let SOURCE = 'demo';   // demo | embedded | served
+let RUNINFO = null;    // run.json of a real run
+let RECEIPT_DATA = null;
+let events = DEMO.slice();
+let mode = 'demo';
+let idx = 0;               // number of events applied
+let playing = false, timer = null, speed = 2;
+let svgReady = false, ballEl, trailLayer, markLayer, nodeEls = {};
+const gaps = [];
+
+function derive(n) {
+  const st = { stage: 'order', cand: null, attempt: -1, passes: [], marks: [], feed: [], huddle: [], files: new Set(),
+    box: Object.fromEntries(PLAYERS.map((p) => [p, { turns: 0, tokens: 0, files: 0, fouls: 0 }])),
+    gate: null, review: null, ball: 'order', last: null, fouls: 0, checkIdx: 0, speaker: null, decision: null };
+  for (let i = 0; i < n; i++) {
+    const e = events[i];
+    if (e.stage) st.stage = e.stage;
+    if (e.cand) st.cand = e.cand;
+    if (e.newAttempt) { st.attempt++; st.checkIdx = 0; }
+    if (e.pass) { st.passes.push({ ...e.pass, i }); st.ball = e.pass.to; }
+    if (e.shot) { st.marks.push({ attempt: Math.max(0, st.attempt), idx: st.checkIdx, made: e.shot.made, i }); st.checkIdx++; }
+    if (e.gate) st.gate = e.gate;
+    if (e.review) st.review = e.review;
+    if (e.files) e.files.forEach((f) => st.files.add(f));
+    if (e.kind === 'foul') st.fouls++;
+    if (e.kind === 'decision') st.decision = e.text;
+    for (const [a, d] of Object.entries(e.box || {})) for (const [k, v] of Object.entries(d)) if (st.box[a]) st.box[a][k] += v;
+    st.feed.push({ ...e, i });
+    if (e.huddle) st.huddle.push({ ...e, i });
+    st.last = { ...e, i };
+  }
+  return st;
+}
+
+/* ---------- rendering ---------- */
+function buildStage() {
+  const svg = $('court');
+  courtBase(svg, 682);
+  s('rect', { x: 200, y: 574, width: 540, height: 66, rx: 8, fill: '#0f1a2e', stroke: 'rgba(255,255,255,.14)' }, svg);
+  trailLayer = s('g', {}, svg);
+  markLayer = s('g', {}, svg);
+  const nodes = s('g', {}, svg);
+  let k = 0;
+  for (const [id, c] of Object.entries(CAST)) {
+    const g = s('g', { class: 'node', 'data-id': id, transform: `translate(${c.x} ${c.y})` }, nodes);
+    g.style.animationDelay = (0.9 + k++ * 0.09) + 's';
+    const r = c.row ? 30 : 36;
+    s('circle', { class: 'disc', r }, g);
+    const jersey = s('text', { class: 'jersey', 'font-size': c.jersey.length > 1 ? 26 : 34 }, g);
+    jersey.textContent = c.jersey; jersey.style.fill = c.color;
+    const name = s('text', { class: 'name', y: r + 22 }, g);
+    name.textContent = c.name;
+    nodeEls[id] = g;
+  }
+  ballEl = s('g', { class: 'ball' }, svg);
+  s('circle', { class: 'ball-body', r: 13, filter: 'url(#glow)' }, ballEl);
+  s('path', { class: 'ball-seam', d: 'M-13 0H13M0 -13V13M-9.2 -9.2Q0 0 -9.2 9.2M9.2 -9.2Q0 0 9.2 9.2' }, ballEl);
+  place(ballEl, 'order');
+  svgReady = true;
+}
+function place(el, who) { const c = CAST[who]; el.setAttribute('transform', `translate(${c.x + (who === 'order' ? 0 : 0)} ${c.y - (el === ballEl ? 44 : 0)})`); }
+function arc(a, b, k) {
+  const A = CAST[a], B = CAST[b], mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+  const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1;
+  const off = 60 * (k % 2 ? -1 : 1);
+  const cx = mx - dy / len * off, cy = my + dx / len * off;
+  const sh = (p, q, r) => { const l = Math.hypot(q.x - p.x, q.y - p.y) || 1; return [p.x + (q.x - p.x) / l * r, p.y + (q.y - p.y) / l * r]; };
+  const [x1, y1] = sh(A, { x: cx, y: cy }, 40), [x2, y2] = sh(B, { x: cx, y: cy }, 44);
+  return `M${x1} ${y1} Q${cx} ${cy} ${x2} ${y2}`;
+}
+function renderCourt(st, animatePass) {
+  trailLayer.replaceChildren(); markLayer.replaceChildren();
+  st.passes.forEach((p, k) => {
+    const age = st.passes.length - 1 - k;
+    const path = s('path', { class: 'pass', d: arc(p.from, p.to, k), 'marker-end': 'url(#arrow)', opacity: Math.max(0.1, 1 - age * 0.2) }, trailLayer);
+    if (animatePass && age === 0 && !reduced) { path.setAttribute('pathLength', '1'); path.style.strokeDasharray = '1'; path.style.strokeDashoffset = '1'; path.getBoundingClientRect(); path.style.transition = 'stroke-dashoffset .7s ease-out'; path.style.strokeDashoffset = '0'; setTimeout(() => { path.style.strokeDasharray = ''; path.style.strokeDashoffset = ''; path.removeAttribute('pathLength'); }, 800); }
+  });
+  const lastAttempt = st.attempt;
+  st.marks.forEach((m) => { const [x, y] = markPos(m.attempt, m.idx); drawMark(markLayer, x, y, m.made, m.i === st.last.i && animatePass ? 'fresh' : '', m.attempt !== lastAttempt); });
+  for (const [id, g] of Object.entries(nodeEls)) {
+    const on = id === st.ball || (st.last && st.last.actor === id);
+    g.classList.toggle('on', on);
+    g.querySelector('.disc').style.stroke = on ? color(id) : '';
+    if (on) g.querySelector('.disc').style.setProperty('stroke', color(id));
+  }
+  const prevBall = ballEl.dataset.at;
+  if (animatePass && st.last && st.last.pass && prevBall && prevBall !== st.ball && !reduced) flyBall(st.last.pass.from, st.last.pass.to, st.passes.length - 1);
+  else place(ballEl, st.ball);
+  ballEl.dataset.at = st.ball;
+  if (animatePass && st.last && st.last.kind === 'foul' && !reduced) { const n = nodeEls.referee; n.classList.remove('flash'); n.getBoundingClientRect(); n.classList.add('flash'); nodeEls.builder.classList.remove('flash'); nodeEls.builder.getBoundingClientRect(); nodeEls.builder.classList.add('flash'); }
+}
+function flyBall(from, to, k) {
+  const probe = s('path', { d: arc(from, to, k), fill: 'none' }); trailLayer.append(probe);
+  const len = probe.getTotalLength(), t0 = performance.now(), dur = 720;
+  const A = CAST[from], B = CAST[to];
+  const step = (now) => {
+    const u = Math.min(1, (now - t0) / dur), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    const p = probe.getPointAtLength(len * e), lift = Math.sin(u * Math.PI);
+    ballEl.setAttribute('transform', `translate(${p.x} ${p.y - 8 * lift}) scale(${1 + 0.35 * lift})`);
+    if (u < 1) requestAnimationFrame(step); else { probe.remove(); place(ballEl, to); }
+  };
+  requestAnimationFrame(step);
+}
+function renderBoard(st, e) {
+  const left = BUDGET - (e ? e.t : 0);
+  $('clock').textContent = mmss(left);
+  $('clock').classList.toggle('low', left < 300);
+  $('chipCand').textContent = st.cand || 'none yet';
+  const order = ['order', 'build', 'gate', 'review', 'repair1', 'repair2'];
+  const cur = st.stage === 'decision' ? 'review' : st.stage;
+  const pips = $('pips'); pips.replaceChildren();
+  const seen = new Set(events.slice(0, idx).map((x) => x.stage).filter(Boolean));
+  STAGES.forEach(([key, label]) => pips.append(h('li', { class: key === cur ? 'on' : seen.has(key) ? 'done' : '', text: label })));
+  const out = $('outcome');
+  const ended = RUNINFO && ['failed', 'stopped', 'error'].includes(RUNINFO.status) && idx >= events.length;
+  const msg = st.decision ? [RUNINFO && RUNINFO.status === 'rejected' ? 'Rejected by the GM' : 'Approved by the GM', st.decision] : ended ? [RUNINFO.status === 'failed' ? 'Run failed' : 'Run stopped', RUNINFO.reason || ''] : st.stage === 'decision' ? ['Waiting for the GM', 'Gate green, reviewer approved'] : st.gate && st.gate.status === 'red' && st.stage.startsWith('repair') ? [`Repair ${st.stage.slice(-1)} of 2`, 'The builder is fixing what the gate found'] : idx === 0 ? ['Run starting', 'Work order on the floor'] : [STAGES.find((x) => x[0] === cur)[1] + ' in progress', st.last ? CAST[st.last.actor].name + ' has the play' : ''];
+  out.replaceChildren(msg[0], h('small', { text: msg[1] }));
+}
+function renderLower(st) {
+  const e = st.last, box = $('lower'); box.replaceChildren();
+  if (!e) return;
+  const c = CAST[e.actor];
+  box.className = 'lower' + (e.kind === 'commentary' ? ' comm' : '');
+  const who = h('div', { class: 'who', text: c.name }); who.style.background = c.color;
+  box.append(who, h('div', { class: 'what', text: shown(e.text) }));
+}
+function evNode(e, fresh) {
+  const c = CAST[e.actor];
+  const kindTag = e.kind === 'decision' ? 'Decision' : e.kind === 'commentary' ? 'Commentary' : e.kind === 'foul' ? 'Foul' : e.actor === 'announcer' ? 'Announcer' : e.kind === 'shot' ? (e.shot.made ? 'Made' : 'Missed') : c.name;
+  const body = h('div', { class: 'body' }, [h('p', {}, [h('span', { class: 'tag', text: kindTag + ':' }), document.createTextNode(shown(e.text))])]);
+  if (e.receipt) body.append(h('div', { class: 'receipts' }, e.receipt.map((f) => { const b = h('button', { class: 'receipt', type: 'button', text: f }); b.addEventListener('click', () => openReceipt(f)); return b; })));
+  const li = h('li', { class: `ev ${e.kind}${fresh ? ' fresh' : ''}` }, [h('span', { class: 't', text: mmss(BUDGET - e.t) }), badge(e.actor), body]);
+  return li;
+}
+let lastFeedCount = 0;
+function renderFeed(st, animate) {
+  const only = $('onlyEvidence').checked;
+  const list = st.feed.filter((e) => !only || (e.kind !== 'commentary' && e.actor !== 'announcer')).slice().reverse();
+  const ol = $('feed'); ol.replaceChildren();
+  if (!list.length) ol.append(h('li', { class: 'empty', text: 'Nothing has happened yet. The first event appears here.' }));
+  list.forEach((e, k) => ol.append(evNode(e, animate && k === 0 && st.feed.length > lastFeedCount)));
+  lastFeedCount = st.feed.length;
+}
+function renderHuddle(st, typing) {
+  const ol = $('huddle'); ol.replaceChildren();
+  if (!st.huddle.length) ol.append(h('li', { class: 'empty', text: 'The announcer will start the huddle.' }));
+  st.huddle.forEach((e) => {
+    const m = h('li', { class: `msg ${e.actor}` });
+    if (e.actor !== 'announcer') m.append(h('span', { class: 'from', text: CAST[e.actor].name }));
+    m.append(h('span', { class: 'bubble', text: shown(e.text) }));
+    ol.append(m);
+  });
+  if (typing) {
+    const t = h('li', { class: 'typing' }, [h('span', { class: 'dots' }, [h('i'), h('i'), h('i')]), h('span', { text: `${CAST[typing].name} is ${typing === 'builder' ? 'working on it' : 'reading the diff'}…` })]);
+    ol.append(t);
+  }
+  ol.scrollTop = ol.scrollHeight;
+}
+const DEMO_RUN = { id: 'wo-001-r1', status: 'demo', base: '0c25ddd0000000000000000000000000000000aa', base_ref: 'ex3', branch: 'factory-run/wo-001-r1',
+  work_order: { id: 'WO-001', title: 'Case-insensitive player picker' }, max_repairs: 2, budget_seconds: 1800, mode: 'live', candidates: ['7f3a1c2', '9be41d0', 'c4e8a19'],
+  models: { builder: 'sonnet', reviewer: 'haiku', commentator: 'haiku' },
+  where: { work_order: 'factory/workorders/WO-001-case-insensitive-picker.md', run_folder: 'factory/runs/wo-001-r1/', event_log: 'factory/runs/wo-001-r1/events.jsonl',
+    receipts: 'factory/runs/wo-001-r1/receipts', report: 'factory/runs/wo-001-r1/report.html', live_page: 'factory/runs/wo-001-r1/index.html', builder_worktree: 'factory/work/wo-001-r1' } };
+function whoRuns(p) {
+  const info = RUNINFO || DEMO_RUN;
+  if (info.mode === 'scripted' && ['builder', 'reviewer'].includes(p)) return 'scripted';
+  if (['builder', 'reviewer', 'commentator'].includes(p)) return (info.models || {})[p] || '';
+  return 'code, not an AI';
+}
+function renderBox(st) {
+  const body = $('boxBody'); body.replaceChildren();
+  const tot = { turns: 0, tokens: 0, files: st.files.size, fouls: st.fouls };
+  PLAYERS.forEach((p) => {
+    const b = st.box[p]; tot.turns += b.turns; tot.tokens += b.tokens;
+    const files = p === 'builder' ? st.files.size : 0;
+    const tr = h('tr'); const who = h('td', {}, [h('span', { class: 'who-cell' }, [badge(p), h('span', {}, [document.createTextNode(CAST[p].name), h('span', { class: 'sub', text: whoRuns(p) })])])]);
+    tr.append(who);
+    [[b.turns, ''], [b.tokens ? (b.tokens / 1000).toFixed(1) + 'k' : 0, ''], [files, ''], [b.fouls, b.fouls ? 'hot' : '']].forEach(([v, c]) => tr.append(h('td', { class: (v === 0 ? 'zero ' : '') + c, text: String(v) })));
+    body.append(tr);
+  });
+  const foot = $('boxFoot'); foot.replaceChildren(h('tr', {}, [h('td', { text: 'Team' }), h('td', { text: String(tot.turns) }), h('td', { text: (tot.tokens / 1000).toFixed(1) + 'k' }), h('td', { text: String(tot.files) }), h('td', { text: String(tot.fouls) })]));
+  $('boxNote').textContent = mode === 'demo' ? 'Demo numbers' : 'Counts come from the run log.';
+}
+const approveCmd = () => `python3 factory/factory.py approve ${(RUNINFO || DEMO_RUN).id}`;
+function renderGM(st) {
+  const box = $('gmBody'); box.replaceChildren();
+  const row = (cls, icon, title, detail) => h('div', { class: 'check ' + cls }, [h('span', { class: 'ico', text: icon }), h('div', {}, [h('strong', { text: title }), h('span', { class: 'd', text: detail })])]);
+  const g = st.gate;
+  box.append(g ? row(g.status === 'green' ? 'ok' : 'bad', g.status === 'green' ? '✓' : '!', 'Gate on the exact candidate', g.text) : row('wait', '', 'Gate on the exact candidate', 'No candidate has been checked yet.'));
+  const r = st.review;
+  box.append(r ? row(r.status === 'approved' ? 'ok' : 'bad', r.status === 'approved' ? '✓' : '!', 'Reviewer', r.text) : row('wait', '', 'Reviewer', 'Waits for a green gate.'));
+  box.append(row(st.files.size ? 'ok' : 'wait', st.files.size ? '✓' : '', 'Scope', st.files.size ? `${st.files.size} ${st.files.size === 1 ? 'file' : 'files'} changed, all inside the work order${st.fouls ? `; ${st.fouls} ${st.fouls === 1 ? 'edit' : 'edits'} blocked` : ''}.` : 'No files changed yet.'));
+  const reachedGM = !RUNINFO || RUNINFO.status === 'waiting' || RUNINFO.status === 'demo';
+  const ready = st.stage === 'decision' && !st.decision && reachedGM;
+  const live = SOURCE === 'served' && !!window.FACTORY_TOKEN && RUNINFO && RUNINFO.status === 'waiting';
+  const canDecide = ready && live;
+  const approve = h('button', { class: 'btn go' + (canDecide ? ' ready' : ''), type: 'button', text: 'Approve' });
+  const reject = h('button', { class: 'btn', type: 'button', text: 'Reject' });
+  approve.disabled = reject.disabled = !canDecide;
+  approve.addEventListener('click', () => askDecision('approve'));
+  reject.addEventListener('click', () => askDecision('reject'));
+  const cmd = h('div', { class: 'cmd' }, [h('span', { text: approveCmd() })]);
+  const copy = h('button', { type: 'button', text: 'Copy' }); copy.addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(approveCmd()); copy.textContent = 'Copied'; setTimeout(() => (copy.textContent = 'Copy'), 1400); });
+  cmd.append(copy);
+  box.append(h('div', { class: 'decide' }, [approve, reject, canDecide ? null : cmd]));
+  const note = st.decision ? st.decision
+    : canDecide ? 'Pressing a button asks you to confirm first. Nothing is pushed or merged until you do.'
+    : ready ? `This copy cannot decide. Open the live page to use the buttons: python3 factory/factory.py watch ${(RUNINFO || DEMO_RUN).id}`
+    : (reachedGM ? 'The buttons work on the live page once the run reaches the GM.' : 'This run did not reach the GM, so there is nothing to approve. ' + (RUNINFO.reason || ''));
+  box.append(h('p', { class: 'note', text: note }));
+  if (RUNINFO && RUNINFO.pr_url) box.append(h('p', { class: 'note result-line' }, [document.createTextNode('Pull request: '), h('a', { href: RUNINFO.pr_url, target: '_blank', rel: 'noopener', text: RUNINFO.pr_url })]));
+  if (decideMessage) box.append(h('p', { class: 'note result-line', role: 'status', text: decideMessage }));
+}
+let decideMessage = '';
+async function sendDecision(body) {
+  const res = await fetch('decide', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Factory-Token': window.FACTORY_TOKEN }, body: JSON.stringify(body) });
+  let data = {};
+  try { data = await res.json(); } catch (err) { /* not JSON */ }
+  if (!res.ok || !data.ok) throw new Error(data.error || `The server answered ${res.status}.`);
+  return data;
+}
+function askDecision(kind) {
+  const info = RUNINFO, sha = (info.final_candidate || '').slice(0, 7), dlg = $('decideDlg'), body = $('dcBody');
+  body.replaceChildren();
+  const error = h('p', { class: 'dc-error', role: 'alert' });
+  const buttons = [];
+  const go = (label, payload, cls = 'btn') => {
+    const b = h('button', { class: cls, type: 'button', text: label });
+    b.addEventListener('click', async () => {
+      buttons.forEach((x) => (x.disabled = true)); error.textContent = ''; b.textContent = 'Working…';
+      try {
+        const reasonBox = $('dcReason');
+        const result = await sendDecision(reasonBox ? { ...payload, reason: reasonBox.value } : payload);
+        decideMessage = result.message; dlg.close(); await refresh(); render(false); renderWhere();
+      } catch (err) { error.textContent = err.message; b.textContent = label; buttons.forEach((x) => (x.disabled = false)); }
+    });
+    buttons.push(b); return b;
+  };
+  const cancel = h('button', { class: 'btn', type: 'button', text: 'Cancel' }); cancel.addEventListener('click', () => dlg.close()); buttons.push(cancel);
+  if (kind === 'approve') {
+    body.append(h('h2', { id: 'dcTitle', text: `Approve candidate ${sha}?` }));
+    body.append(h('p', { class: 'dc-note', text: `It is on the branch ${info.branch}, started from ${info.base.slice(0, 7)} on ${info.base_ref}. The gate passed on this exact commit and the reviewer approved it.` }));
+    body.append(h('p', {}, [h('strong', { text: 'Approve and open the PR ' }), document.createTextNode(`pushes only that branch to GitHub and opens a pull request into ${info.base_ref}. You review and merge it there; nothing is merged for you.`)]));
+    body.append(h('p', {}, [h('strong', { text: 'Approve only ' }), document.createTextNode('records your decision here and pushes nothing.')]));
+    body.append(error, h('div', { class: 'dc-actions' }, [go('Approve and open the PR', { decision: 'approve', open_pr: true }, 'btn go'), go('Approve only', { decision: 'approve' }), cancel]));
+  } else {
+    const reason = h('textarea', { id: 'dcReason', rows: '3', maxlength: '300', placeholder: 'Why? (optional, kept in the run record)' });
+    body.append(h('h2', { id: 'dcTitle', text: `Reject candidate ${sha}?` }));
+    body.append(h('p', { class: 'dc-note', text: 'The branch and the evidence stay for the record. Nothing is pushed.' }), h('label', { for: 'dcReason', class: 'sr-only', text: 'Reason' }), reason);
+    body.append(error, h('div', { class: 'dc-actions' }, [go('Reject', { decision: 'reject' }), cancel]));
+  }
+  dlg.showModal();
+}
+function render(animate) {
+  const st = derive(idx), e = st.last;
+  if (!svgReady) buildStage();
+  renderBoard(st, e); renderCourt(st, animate); renderLower(st); renderFeed(st, animate); renderBox(st); renderGM(st);
+  const next = events[idx];
+  renderHuddle(st, playing && next && next.huddle && (next.actor === 'builder' || next.actor === 'reviewer') ? next.actor : null);
+  $('scrub').value = String(idx); $('pos').textContent = `Event ${idx} of ${events.length}`;
+  [...$('ticks').children].forEach((t, i) => t.classList.toggle('past', i < idx));
+  $('sr').textContent = e ? `${CAST[e.actor].name}: ${e.text}` : '';
+  $('court').setAttribute('aria-label', `Half court. ${CAST[st.ball].name} has the ball. ${st.marks.length} gate checks marked.`);
+}
+
+/* ---------- playback ---------- */
+function gapFor(i) { const e = events[i], p = events[i - 1]; if (!p) return 700; if (e.kind === 'shot') return 520; return Math.min(2700, Math.max(900, (e.t - p.t) * 38)); }
+function setPlaying(on) {
+  playing = on; clearTimeout(timer); clearTimeout(autoTimer);
+  $('play').setAttribute('aria-label', on ? 'Pause' : 'Play');
+  $('playIcon').innerHTML = on ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+  if (on) { if (idx >= events.length) idx = 0; schedule(); }
+  render(false);
+}
+function schedule() {
+  clearTimeout(timer);
+  if (!playing) return;
+  if (idx >= events.length) { setPlaying(false); return; }
+  render(false);
+  timer = setTimeout(() => { idx++; render(true); schedule(); }, gapFor(idx) / speed);
+}
+function seek(i) { clearTimeout(autoTimer); idx = Math.max(0, Math.min(events.length, i)); render(false); if (playing) schedule(); }
+function buildTicks() {
+  const t = $('ticks'); t.replaceChildren();
+  events.forEach((e) => { const i = h('i'); i.style.background = e.kind === 'foul' ? '#e5454e' : e.kind === 'shot' ? (e.shot.made ? '#3ddc84' : '#e5454e') : color(e.actor); t.append(i); });
+  $('scrub').max = String(events.length);
+}
+
+/* ---------- receipts ---------- */
+async function openReceipt(f) {
+  $('rcTitle').textContent = f; $('rcBody').textContent = 'Loading…'; $('receiptDlg').showModal();
+  let text = null;
+  if (RECEIPT_DATA && f in RECEIPT_DATA) text = RECEIPT_DATA[f];
+  else if (SOURCE === 'served') { try { const r = await fetch('receipts/' + encodeURIComponent(f), { cache: 'no-store' }); if (r.ok) text = await r.text(); } catch (err) { /* not available */ } }
+  else if (SOURCE === 'demo') text = RECEIPTS[f];
+  $('rcBody').textContent = text == null ? 'This receipt is not available.' : text;
+  $('rcFoot').textContent = SOURCE === 'demo' ? 'Demo content. A real receipt is the exact file the controller saved for this run.' : `The exact file the controller saved: ${(RUNINFO.where.receipts || '')}/${f}`;
+}
+
+/* ---------- season ---------- */
+function runAsSeason() {
+  const attempts = []; let turns = 0;
+  events.forEach((e) => { if (e.newAttempt) attempts.push([]); if (e.shot && attempts.length) attempts[attempts.length - 1].push(e.shot.made ? 1 : 0); for (const d of Object.values(e.box || {})) turns += d.turns || 0; });
+  const status = (RUNINFO && RUNINFO.status) || 'waiting';
+  return { id: RUN.id, title: RUN.title, result: status === 'approved' ? 'delivered' : status === 'waiting' ? 'waiting' : 'stopped',
+    first: attempts.length ? attempts[0].every((x) => x === 1) : null, repairs: Math.max(0, attempts.length - 1), turns, attempts, open: true };
+}
+const seasonRows = () => (SOURCE === 'demo' ? SEASON : [runAsSeason()]);
+function renderSeason() {
+  const rows = seasonRows();
+  const done = rows.filter((r) => r.result === 'delivered').length;
+  const withGate = rows.filter((r) => r.attempts.length);
+  const first = withGate.filter((r) => r.attempts[0].every((x) => x === 1)).length;
+  const stats = [[rows.length, rows.length === 1 ? 'run' : 'runs'], [done, 'delivered'], [withGate.length ? Math.round(first / withGate.length * 100) + '%' : 'none', 'passed the gate first time'], [(rows.reduce((a, r) => a + r.repairs, 0) / rows.length).toFixed(1), 'repairs per run']];
+  $('seasonLine').replaceChildren(...stats.map(([v, c]) => h('div', { class: 'stat' }, [h('div', { class: 'big', text: String(v) }), h('div', { class: 'cap', text: c })])));
+  const body = $('runsBody'); body.replaceChildren();
+  rows.forEach((r) => {
+    const label = { delivered: 'Delivered', waiting: 'Waiting for the GM', stopped: 'Stopped' }[r.result];
+    const tr = h('tr', { class: r.open ? 'link' : '', tabindex: r.open ? '0' : '-1' }, [
+      h('td', {}, [h('strong', { text: r.id + ' ' }), document.createTextNode(r.title)]),
+      h('td', {}, [h('span', { class: 'result ' + r.result, text: label })]),
+      h('td', { text: r.first === null ? 'Never reached' : r.first ? 'Passed' : 'Failed' }),
+      h('td', { text: String(r.repairs) }), h('td', { text: String(r.turns) })]);
+    if (r.open) { const go = () => showView('game'); tr.addEventListener('click', go); tr.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); }); }
+    body.append(tr);
+  });
+  const svg = $('miniCourt'); courtBase(svg, 600); svg.querySelector('.ln') && 0;
+  const g = s('g', {}, svg);
+  rows.forEach((r, k) => r.attempts.forEach((a, at) => a.forEach((ok, i) => { const [x, y] = markPos(Math.min(at, 2), i); drawMark(g, x + (k - (rows.length - 1) / 2) * 9, y, !!ok, '', false); })));
+}
+
+/* ---------- views, live, wiring ---------- */
+function showView(v) {
+  document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+  $('game').hidden = v !== 'game'; $('season').hidden = v !== 'season';
+  document.body.dataset.view = v;
+  document.querySelector('.transport').style.display = v === 'game' ? '' : 'none';
+  if (v === 'season') {
+    setPlaying(false); renderSeason();
+    $('runTitle').textContent = 'Season';
+    $('outcome').replaceChildren(`${seasonRows().length} ${seasonRows().length === 1 ? 'run' : 'runs'}`, h('small', { text: 'Select a run to watch it' }));
+  } else {
+    $('runTitle').textContent = RUN.title;
+    render(false);
+  }
+}
+function setMode(m) {
+  mode = m;
+  const chip = $('chipMode');
+  chip.textContent = m === 'live' ? 'Live' : m === 'replay' ? 'Replay' : 'Demo data';
+  chip.className = 'chip mode' + (m === 'live' ? ' live' : '');
+  $('demoStrip').hidden = m !== 'demo';
+  const agents = $('chipAgents');
+  agents.hidden = !(RUNINFO && RUNINFO.mode === 'scripted');
+}
+const parseLines = (text) => text.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+function applyRun(run, evs, receipts) {
+  RUNINFO = run; RECEIPT_DATA = receipts || null; BUDGET = run.budget_seconds; CHECKS = run.checks;
+  RUN = { id: run.work_order.id, title: run.work_order.title, base: run.base.slice(0, 7) };
+  events = evs;
+  $('runTitle').textContent = RUN.title; $('chipOrder').textContent = RUN.id; $('chipBase').textContent = RUN.base;
+}
+const STATUS_TEXT = { running: 'running now', waiting: 'finished: waiting for the GM', approved: 'finished: approved by the GM', rejected: 'finished: rejected by the GM', failed: 'finished: failed', stopped: 'finished: stopped', error: 'finished: the factory failed', demo: 'demo data' };
+function renderWhere() {
+  const run = RUNINFO || DEMO_RUN, w = run.where, box = $('where'); box.replaceChildren();
+  const rows = [
+    ['Work order', w.work_order, 'The nine-field order the builder and reviewer were given.'],
+    ['This run', `${run.id}, ${STATUS_TEXT[run.status] || run.status}`, 'One folder per run; everything below is inside it.'],
+    ['Factory version', run.factory_version || 'demo', 'The factory code that ran this: the controller, the announcer table and the gate.'],
+    ['Base commit', `${run.base.slice(0, 7)} on ${run.base_ref}`, 'The exact code the candidate started from.'],
+    ['Candidate branch', run.branch, 'The builder commits here and nowhere else. Nothing is pushed.'],
+    ['Candidate commits', (run.candidates || []).map((c) => c.slice(0, 7)).join(', ') || 'none yet', 'One per attempt. The gate ran on each of these exact commits.'],
+    ['Builder checkout', w.builder_worktree, 'A second checkout of the repo, so your own folder is never touched.'],
+    ['Event log', w.event_log, 'The append-only record this page is drawn from, one JSON line per event.'],
+    ['Receipts', w.receipts, 'Diffs, gate output, reviews and scope checks. Click a file name in the play-by-play to read one.'],
+    ['Who runs what', `builder ${whoRuns('builder')}, reviewer ${whoRuns('reviewer')}, commentator ${whoRuns('commentator')}; announcer, referee and gate are plain code`, 'The controller is code, not an AI.'],
+    ['Budget', `${Math.round(run.budget_seconds / 60)} minutes and ${run.max_repairs} repair attempts`, 'When the shot clock hits zero the agent process group is killed.'],
+    ['Watch live', `python3 factory/factory.py watch ${run.id}`, 'Serves this page on http://127.0.0.1:5180/ and follows the log.'],
+    ['Decide', `the Approve and Reject buttons on the live page, or: python3 factory/factory.py approve ${run.id}`, 'Both make the same decision, and nothing is pushed or merged until one of them is used and confirmed. An offline copy of this page cannot decide.'],
+    ['Stop', `python3 factory/factory.py stop ${run.id}`, 'Writes a STOP file; the controller kills the running agent.'],
+    ['This report', w.report, 'The same page with the whole run inside it: opens from a file, offline.'],
+  ];
+  rows.forEach(([name, value, note]) => {
+    box.append(h('div', { class: 'where-row' }, [h('dt', { text: name }), h('dd', {}, [h('span', { class: 'val', text: value }), h('span', { class: 'why', text: note })])]));
+  });
+}
+let pollTimer = null;
+let autoTimer = null;   // the pending autoplay: any move by the viewer cancels it
+async function refresh() {
+  const [r1, r2] = await Promise.all([fetch('run.json', { cache: 'no-store' }), fetch('events.jsonl', { cache: 'no-store' })]);
+  if (!r1.ok || !r2.ok) return null;
+  const run = await r1.json(), all = parseLines(await r2.text());
+  RUNINFO = run;
+  if (all.length > events.length) { const follow = idx >= events.length; events = all; buildTicks(); if (follow) { idx = events.length; render(true); } else render(false); }
+  renderWhere();
+  return run;
+}
+function poll() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const run = await refresh();
+      if (run && run.status !== 'running') { clearInterval(pollTimer); setMode('replay'); render(false); }
+    } catch (err) { /* the server is busy or gone: try again next second */ }
+  }, 1000);
+}
+async function boot() {
+  if (window.RUN_DATA) {
+    SOURCE = 'embedded'; applyRun(window.RUN_DATA.run, window.RUN_DATA.events, window.RUN_DATA.receipts);
+    setMode(window.RUN_DATA.run.status === 'running' ? 'live' : 'replay');
+  } else if (location.protocol !== 'file:') {
+    try {
+      const [r1, r2] = await Promise.all([fetch('run.json', { cache: 'no-store' }), fetch('events.jsonl', { cache: 'no-store' })]);
+      if (r1.ok && r2.ok) { const run = await r1.json(); SOURCE = 'served'; applyRun(run, parseLines(await r2.text()), null); setMode(run.status === 'running' ? 'live' : 'replay'); }
+    } catch (err) { /* no run here: keep the demo */ }
+  }
+  if (SOURCE === 'demo') setMode('demo');
+  buildTicks(); renderWhere();
+  if (mode === 'live') { idx = events.length; render(false); poll(); return; }
+  render(false);
+  if (!reduced) {
+    document.body.classList.add('intro');
+    setTimeout(() => document.body.classList.remove('intro'), 2600);
+    autoTimer = setTimeout(() => setPlaying(true), 2200);
+  } else { idx = events.length; render(false); }
+}
+$('play').addEventListener('click', () => setPlaying(!playing));
+$('prev').addEventListener('click', () => { setPlaying(false); seek(idx - 1); });
+$('next').addEventListener('click', () => { setPlaying(false); seek(idx + 1); });
+$('scrub').addEventListener('input', (e) => seek(Number(e.target.value)));
+$('speed').addEventListener('change', (e) => { speed = Number(e.target.value); if (playing) schedule(); });
+$('onlyEvidence').addEventListener('change', () => render(false));
+$('rcClose').addEventListener('click', () => $('receiptDlg').close());
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest('input,select,textarea,dialog')) return;
+  if (e.code === 'Space') { e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === 'ArrowRight') { setPlaying(false); seek(idx + 1); }
+  else if (e.key === 'ArrowLeft') { setPlaying(false); seek(idx - 1); }
+});
+window.__seek = (i) => { setPlaying(false); seek(i); };
+window.__view = showView;
+
+boot();
+</script>
+</body>
+</html>

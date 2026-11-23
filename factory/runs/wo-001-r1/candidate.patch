@@ -1,0 +1,233 @@
+diff --git a/frontend/e2e/validation.e2e.ts b/frontend/e2e/validation.e2e.ts
+index a682b54..e68a070 100644
+--- a/frontend/e2e/validation.e2e.ts
++++ b/frontend/e2e/validation.e2e.ts
+@@ -179,21 +179,18 @@ test.describe('odd but valid text is stored as typed and drawn as text, never ru
+     expect(await api.list()).toHaveLength(1)
+   })
+ 
+-  test('KNOWN GAP: names that differ only in capital letters are listed as two people in the picker', async ({ page, api }) => {
+-    // The backend's player filter ignores case, so "yuly" and "YULY" should be one person. The picker still lists them
+-    // separately. This test pins today's behaviour so that fixing the gap fails it on purpose: when the picker shows one
+-    // person, the list below becomes two entries (Every player and the one person), the count at the end 2, and the test
+-    // loses its KNOWN GAP name.
++  test('names that differ only in capital letters are one person in the picker', async ({ page, api }) => {
++    // The backend's player filter ignores case, so "yuly" and "YULY" are one person with both shots.
+     await api.seed([
+       { player: 'yuly', x: 25, y: 8, made: true },
+       { player: 'YULY', x: 20, y: 20, made: false },
+     ])
+     await openApp(page)
+     await page.getByRole('combobox', { name: /^Shots of:/ }).click()
+-    await expect(page.getByRole('option')).toHaveText([/Every player/, /yuly/i, /yuly/i])
++    await expect(page.getByRole('option')).toHaveText([/Every player/, /yuly.*2 shots/i])
+     await page.keyboard.press('Escape')
+-    // The same gap shows in the numbers: each spelling counts as its own person (1 shot each), not 2 shots for one.
+-    await expect(kpi(page, 'SHOTS')).toHaveText('1')
++    // The numbers count both spellings together.
++    await expect(kpi(page, 'SHOTS')).toHaveText('2')
+   })
+ })
+ 
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 46a1f5d..3394419 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -8,7 +8,7 @@ import Logo from './Logo'
+ import ShooterSelect from './ShooterSelect'
+ import { tabTarget } from './focusTrap'
+ import { deletedText, withShooterSwitch } from './notices'
+-import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
++import { listShooters, pickDefaultShooter, resolveShooter, sameShooter } from './shooter'
+ import PlayersPage from './PlayersPage'
+ import ShotForm from './ShotForm'
+ import { useChat } from './coach/useChat'
+@@ -234,7 +234,7 @@ export default function App() {
+     if (id === null) return
+     // A shot by someone else is hidden on the map, so show that player's shots.
+     const player = shots?.find((s) => s.id === id)?.player
+-    if (player !== undefined && shooter !== '' && player !== shooter) setShooterChoice(player)
++    if (player !== undefined && shooter !== '' && !sameShooter(player, shooter)) setShooterChoice(player)
+     setDrawerOpen(false) // the drawer would cover the map
+     setScrollTarget({ id: 'map-title', block: 'start' })
+   }
+@@ -245,7 +245,7 @@ export default function App() {
+   // Make the shown shooter the explicit choice, so a save or delete never silently changes whose
+   // shots are shown. A chosen player with no shots left is replaced by the default, and the user is told.
+   // (Set during render, which React allows for a component's own state.)
+-  if (shooters.length > 0 && !loadError && shooter !== shooterChoice) {
++  if (shooters.length > 0 && !loadError && (shooterChoice === null || !sameShooter(shooter, shooterChoice))) {
+     setShooterChoice(shooter)
+     if (shooterChoice !== null) {
+       // A delete confirmation stays visible: the sentence is added to it (and adding twice is a no-op).
+@@ -255,8 +255,11 @@ export default function App() {
+       }))
+     }
+   }
+-  const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
+-  const shooterPicker = <ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
++  const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => sameShooter(s.player, shooter))), [shots, shooter])
++  // The map filters by exact spelling, so it gets the shooter's shots under the one listed spelling
++  // ("yuly" and "YULY" are one person). Only this copy is renamed; what is stored is not touched.
++  const mapShots = useMemo(() => (shooterShots === null || !shooter ? shots : shooterShots.map((s) => (s.player === shooter ? s : { ...s, player: shooter }))), [shooterShots, shots, shooter])
++  const shooterPicker =<ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
+ 
+   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
+   const baseline = useMemo(
+@@ -427,7 +430,7 @@ export default function App() {
+             The map's scene stops drawing while hidden and re-measures when shown again. */}
+         <div className="log-view" hidden={tab !== 'log'}>
+           <ShotMap
+-            shots={shots}
++            shots={mapShots}
+             player={shooter}
+             onPlayerChange={setShooterChoice}
+             loadError={loadError}
+diff --git a/frontend/src/ShooterSelect.tsx b/frontend/src/ShooterSelect.tsx
+index a8c10c2..7d9aba3 100644
+--- a/frontend/src/ShooterSelect.tsx
++++ b/frontend/src/ShooterSelect.tsx
+@@ -1,7 +1,7 @@
+ import { useMemo } from 'react'
+ import Picker from './Picker'
+ import type { PickerOption } from './Picker'
+-import { listShooters } from './shooter'
++import { listShooters, shooterCounts, shooterKey } from './shooter'
+ import { initials } from './court/players'
+ 
+ interface Props {
+@@ -19,8 +19,7 @@ const shotsLabel = (n: number) => `${n} ${n === 1 ? 'shot' : 'shots'}`
+ /** Whose shots the map, the vs NBA tab and the Players tab use: one choice, in the top bar where the player's name is. */
+ export default function ShooterSelect({ shots, value, onChange, compact = false }: Props) {
+   const options = useMemo<PickerOption[]>(() => {
+-    const counts = new Map<string, number>()
+-    for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
++    const counts = shooterCounts(shots)
+     return [
+       {
+         id: '',
+@@ -36,7 +35,7 @@ export default function ShooterSelect({ shots, value, onChange, compact = false
+       ...listShooters(shots).map((name) => ({
+         id: name,
+         name,
+-        sub: shotsLabel(counts.get(name) ?? 0),
++        sub: shotsLabel(counts.get(shooterKey(name)) ?? 0),
+         thumb: (
+           <span className="pp-thumb pp-me" aria-hidden="true">
+             {initials(name)}
+diff --git a/frontend/src/shooter.test.ts b/frontend/src/shooter.test.ts
+index bf27b68..f7b8482 100644
+--- a/frontend/src/shooter.test.ts
++++ b/frontend/src/shooter.test.ts
+@@ -8,6 +8,14 @@ describe('listShooters', () => {
+     expect(listShooters(shots('Mia', 'Ben', 'Mia', 'Ana'))).toEqual(['Ana', 'Ben', 'Mia'])
+   })
+ 
++  it('lists names that differ only in case or surrounding spaces once, with the spelling that has the most shots', () => {
++    expect(listShooters(shots('yuly', 'YULY', 'YULY', ' Ben ', 'ben', 'Ana'))).toEqual(['Ana', 'Ben', 'YULY'])
++  })
++
++  it('gives a spelling tie to the first one alphabetically', () => {
++    expect(listShooters(shots('yuly', 'YULY'))).toEqual(['YULY'])
++  })
++
+   it('is empty without shots', () => {
+     expect(listShooters(null)).toEqual([])
+     expect(listShooters([])).toEqual([])
+@@ -23,6 +31,11 @@ describe('pickDefaultShooter', () => {
+     expect(pickDefaultShooter(shots('Mia', 'Ben', 'Ben', 'Mia'))).toBe('Ben')
+   })
+ 
++  it('adds the shots of all spellings together', () => {
++    // Ben has 3 shots over three spellings (a tie, so the first alphabetically is shown); Ana has 2
++    expect(pickDefaultShooter(shots('ben', 'Ben', ' BEN', 'Ana', 'Ana'))).toBe('BEN')
++  })
++
+   it('is empty when there are no shots', () => {
+     expect(pickDefaultShooter(null)).toBe('')
+     expect(pickDefaultShooter([])).toBe('')
+@@ -44,6 +57,10 @@ describe('resolveShooter', () => {
+     expect(resolveShooter('', shooters, 'Ben')).toBe('')
+   })
+ 
++  it('keeps a chosen player whose spelling differs only in case or spaces, as the listed spelling', () => {
++    expect(resolveShooter(' ANA ', shooters, 'Ben')).toBe('Ana')
++  })
++
+   it('falls back when the chosen player has no shots left', () => {
+     expect(resolveShooter('Cy', shooters, 'Ben')).toBe('Ben')
+   })
+diff --git a/frontend/src/shooter.ts b/frontend/src/shooter.ts
+index 8cd1cc5..188384b 100644
+--- a/frontend/src/shooter.ts
++++ b/frontend/src/shooter.ts
+@@ -4,18 +4,53 @@ interface HasPlayer {
+   player: string
+ }
+ 
+-/** Everyone who has at least one shot, sorted by name. */
++/** The identity of a player: letter case and spaces around the name are ignored, like the backend's player filter. */
++export function shooterKey(name: string): string {
++  return name.trim().toLowerCase()
++}
++
++export function sameShooter(a: string, b: string): boolean {
++  return shooterKey(a) === shooterKey(b)
++}
++
++/** How many shots each person has, by key (all spellings together). */
++export function shooterCounts(shots: HasPlayer[] | null): Map<string, number> {
++  const counts = new Map<string, number>()
++  for (const s of shots ?? []) counts.set(shooterKey(s.player), (counts.get(shooterKey(s.player)) ?? 0) + 1)
++  return counts
++}
++
++/** Everyone who has at least one shot, sorted by name. Spellings of one person are listed once, as the spelling with the most shots (a tie: the first alphabetically). */
+ export function listShooters(shots: HasPlayer[] | null): string[] {
+-  return [...new Set((shots ?? []).map((s) => s.player))].sort()
++  const spellings = new Map<string, Map<string, number>>()
++  for (const s of shots ?? []) {
++    const key = shooterKey(s.player)
++    const spelling = s.player.trim()
++    const byName = spellings.get(key) ?? new Map<string, number>()
++    byName.set(spelling, (byName.get(spelling) ?? 0) + 1)
++    spellings.set(key, byName)
++  }
++  const names: string[] = []
++  for (const byName of spellings.values()) {
++    let best = ''
++    let bestCount = 0
++    for (const [name, n] of [...byName].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
++      if (n > bestCount) {
++        best = name
++        bestCount = n
++      }
++    }
++    names.push(best)
++  }
++  return names.sort()
+ }
+ 
+ /** The player with the most shots; a tie goes to the first name alphabetically. '' when there are no shots. */
+ export function pickDefaultShooter(shots: HasPlayer[] | null): string {
+-  const counts = new Map<string, number>()
+-  for (const s of shots ?? []) counts.set(s.player, (counts.get(s.player) ?? 0) + 1)
++  const counts = shooterCounts(shots)
+   let best = ''
+   for (const name of listShooters(shots)) {
+-    if (best === '' || (counts.get(name) ?? 0) > (counts.get(best) ?? 0)) best = name
++    if (best === '' || (counts.get(shooterKey(name)) ?? 0) > (counts.get(shooterKey(best)) ?? 0)) best = name
+   }
+   return best
+ }
+@@ -26,6 +61,9 @@ export function pickDefaultShooter(shots: HasPlayer[] | null): string {
+  */
+ export function resolveShooter(choice: string | null, shooters: string[], fallback: string): string {
+   if (choice === '') return ''
+-  if (choice !== null && shooters.includes(choice)) return choice
++  if (choice !== null) {
++    const listed = shooters.find((name) => sameShooter(name, choice))
++    if (listed !== undefined) return listed
++  }
+   return fallback
+ }

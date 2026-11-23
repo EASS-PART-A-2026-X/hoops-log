@@ -1,0 +1,11 @@
+candidate 3843f16b08cff3b2dd416a72a114c5d89d6c1438
+PASS  frontend lint  (0.2 s)
+PASS  frontend types  (0.6 s)
+PASS  frontend tests  (4.6 s)
+PASS  frontend build  (2.0 s)
+PASS  backend tests  (13.6 s)
+PASS  ai-service tests  (10.6 s)
+PASS  new tests fail without the change  (0.6 s)
+      Tests failed on the original code, as they should: frontend/src/shooter.test.ts
+
+7 of 7 checks passed

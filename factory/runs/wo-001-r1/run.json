@@ -1,0 +1,50 @@
+{
+  "id": "wo-001-r1",
+  "work_order": {
+    "id": "WO-001",
+    "title": "Case-insensitive player picker",
+    "path": "factory/workorders/WO-001-case-insensitive-picker.md"
+  },
+  "factory_version": "221db43",
+  "status": "failed",
+  "pid": 1808161,
+  "mode": "live",
+  "started_at": 1795469294.9041662,
+  "budget_seconds": 2700,
+  "max_repairs": 2,
+  "checks": [
+    "frontend lint",
+    "frontend types",
+    "frontend tests",
+    "frontend build",
+    "backend tests",
+    "ai-service tests",
+    "new tests fail without the change"
+  ],
+  "models": {
+    "builder": "sonnet",
+    "reviewer": "haiku",
+    "commentator": "haiku"
+  },
+  "base": "ca5710993b3f32b99a2a23546a8ebf8dc758dc68",
+  "base_ref": "ex3",
+  "branch": "factory-run/wo-001-r1",
+  "worktree": "factory/work/wo-001-r1",
+  "candidates": [
+    "77b4d76d3129694f7f189e781dd414d54364b796",
+    "3843f16b08cff3b2dd416a72a114c5d89d6c1438",
+    "f29c1c6773ba11ba2afbbbb28f454fa47dbc36d4"
+  ],
+  "where": {
+    "run_folder": "factory/runs/wo-001-r1",
+    "work_order": "factory/workorders/WO-001-case-insensitive-picker.md",
+    "event_log": "factory/runs/wo-001-r1/events.jsonl",
+    "receipts": "factory/runs/wo-001-r1/receipts",
+    "live_page": "factory/runs/wo-001-r1/index.html",
+    "report": "factory/runs/wo-001-r1/report.html",
+    "builder_worktree": "factory/work/wo-001-r1"
+  },
+  "reason": "the reviewer still found a gap on f29c1c6 after the repairs",
+  "finished_at": 1795469534.7769651,
+  "final_candidate": "f29c1c6773ba11ba2afbbbb28f454fa47dbc36d4"
+}

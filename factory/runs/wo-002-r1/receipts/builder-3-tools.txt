@@ -1,0 +1,11 @@
+Read frontend/src/game/useCelebrations.ts
+Read frontend/src/shooter.ts
+Glob frontend/src/game/*
+Read frontend/src/game/celebrate.ts
+Read frontend/src/game/useCelebrations.test.ts
+Edit frontend/src/game/useCelebrations.ts
+Edit frontend/src/game/useCelebrations.ts
+Edit frontend/src/game/useCelebrations.ts
+Edit frontend/src/game/useCelebrations.ts
+Edit frontend/src/game/useCelebrations.test.ts
+Edit frontend/src/game/useCelebrations.test.ts

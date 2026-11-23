@@ -1,0 +1,20 @@
+Read frontend/src/shooter.ts
+Read frontend/src/shooter.test.ts
+Grep shooter|Shooter|KNOWN GAP
+Read frontend/src/ShooterSelect.tsx
+Read frontend/e2e/validation.e2e.ts
+Read frontend/src/App.tsx
+Edit frontend/src/shooter.ts
+Edit frontend/src/shooter.ts
+Edit frontend/src/ShooterSelect.tsx
+Edit frontend/src/ShooterSelect.tsx
+Edit frontend/src/ShooterSelect.tsx
+Edit frontend/src/App.tsx
+Edit frontend/src/App.tsx
+Edit frontend/src/App.tsx
+Edit frontend/src/App.tsx
+Edit frontend/src/shooter.test.ts
+Edit frontend/src/shooter.test.ts
+Edit frontend/src/shooter.test.ts
+Edit frontend/e2e/validation.e2e.ts
+Edit frontend/e2e/validation.e2e.ts

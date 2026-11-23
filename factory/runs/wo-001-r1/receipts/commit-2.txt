@@ -1,0 +1,4 @@
+candidate 3843f16b08cff3b2dd416a72a114c5d89d6c1438
+parent 77b4d76d3129694f7f189e781dd414d54364b796
+files changed: 1
+frontend/src/shooter.test.ts
