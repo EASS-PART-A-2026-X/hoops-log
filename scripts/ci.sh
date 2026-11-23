@@ -3,7 +3,7 @@
 #
 #   scripts/ci.sh            lint, format, tests, mutation score   (about 1 minute)
 #                            (backend and ai-service; mutation score is backend only)
-#   scripts/ci.sh --docker   ...plus the Docker persistence and kill test
+#   scripts/ci.sh --docker   ...plus the Docker persistence/kill test and the Compose stack test
 #   scripts/ci.sh --fast     lint, format and tests only           (a few seconds)
 #
 # The frontend runs when frontend/ exists: npm ci, lint, tests and build, or only lint with --fast.
@@ -34,6 +34,7 @@ if [ "$mode" != "--fast" ]; then
 fi
 if [ "$mode" = "--docker" ]; then
   step "docker persistence + kill test" python3 ../scripts/docker_check.py
+  step "docker compose stack test"      python3 ../scripts/compose_check.py
 fi
 
 if [ -f ../frontend/package.json ]; then
