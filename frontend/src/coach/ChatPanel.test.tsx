@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProposedShot } from '../api'
 import ChatPanel from './ChatPanel'
@@ -136,6 +139,43 @@ describe('while he is thinking', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(chat.cancel).toHaveBeenCalledTimes(1)
     expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows moving dots in a status, not a message bubble that could pass for something he said', () => {
+    panel(stubChat({ thinking: true }))
+    const status = screen.getByRole('status')
+    expect(status.querySelectorAll('.typing-dots i')).toHaveLength(3)
+    expect(status.querySelector('.chat-bubble')).toBeNull()
+    expect(status.textContent).toContain('Deni is thinking')
+  })
+
+  it('says nothing about speed at first, and "taking longer than usual" after ten seconds', () => {
+    vi.useFakeTimers()
+    try {
+      panel(stubChat({ thinking: true }))
+      expect(screen.queryByText(/Taking longer than usual/)).toBeNull()
+      act(() => void vi.advanceTimersByTime(9_900))
+      expect(screen.queryByText(/Taking longer than usual/)).toBeNull()
+      act(() => void vi.advanceTimersByTime(200))
+      expect(screen.getByText(/Taking longer than usual/)).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('starts the wait over for the next question, and shows no dots when nothing is running', () => {
+    vi.useFakeTimers()
+    try {
+      const view = panel(stubChat({ thinking: true }))
+      act(() => void vi.advanceTimersByTime(11_000))
+      expect(screen.getByText(/Taking longer than usual/)).toBeTruthy()
+      view.rerender(<ChatPanel chat={stubChat({ thinking: false })} aiAvailable player="Yuly" />)
+      expect(screen.queryByRole('status')).toBeNull()
+      view.rerender(<ChatPanel chat={stubChat({ thinking: true })} aiAvailable player="Yuly" />)
+      expect(screen.queryByText(/Taking longer than usual/)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows no Cancel when nothing is running', () => {
@@ -311,5 +351,16 @@ describe('screen readers', () => {
   it('the log is not live: the caption announces each reply, so a reader hears it once', () => {
     panel(stubChat())
     expect(screen.getByRole('log', { name: 'Conversation with Deni' }).getAttribute('aria-live')).toBe('off')
+  })
+})
+
+describe('the stylesheet', () => {
+  it('stops his messages from taking the avatar\'s 100% x 100% box (both use the class "deni")', () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'index.css'), 'utf8')
+    // The avatar rule is the reason: if it is ever changed, this test can go. Until then the message class must undo it.
+    expect(css).toMatch(/\.deni \{[^}]*height: 100%/)
+    const message = /\.chat-msg\.deni \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(message).toMatch(/height: auto/)
+    expect(message).toMatch(/width: auto/)
   })
 })

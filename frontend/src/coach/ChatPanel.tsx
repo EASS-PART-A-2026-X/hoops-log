@@ -62,9 +62,16 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
           <Message key={m.id} message={m} player={savingFor} onSave={save} onDiscard={discard} onSaveAll={saveAll} />
         ))}
         {thinking && (
-          <li className="chat-msg deni thinking" aria-live="polite">
-            <span className="chat-bubble">Deni is thinking… this can take up to a minute.</span>
-            <button type="button" className="btn" onClick={cancel}>
+          // Not a message: three moving dots, so it cannot be mistaken for something Deni said. The words are for screen readers.
+          <li className="chat-msg deni typing" role="status">
+            <span className="typing-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="sr-only">Deni is thinking…</span>
+            <SlowHint />
+            <button type="button" className="typing-cancel" onClick={cancel}>
               Cancel
             </button>
           </li>
@@ -105,6 +112,17 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
       </p>
     </div>
   )
+}
+
+/** Shown only while he is thinking (the component is mounted just then), and only once it has taken a while. */
+const SLOW_AFTER_MS = 10_000
+function SlowHint() {
+  const [late, setLate] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setLate(true), SLOW_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [])
+  return late ? <span className="typing-hint">Taking longer than usual…</span> : null
 }
 
 interface MessageProps {

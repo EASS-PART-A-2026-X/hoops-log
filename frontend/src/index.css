@@ -4405,6 +4405,9 @@ h3 {
 .chat-msg.deni {
   align-self: flex-start;
   align-items: flex-start;
+  /* "deni" is also the avatar's class (.deni is 100% x 100%): without this reset a message is stretched to a tall box. */
+  width: auto;
+  height: auto;
 }
 
 .chat-bubble {
@@ -4430,16 +4433,87 @@ h3 {
   color: #fff;
 }
 
+/* An error is a notice from the app, not something Deni said: a red bar and a tinted box, square-ish, in normal text. */
 .chat-msg.failed .chat-bubble {
-  border-color: var(--red);
-  background: transparent;
-  color: var(--red);
+  border: 1px solid rgba(224, 58, 62, 0.45);
+  border-left: 4px solid var(--red);
+  border-radius: 10px;
+  background: rgba(224, 58, 62, 0.12);
+  color: var(--text);
 }
 
-.chat-msg.thinking {
+/* While he is thinking: three moving dots (no words in a bubble), a quiet Cancel, and a hint if it is slow. */
+.chat-msg.typing {
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
+  gap: 10px;
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 13px 15px;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  border-bottom-left-radius: 4px;
+  background: var(--bg);
+}
+
+.typing-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--orange-soft);
+  opacity: 0.35;
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+
+.typing-dots i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.typing-dots i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dots i {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+.typing-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.typing-cancel {
+  min-height: 32px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .chat-cards {
