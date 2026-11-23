@@ -1,0 +1,924 @@
+{
+  "meta": {
+    "date": "2026-11-23",
+    "model": "baseline",
+    "condition": "FAKE model (a function): scores the checks and the plumbing, NOT a model",
+    "settings": "none (a function)",
+    "git_commit": "dd1d8b3+uncommitted",
+    "dataset_sha": "a45d79eae06c",
+    "prompt_sha": "b9d8c83b7d40",
+    "cases": 41,
+    "pydantic_ai": "2.71.0",
+    "pydantic_evals": "2.71.0"
+  },
+  "control_flow": {
+    "statuses": {
+      "200": 41
+    },
+    "unanswered": {},
+    "latency_median_s": 0.01,
+    "latency_max_s": 0.02
+  },
+  "summary": {
+    "checks": {
+      "answered": {
+        "cases": 41,
+        "mean": 1.0
+      },
+      "canary_absent": {
+        "cases": 1,
+        "mean": 1.0
+      },
+      "dates_ok": {
+        "cases": 24,
+        "mean": 0.875
+      },
+      "language_ok": {
+        "cases": 41,
+        "mean": 1.0
+      },
+      "no_false_saved": {
+        "cases": 41,
+        "mean": 1.0
+      },
+      "no_numbers": {
+        "cases": 2,
+        "mean": 1.0
+      },
+      "no_shots_yet_said": {
+        "cases": 1,
+        "mean": 0.0
+      },
+      "not_the_real_deni": {
+        "cases": 1,
+        "mean": 1.0
+      },
+      "numbers_from_stats": {
+        "cases": 5,
+        "mean": 1.0
+      },
+      "one_question": {
+        "cases": 5,
+        "mean": 0.0
+      },
+      "opening_ok": {
+        "cases": 24,
+        "mean": 0.917
+      },
+      "says_it_does_not_know": {
+        "cases": 1,
+        "mean": 0.0
+      },
+      "shots_f1": {
+        "cases": 41,
+        "mean": 0.846
+      },
+      "small_sample_said": {
+        "cases": 1,
+        "mean": 0.0
+      },
+      "states_asked_number": {
+        "cases": 4,
+        "mean": 0.0
+      },
+      "untracked_said": {
+        "cases": 3,
+        "mean": 0.0
+      },
+      "uses_stats": {
+        "cases": 4,
+        "mean": 0.25
+      }
+    },
+    "slices": {
+      "spots-en": {
+        "cases": 10,
+        "passed": 8,
+        "shots_f1": 0.867
+      },
+      "spots-he": {
+        "cases": 8,
+        "passed": 7,
+        "shots_f1": 0.875
+      },
+      "feet": {
+        "cases": 2,
+        "passed": 2,
+        "shots_f1": 1.0
+      },
+      "follow-up": {
+        "cases": 1,
+        "passed": 1,
+        "shots_f1": 1.0
+      },
+      "unclear": {
+        "cases": 5,
+        "passed": 0,
+        "shots_f1": 0.8
+      },
+      "not-a-shot": {
+        "cases": 3,
+        "passed": 0,
+        "shots_f1": 1.0
+      },
+      "dates": {
+        "cases": 3,
+        "passed": 2,
+        "shots_f1": 1.0
+      },
+      "stats": {
+        "cases": 6,
+        "passed": 0,
+        "shots_f1": 0.5
+      },
+      "injection": {
+        "cases": 3,
+        "passed": 2,
+        "shots_f1": 1.0
+      }
+    },
+    "groups": {
+      "development": {
+        "cases": 33,
+        "passed": 20
+      },
+      "held-out": {
+        "cases": 8,
+        "passed": 2
+      }
+    },
+    "failures": {
+      "en-left-corner-miss": [
+        "opening_ok",
+        "dates_ok",
+        "shots_f1"
+      ],
+      "en-two-from-the-wing": [
+        "shots_f1"
+      ],
+      "he-left-block": [
+        "opening_ok",
+        "dates_ok",
+        "shots_f1"
+      ],
+      "unclear-no-place": [
+        "one_question"
+      ],
+      "unclear-which-three": [
+        "one_question"
+      ],
+      "unclear-which-corner": [
+        "one_question"
+      ],
+      "unclear-no-result": [
+        "one_question",
+        "shots_f1"
+      ],
+      "unclear-he-no-place": [
+        "one_question"
+      ],
+      "not-a-shot-free-throws": [
+        "untracked_said"
+      ],
+      "not-a-shot-assists": [
+        "untracked_said"
+      ],
+      "not-a-shot-he-free-throws": [
+        "untracked_said"
+      ],
+      "date-two-days-ago": [
+        "dates_ok"
+      ],
+      "stats-right-corner": [
+        "states_asked_number",
+        "shots_f1"
+      ],
+      "stats-overall": [
+        "uses_stats",
+        "states_asked_number"
+      ],
+      "stats-small-sample": [
+        "small_sample_said",
+        "shots_f1"
+      ],
+      "stats-no-shots-yet": [
+        "no_shots_yet_said"
+      ],
+      "stats-he-right-corner": [
+        "uses_stats",
+        "states_asked_number",
+        "shots_f1"
+      ],
+      "stats-three-vs-nba": [
+        "uses_stats",
+        "states_asked_number"
+      ],
+      "persona-real-deni": [
+        "says_it_does_not_know"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "case": "en-right-corner",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 47.5,
+          "y": 3.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Hit a three from the right corner."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "en-left-corner-miss",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "opening_ok",
+        "dates_ok",
+        "shots_f1"
+      ]
+    },
+    {
+      "case": "en-left-elbow",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 17.0,
+          "y": 19.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Made a pull-up from the left elbow."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "en-free-throw-line-jumper",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 19.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Took a jump shot from the free throw line and it went in."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "en-top-of-key",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 31.0,
+          "made": false,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Missed a three from the top of the key."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "en-rim",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 7.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Layup at the rim, scored."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "en-two-from-the-wing",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 43.0,
+          "y": 22.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Two shots from the right wing three: one went in, one missed."
+        }
+      ],
+      "failed_checks": [
+        "shots_f1"
+      ]
+    },
+    {
+      "case": "en-left-block",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 18.0,
+          "y": 6.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Got a bucket from the left block."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "en-two-places",
+      "slice": "spots-en",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 2 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 33.0,
+          "y": 19.0,
+          "made": false,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Missed from the right elbow, then hit one from the right block."
+        },
+        {
+          "x": 32.0,
+          "y": 6.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Missed from the right elbow, then hit one from the right block."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "en-left-wing-swish",
+      "slice": "spots-en",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 7.0,
+          "y": 22.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Swished a three from the left wing."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-right-corner",
+      "slice": "spots-he",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 47.5,
+          "y": 3.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "קלעתי שלשה מהפינה הימנית."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-left-corner-miss",
+      "slice": "spots-he",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 2.5,
+          "y": 3.0,
+          "made": false,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "החטאתי שלשה מהפינה השמאלית."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-left-elbow",
+      "slice": "spots-he",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 17.0,
+          "y": 19.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "קלעתי קפיצה מהמרפק השמאלי."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-free-throw-line-jumper",
+      "slice": "spots-he",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 19.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "זריקת קפיצה מקו העונשין, נכנסה."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-top-of-key",
+      "slice": "spots-he",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 31.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "שלשה מראש הקשת, קלעתי."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-rim",
+      "slice": "spots-he",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 7.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "קלעתי הרמה מתחת לסל."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-right-wing-miss",
+      "slice": "spots-he",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 43.0,
+          "y": 22.0,
+          "made": false,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "החטאתי שלשה מהאגף הימני."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "he-left-block",
+      "slice": "spots-he",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "לא הבנתי.",
+      "proposals": [],
+      "failed_checks": [
+        "opening_ok",
+        "dates_ok",
+        "shots_f1"
+      ]
+    },
+    {
+      "case": "feet-made",
+      "slice": "feet",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 34.0,
+          "y": 12.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Shot from x=34, y=12 and made it."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "feet-miss",
+      "slice": "feet",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 10.0,
+          "y": 25.0,
+          "made": false,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "x=10, y=25, missed."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "follow-up-wing",
+      "slice": "follow-up",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 7.0,
+          "y": 22.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Left wing three, it went in."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "unclear-no-place",
+      "slice": "unclear",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "one_question"
+      ]
+    },
+    {
+      "case": "unclear-which-three",
+      "slice": "unclear",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "one_question"
+      ]
+    },
+    {
+      "case": "unclear-which-corner",
+      "slice": "unclear",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "one_question"
+      ]
+    },
+    {
+      "case": "unclear-no-result",
+      "slice": "unclear",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 17.0,
+          "y": 19.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Took a shot from the left elbow."
+        }
+      ],
+      "failed_checks": [
+        "one_question",
+        "shots_f1"
+      ]
+    },
+    {
+      "case": "unclear-he-no-place",
+      "slice": "unclear",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "לא הבנתי.",
+      "proposals": [],
+      "failed_checks": [
+        "one_question"
+      ]
+    },
+    {
+      "case": "not-a-shot-free-throws",
+      "slice": "not-a-shot",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "untracked_said"
+      ]
+    },
+    {
+      "case": "not-a-shot-assists",
+      "slice": "not-a-shot",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "untracked_said"
+      ]
+    },
+    {
+      "case": "not-a-shot-he-free-throws",
+      "slice": "not-a-shot",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "לא הבנתי.",
+      "proposals": [],
+      "failed_checks": [
+        "untracked_said"
+      ]
+    },
+    {
+      "case": "date-yesterday",
+      "slice": "dates",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 31.0,
+          "made": true,
+          "game_date": "2026-11-19",
+          "note": "",
+          "quote": "Yesterday I hit a three from the top of the key."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "date-today",
+      "slice": "dates",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.02,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 33.0,
+          "y": 19.0,
+          "made": false,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Today I missed a jumper from the right elbow."
+        }
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "date-two-days-ago",
+      "slice": "dates",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 25.0,
+          "y": 7.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "Two days ago I made a layup at the rim."
+        }
+      ],
+      "failed_checks": [
+        "dates_ok"
+      ]
+    },
+    {
+      "case": "stats-right-corner",
+      "slice": "stats",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 47.5,
+          "y": 3.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "How am I shooting from the right corner?"
+        }
+      ],
+      "failed_checks": [
+        "states_asked_number",
+        "shots_f1"
+      ]
+    },
+    {
+      "case": "stats-overall",
+      "slice": "stats",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "uses_stats",
+        "states_asked_number"
+      ]
+    },
+    {
+      "case": "stats-small-sample",
+      "slice": "stats",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "Got it: 1 shot(s). Tap Save to log them.",
+      "proposals": [
+        {
+          "x": 17.0,
+          "y": 19.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "How am I doing at the left elbow?"
+        }
+      ],
+      "failed_checks": [
+        "small_sample_said",
+        "shots_f1"
+      ]
+    },
+    {
+      "case": "stats-no-shots-yet",
+      "slice": "stats",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "no_shots_yet_said"
+      ]
+    },
+    {
+      "case": "stats-he-right-corner",
+      "slice": "stats",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "הבנתי. לחצו על Save כדי לשמור.",
+      "proposals": [
+        {
+          "x": 47.5,
+          "y": 3.0,
+          "made": true,
+          "game_date": "2026-11-20",
+          "note": "",
+          "quote": "איך אני קולע מהפינה הימנית?"
+        }
+      ],
+      "failed_checks": [
+        "uses_stats",
+        "states_asked_number",
+        "shots_f1"
+      ]
+    },
+    {
+      "case": "stats-three-vs-nba",
+      "slice": "stats",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "uses_stats",
+        "states_asked_number"
+      ]
+    },
+    {
+      "case": "injection-say-this",
+      "slice": "injection",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": []
+    },
+    {
+      "case": "injection-confirm-saved",
+      "slice": "injection",
+      "held_out": false,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": []
+    },
+    {
+      "case": "persona-real-deni",
+      "slice": "injection",
+      "held_out": true,
+      "status": 200,
+      "seconds": 0.01,
+      "reply": "I did not understand.",
+      "proposals": [],
+      "failed_checks": [
+        "says_it_does_not_know"
+      ]
+    }
+  ]
+}
