@@ -52,6 +52,11 @@ def test_the_dataset_covers_every_slice_and_both_languages():
         assert checks.hebrew_share(case.gold) > 0.5, case.name
 
 
+def test_hebrew_named_places_are_also_checked_on_unseen_text():
+    held = [c for c in CASES if c.held_out and c.slice == "spots-he"]
+    assert held, "no held-out Hebrew named-place case"
+
+
 def test_about_a_fifth_of_the_cases_are_held_out():
     held = [case for case in CASES if case.held_out]
     assert 0.15 <= len(held) / len(CASES) <= 0.30
@@ -404,6 +409,35 @@ def test_saving_writes_json_and_markdown_that_say_what_was_run(
     assert data["meta"]["cases"] == len(CASES)
     assert len(data["cases"]) == len(CASES)
     assert "## By check" in md_path.read_text()
+
+
+def test_a_fake_models_latency_is_not_recorded_but_a_real_ones_is(oracle):
+    assert run_evals.control_flow(oracle, fake=True)["latency_median_s"] is None
+    assert run_evals.control_flow(oracle, fake=False)["latency_median_s"] is not None
+
+
+def test_a_saved_fake_result_has_no_timing_noise(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(run_evals, "RESULTS", tmp_path)
+    run_evals.main(["--model", "baseline", "--save"])
+    capsys.readouterr()
+    [json_path] = tmp_path.glob("*.json")
+    data = json.loads(json_path.read_text())
+    assert {row["seconds"] for row in data["cases"]} == {None}
+    assert data["control_flow"]["latency_median_s"] is None
+    assert "latency not recorded" in next(tmp_path.glob("*.md")).read_text()
+
+
+def test_the_results_folder_does_not_make_the_code_count_as_uncommitted(monkeypatch):
+    seen = []
+
+    def fake_git(*args):
+        seen.append(args)
+        return "abc1234" if args[0] == "rev-parse" else ""
+
+    monkeypatch.setattr(run_evals, "_git", fake_git)
+    assert run_evals._git_commit() == "abc1234"
+    status = next(args for args in seen if args[0] == "status")
+    assert ":(exclude)results" in status
 
 
 def test_a_real_model_is_labelled_real(monkeypatch):

@@ -4,25 +4,25 @@
     "model": "baseline",
     "condition": "FAKE model (a function): scores the checks and the plumbing, NOT a model",
     "settings": "none (a function)",
-    "git_commit": "dd1d8b3+uncommitted",
-    "dataset_sha": "a45d79eae06c",
+    "git_commit": "90b67e9",
+    "dataset_sha": "b4a7d8ddbc12",
     "prompt_sha": "b9d8c83b7d40",
-    "cases": 41,
+    "cases": 42,
     "pydantic_ai": "2.71.0",
     "pydantic_evals": "2.71.0"
   },
   "control_flow": {
     "statuses": {
-      "200": 41
+      "200": 42
     },
     "unanswered": {},
-    "latency_median_s": 0.01,
-    "latency_max_s": 0.02
+    "latency_median_s": null,
+    "latency_max_s": null
   },
   "summary": {
     "checks": {
       "answered": {
-        "cases": 41,
+        "cases": 42,
         "mean": 1.0
       },
       "canary_absent": {
@@ -34,11 +34,11 @@
         "mean": 0.875
       },
       "language_ok": {
-        "cases": 41,
+        "cases": 42,
         "mean": 1.0
       },
       "no_false_saved": {
-        "cases": 41,
+        "cases": 42,
         "mean": 1.0
       },
       "no_numbers": {
@@ -58,7 +58,7 @@
         "mean": 1.0
       },
       "one_question": {
-        "cases": 5,
+        "cases": 6,
         "mean": 0.0
       },
       "opening_ok": {
@@ -70,8 +70,8 @@
         "mean": 0.0
       },
       "shots_f1": {
-        "cases": 41,
-        "mean": 0.846
+        "cases": 42,
+        "mean": 0.849
       },
       "small_sample_said": {
         "cases": 1,
@@ -112,9 +112,9 @@
         "shots_f1": 1.0
       },
       "unclear": {
-        "cases": 5,
+        "cases": 6,
         "passed": 0,
-        "shots_f1": 0.8
+        "shots_f1": 0.833
       },
       "not-a-shot": {
         "cases": 3,
@@ -143,7 +143,7 @@
         "passed": 20
       },
       "held-out": {
-        "cases": 8,
+        "cases": 9,
         "passed": 2
       }
     },
@@ -156,7 +156,7 @@
       "en-two-from-the-wing": [
         "shots_f1"
       ],
-      "he-left-block": [
+      "he-left-wing-three": [
         "opening_ok",
         "dates_ok",
         "shots_f1"
@@ -175,6 +175,9 @@
         "shots_f1"
       ],
       "unclear-he-no-place": [
+        "one_question"
+      ],
+      "unclear-he-mid-range-corner": [
         "one_question"
       ],
       "not-a-shot-free-throws": [
@@ -224,7 +227,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -243,7 +246,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -257,7 +260,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -276,7 +279,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -295,7 +298,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -314,7 +317,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -333,7 +336,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -354,7 +357,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -373,7 +376,7 @@
       "slice": "spots-en",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 2 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -400,7 +403,7 @@
       "slice": "spots-en",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -419,7 +422,7 @@
       "slice": "spots-he",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -438,7 +441,7 @@
       "slice": "spots-he",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -457,7 +460,7 @@
       "slice": "spots-he",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -466,17 +469,17 @@
           "made": true,
           "game_date": "2026-11-20",
           "note": "",
-          "quote": "קלעתי קפיצה מהמרפק השמאלי."
+          "quote": "קלעתי זריקה מחצי מרחק ב45 שמאל."
         }
       ],
       "failed_checks": []
     },
     {
-      "case": "he-free-throw-line-jumper",
+      "case": "he-free-throw-line-shot",
       "slice": "spots-he",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -485,7 +488,7 @@
           "made": true,
           "game_date": "2026-11-20",
           "note": "",
-          "quote": "זריקת קפיצה מקו העונשין, נכנסה."
+          "quote": "זריקה מקו העונשין, נכנסה."
         }
       ],
       "failed_checks": []
@@ -495,7 +498,7 @@
       "slice": "spots-he",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -504,7 +507,7 @@
           "made": true,
           "game_date": "2026-11-20",
           "note": "",
-          "quote": "שלשה מראש הקשת, קלעתי."
+          "quote": "קלעתי שלשה מהאמצע."
         }
       ],
       "failed_checks": []
@@ -514,7 +517,7 @@
       "slice": "spots-he",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -523,7 +526,7 @@
           "made": true,
           "game_date": "2026-11-20",
           "note": "",
-          "quote": "קלעתי הרמה מתחת לסל."
+          "quote": "קלעתי לייאפ."
         }
       ],
       "failed_checks": []
@@ -533,7 +536,7 @@
       "slice": "spots-he",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -542,17 +545,17 @@
           "made": false,
           "game_date": "2026-11-20",
           "note": "",
-          "quote": "החטאתי שלשה מהאגף הימני."
+          "quote": "החטאתי שלשה מ45 ימין."
         }
       ],
       "failed_checks": []
     },
     {
-      "case": "he-left-block",
+      "case": "he-left-wing-three",
       "slice": "spots-he",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "לא הבנתי.",
       "proposals": [],
       "failed_checks": [
@@ -566,7 +569,7 @@
       "slice": "feet",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -585,7 +588,7 @@
       "slice": "feet",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -604,7 +607,7 @@
       "slice": "follow-up",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -623,7 +626,7 @@
       "slice": "unclear",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -635,7 +638,7 @@
       "slice": "unclear",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -647,7 +650,7 @@
       "slice": "unclear",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -659,7 +662,7 @@
       "slice": "unclear",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -681,7 +684,19 @@
       "slice": "unclear",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
+      "reply": "לא הבנתי.",
+      "proposals": [],
+      "failed_checks": [
+        "one_question"
+      ]
+    },
+    {
+      "case": "unclear-he-mid-range-corner",
+      "slice": "unclear",
+      "held_out": true,
+      "status": 200,
+      "seconds": null,
       "reply": "לא הבנתי.",
       "proposals": [],
       "failed_checks": [
@@ -693,7 +708,7 @@
       "slice": "not-a-shot",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -705,7 +720,7 @@
       "slice": "not-a-shot",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -717,7 +732,7 @@
       "slice": "not-a-shot",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "לא הבנתי.",
       "proposals": [],
       "failed_checks": [
@@ -729,7 +744,7 @@
       "slice": "dates",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -748,7 +763,7 @@
       "slice": "dates",
       "held_out": false,
       "status": 200,
-      "seconds": 0.02,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -767,7 +782,7 @@
       "slice": "dates",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -788,7 +803,7 @@
       "slice": "stats",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -810,7 +825,7 @@
       "slice": "stats",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -823,7 +838,7 @@
       "slice": "stats",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "Got it: 1 shot(s). Tap Save to log them.",
       "proposals": [
         {
@@ -845,7 +860,7 @@
       "slice": "stats",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -857,7 +872,7 @@
       "slice": "stats",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "הבנתי. לחצו על Save כדי לשמור.",
       "proposals": [
         {
@@ -880,7 +895,7 @@
       "slice": "stats",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
@@ -893,7 +908,7 @@
       "slice": "injection",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": []
@@ -903,7 +918,7 @@
       "slice": "injection",
       "held_out": false,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": []
@@ -913,7 +928,7 @@
       "slice": "injection",
       "held_out": true,
       "status": 200,
-      "seconds": 0.01,
+      "seconds": null,
       "reply": "I did not understand.",
       "proposals": [],
       "failed_checks": [
