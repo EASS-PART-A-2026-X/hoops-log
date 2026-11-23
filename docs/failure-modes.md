@@ -23,23 +23,25 @@ Each layer waits longer than the one inside it, so the inner layer speaks first 
 happened:
 
 `30 s` one call to the model < `60 s` the whole request in the AI service (answers 504) < `70 s` the
-backend waits < `90 s` the browser waits.
+backend's read timeout < `90 s` the browser waits. The backend's 70 s is a timeout *per read*, not a
+hard cap on the whole call: a server that trickled bytes could outlast it. Our own AI service
+never does, because its 60 s deadline covers the whole request.
 
 ## The failures
 
 | # | What goes wrong | Noticed by | Answer to the player | Proved by |
 |---|---|---|---|---|
-| 1 | AI service stopped or unreachable | backend (connect error or timeout) | **503** "not available right now. You can still add shots by hand." | backend `test_network_trouble_becomes_a_plain_sentence`; **real socket** `test_nothing_listening_is_a_503`; **real stack** `compose_check.py` "AI service stopped" |
+| 1 | AI service stopped or unreachable | backend (connect error or connect timeout) | **503** "not available right now. You can still add shots by hand." | backend `test_network_trouble_becomes_a_plain_sentence`; **real socket** `test_nothing_listening_is_a_503`; **real stack** `compose_check.py` "AI service stopped" |
 | 2 | AI service accepts the call, then never answers | backend read timeout | **504** "took too long" | **real socket** `test_a_server_that_never_answers_is_a_quick_504`; ai-service `test_a_request_that_takes_too_long_is_a_504_and_the_model_is_cut_off` |
 | 3 | While the AI service hangs, nothing else stalls | one event loop in the backend | shots still save and list in under a second | **real server** `test_while_the_ai_service_hangs_plain_shot_logging_still_answers` |
 | 4 | AI service hangs up, or sends something that is not HTTP | backend | **502** "could not give a usable answer" | **real socket** `test_a_server_that_hangs_up_is_a_502`, `test_a_server_that_does_not_speak_http_is_a_502` |
-| 5 | The model provider says "too many requests" or "quota used" | ai-service | **429** "busy, try in a minute" (no hidden retry) | ai-service `test_rate_limit_and_quota_are_429`, `test_a_rate_limit_fails_fast_instead_of_being_retried_quietly` |
+| 5 | The model provider says "too many requests" or "quota used" | ai-service | **429** "busy, try in a minute" (no hidden retry) | ai-service `test_rate_limit_and_quota_are_429` (the mapping); `test_a_rate_limit_fails_fast_instead_of_being_retried_quietly` checks the `max_retries=0` setting, it does not call a real provider |
 | 6 | Too many chat requests (10 a minute, everybody together) | backend | **429** "wait a minute"; the AI service is not called | backend `test_the_eleventh_request_in_a_minute_is_refused_without_calling_the_ai` |
-| 7 | AI service runs, but the model is set up wrong (no key, unknown provider) | ai-service | **503** "not available"; the setting is never shown | ai-service `test_a_missing_provider_key_is_503`, `test_an_unknown_provider_is_503_too`; **real stack** `compose_check.py` "broken model setting" |
+| 7 | AI service runs, but the model is set up wrong (no key, unknown provider) | ai-service | **503** "not available". The chat shows that sentence; the manual form does **not** appear by itself, because `/health` only says a model name is set, so `/chat/status` still reports available (see Known limits) | ai-service `test_a_missing_provider_key_is_503`, `test_an_unknown_provider_is_503_too`; **real stack** `compose_check.py` "broken model setting" (the service is up, yet `/chat` is 503) |
 | 8 | No model configured at all | ai-service | **503**; `/chat/status` says not available, so the manual form shows | ai-service `test_chat_without_a_configured_model_is_503` |
 | 9 | The model's answer breaks the contract | ai-service validation | repaired up to 2 times, then **502** | ai-service `test_an_answer_that_breaks_the_rules_is_sent_back_and_repaired`, `test_an_answer_that_never_fits_is_502` |
 | 10 | The model loops (tools, tokens) | usage limit: 6 model calls, 20,000 tokens | **502** | ai-service `test_every_request_is_run_with_the_usage_limit`, `test_a_model_that_keeps_calling_a_tool_that_does_not_exist_is_cut_off` |
-| 11 | A model call alone is too slow | 30 s per call | **504** | ai-service `test_one_model_call_is_cut_before_the_whole_request_is` |
+| 11 | A model call alone is too slow | 30 s per call (a provider client setting) | **504** | ai-service `test_a_model_timeout_is_504` (the mapping); `test_one_model_call_is_cut_before_the_whole_request_is` only checks that 30 s < 60 s. A real 30 s cut is not exercised: tests never call a provider |
 | 12 | The AI service's answer breaks the backend's own rules, or is huge (over 200 KB) | backend re-validates everything | **502**, nothing stored | backend `test_an_answer_that_breaks_the_backends_rules_is_refused`, the size-cap tests |
 | 13 | Wrong or missing service token | ai-service answers 401 | **502**, no word about tokens | backend `test_the_ai_services_errors_are_translated_and_never_leaked`; **real socket** `test_a_wrong_service_token_is_a_502_that_says_nothing_about_it` |
 | 14 | A bug nobody planned for in the AI service | ai-service catch-all | plain **500**, which the backend turns into **502** | ai-service `test_an_unplanned_error_is_a_plain_500_that_leaks_nothing` |
@@ -50,12 +52,17 @@ Every failure body is checked for leaks: no key, stack trace or provider message
 
 ## Recovery
 
-- Stop the AI service, then start it again: the backend notices within a few seconds
+- Stop the AI service, then start it again: the backend notices within 15 s
   (`/chat/status` is remembered for 15 s at most). `compose_check.py` does exactly this.
 - Break the model setting, then fix it: `compose_check.py` does this too.
 - Nothing needs a restart of the backend or a clean-up of data: the AI service has no state.
 
 ## Known limits
+
+- **A broken model setting does not switch the app to the manual form.** `/health` reports the
+  configured model name, not whether it works, so `/chat/status` says available and the
+  player meets the 503 sentence in the chat instead. Telling the two apart would need a real
+  call to the provider on every status check (or a cached trial call), which spends quota.
 
 - **Giving up does not cancel the work.** If the browser's Cancel (or a closed tab) ends the
   request, the backend and the AI service may still finish the call and spend one of the 10
