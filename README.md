@@ -138,6 +138,9 @@ uv run ruff format --check .
 
 `tests/test_shots.py` starts with a testing-strategy comment listing every input partition; each test fixes one of them. `tests/test_court.py` checks the zone and 2PT/3PT rules. `tests/test_seed.py` checks the demo data is added once, and `tests/test_restart.py` checks a shot is still there after the server restarts on the same database file. The other tests use a fresh in-memory database each.
 
+## How the AI path fails
+Shots keep working when the AI does not. [docs/failure-modes.md](docs/failure-modes.md) lists each way the AI path can break (service stopped, silent, hanging up, rate-limited, mis-set, bad answers, wrong token), which layer notices, which single layer retries (only the model's own output repair, up to 2 times), the status code and sentence the player gets, and the test that proves it. Five of those tests use a real misbehaving server on a real socket (and one runs a real backend while the AI service hangs), and `scripts/compose_check.py` stops the AI service and breaks its model setting in the real stack.
+
 ## How I know the tests are good
 Passing tests only show that the cases I thought of work. Three tools, all in this repo, check the rest. Everything below runs from a fresh clone with only `uv` (and Docker for the last step).
 

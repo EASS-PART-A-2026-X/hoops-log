@@ -9,7 +9,9 @@ Checks, in order:
   4. a shot survives `docker compose down` + `up` (the named volume)
   5. with the AI service stopped, plain shot CRUD still works and /chat says 503
   6. the AI service comes back and the backend notices
-  7. the built frontend points at this backend, and the backend allows the app's
+  7. the AI service running with a broken model setting (it answers /health but cannot
+     do the job): /chat is a plain 503, shots still work, and fixing it brings Deni back
+  8. the built frontend points at this backend, and the backend allows the app's
      origin (CORS)
 
 It also checks the backend does not `depends_on` the AI service: that would stop
@@ -36,9 +38,16 @@ PORTS = {"BACKEND_PORT": "18100", "FRONTEND_PORT": "18173"}
 BACKEND = f"http://127.0.0.1:{PORTS['BACKEND_PORT']}"
 FRONTEND = f"http://127.0.0.1:{PORTS['FRONTEND_PORT']}"
 APP_ORIGIN = "http://localhost:5173"  # the only origin the backend's CORS list allows
-ENV = {**os.environ, **PORTS, "AI_MODEL": "test", "COMPOSE_PROJECT_NAME": PROJECT}
+# The backend lets 10 chat requests through a minute; polling must not hit that limit.
+ENV = {
+    **os.environ,
+    **PORTS,
+    "AI_MODEL": "test",
+    "AI_RATE_LIMIT": "200",
+    "COMPOSE_PROJECT_NAME": PROJECT,
+}
 # Lets a Windows docker.exe called from WSL see the variables too (ignored elsewhere).
-ENV["WSLENV"] = ":".join([*PORTS, "AI_MODEL", "COMPOSE_PROJECT_NAME"])
+ENV["WSLENV"] = ":".join([*PORTS, "AI_MODEL", "AI_RATE_LIMIT", "COMPOSE_PROJECT_NAME"])
 
 
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -185,6 +194,48 @@ def main() -> int:
         compose("start", "ai-service")
         results.append(
             ("AI service back: backend notices", wait_for(chat_available), "")
+        )
+
+        # A running service with a broken model setting is a different failure from a
+        # stopped one: it answers /health, then cannot do the job.
+        ENV["AI_MODEL"] = "nosuchprovider:model"
+        recreated = compose("up", "-d", "--wait", "ai-service", check=False)
+        chat = request("POST", f"{BACKEND}/chat", message)
+        got = request("GET", f"{BACKEND}/shots")[0]
+        ok = recreated.returncode == 0 and (chat[0], got) == (503, 200)
+        detail = f"chat {chat[0]}, GET /shots {got}"
+        results.append(("broken model setting: /chat is 503, shots work", ok, detail))
+        # Ask the AI service itself (the backend remembers its status for 15 s). It must
+        # be up with the broken setting, or the 503 above could come from a service that
+        # is simply not there (the stopped-service case, tested above).
+        health = compose(
+            "exec",
+            "-T",
+            "ai-service",
+            "python",
+            "-c",
+            "import urllib.request as u;"
+            "r = u.urlopen('http://localhost:8001/health', timeout=3);"
+            "print(r.read().decode())",
+            check=False,
+        ).stdout
+        results.append(
+            (
+                "broken model: the service is up, it just cannot answer",
+                "nosuchprovider:model" in health,
+                health.strip()[:80],
+            )
+        )
+
+        ENV["AI_MODEL"] = "test"
+        fixed = compose("up", "-d", "--wait", "ai-service", check=False)
+        again = wait_for(lambda: request("POST", f"{BACKEND}/chat", message)[0] == 200)
+        results.append(
+            (
+                "model setting fixed: Deni answers again",
+                fixed.returncode == 0 and again,
+                "",
+            )
         )
     finally:
         compose("down", "-v", check=False)
