@@ -9,7 +9,9 @@ Checks, in order:
   4. a shot survives `docker compose down` + `up` (the named volume)
   5. with the AI service stopped, plain shot CRUD still works and /chat says 503
   6. the AI service comes back and the backend notices
-  7. the built frontend points at this backend, and the backend allows the app's
+  7. the AI service running with a broken model setting: /chat is a plain 503, shots
+     still work, and fixing the setting brings Deni back
+  8. the built frontend points at this backend, and the backend allows the app's
      origin (CORS)
 
 It also checks the backend does not `depends_on` the AI service: that would stop
@@ -185,6 +187,31 @@ def main() -> int:
         compose("start", "ai-service")
         results.append(
             ("AI service back: backend notices", wait_for(chat_available), "")
+        )
+
+        # A running service with a broken model setting is a different failure from a
+        # stopped one: it answers /health, then cannot do the job.
+        ENV["AI_MODEL"] = "nosuchprovider:model"
+        recreated = compose("up", "-d", "--wait", "ai-service", check=False)
+        chat = request("POST", f"{BACKEND}/chat", message)
+        got = request("GET", f"{BACKEND}/shots")[0]
+        ok = recreated.returncode == 0 and (chat[0], got) == (503, 200)
+        detail = f"chat {chat[0]}, GET /shots {got}"
+        results.append(("broken model setting: /chat is 503, shots work", ok, detail))
+        leaked = "nosuchprovider" in chat[1]
+        results.append(
+            ("the broken setting is not leaked to the player", not leaked, "")
+        )
+
+        ENV["AI_MODEL"] = "test"
+        fixed = compose("up", "-d", "--wait", "ai-service", check=False)
+        again = wait_for(lambda: request("POST", f"{BACKEND}/chat", message)[0] == 200)
+        results.append(
+            (
+                "model setting fixed: Deni answers again",
+                fixed.returncode == 0 and again,
+                "",
+            )
         )
     finally:
         compose("down", "-v", check=False)
