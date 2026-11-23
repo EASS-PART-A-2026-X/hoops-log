@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { GameToast } from '../game/useCelebrations'
 import { chronological } from '../game/xp'
+import { shooterKey } from '../shooter'
 import { MILESTONES, daysBetween, dayOf, greet, levelUp, milestone, saved, streak, tip, trophy, welcomeBack } from './lines'
 import type { TabName } from './lines'
 import type { CoachApi } from './useCoach'
@@ -64,7 +65,8 @@ export function useCoachEvents({ coach, shots, truncated, ready, tab, name, shot
     if (greeted.current || !ready || shots === null) return
     greeted.current = true
     // Away for a few days: say so instead of the usual greeting.
-    const dates = shots.filter((x) => x.player === name).map((x) => x.game_date)
+    const who = shooterKey(name)
+    const dates = shots.filter((x) => shooterKey(x.player) === who).map((x) => x.game_date)
     const last = dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null
     const away = last === null ? null : daysBetween(last, dayOf(new Date()))
     say(away !== null && away >= AWAY_DAYS ? welcomeBack(name, away) : greet(name, shotCount, rank, variant.current++))
@@ -86,10 +88,11 @@ export function useCoachEvents({ coach, shots, truncated, ready, tab, name, shot
     if (before === null || quiet || maxId <= before || !greeted.current) return
     const latest = shots.find((s) => s.id === maxId)
     if (!latest) return
-    const mine = shots.filter((s) => s.player === latest.player)
+    const who = shooterKey(latest.player)
+    const mine = shots.filter((s) => shooterKey(s.player) === who)
     const run = currentStreak(mine)
     // A batch can jump over a round number, so look at every number it passed, not only where it ended.
-    const added = shots.filter((s) => s.id > before && s.player === latest.player).length
+    const added = shots.filter((s) => s.id > before && shooterKey(s.player) === who).length
     const passed = (MILESTONES as readonly number[]).filter((m) => mine.length - added < m && m <= mine.length)
     const reached = passed[passed.length - 1]
     // A round number of shots beats a streak, which beats the plain line.

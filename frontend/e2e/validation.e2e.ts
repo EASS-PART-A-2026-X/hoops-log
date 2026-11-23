@@ -179,21 +179,18 @@ test.describe('odd but valid text is stored as typed and drawn as text, never ru
     expect(await api.list()).toHaveLength(1)
   })
 
-  test('KNOWN GAP: names that differ only in capital letters are listed as two people in the picker', async ({ page, api }) => {
-    // The backend's player filter ignores case, so "yuly" and "YULY" should be one person. The picker still lists them
-    // separately. This test pins today's behaviour so that fixing the gap fails it on purpose: when the picker shows one
-    // person, the list below becomes two entries (Every player and the one person), the count at the end 2, and the test
-    // loses its KNOWN GAP name.
+  test('names that differ only in capital letters are ONE person in the picker', async ({ page, api }) => {
+    // The backend's player filter ignores case, so "yuly" and "YULY" are one person: listed once, with both shots counted.
     await api.seed([
       { player: 'yuly', x: 25, y: 8, made: true },
       { player: 'YULY', x: 20, y: 20, made: false },
     ])
     await openApp(page)
     await page.getByRole('combobox', { name: /^Shots of:/ }).click()
-    await expect(page.getByRole('option')).toHaveText([/Every player/, /yuly/i, /yuly/i])
+    await expect(page.getByRole('option')).toHaveText([/Every player/, /yuly/i])
     await page.keyboard.press('Escape')
-    // The same gap shows in the numbers: each spelling counts as its own person (1 shot each), not 2 shots for one.
-    await expect(kpi(page, 'SHOTS')).toHaveText('1')
+    // The numbers agree: 2 shots for one person.
+    await expect(kpi(page, 'SHOTS')).toHaveText('2')
   })
 })
 

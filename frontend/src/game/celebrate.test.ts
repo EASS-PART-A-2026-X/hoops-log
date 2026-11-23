@@ -33,7 +33,13 @@ describe('diffSnap', () => {
 describe('byPlayer', () => {
   it('groups shots by player', () => {
     const groups = byPlayer([{ player: 'A', id: 1 }, { player: 'B', id: 2 }, { player: 'A', id: 3 }])
-    expect([...groups.keys()]).toEqual(['A', 'B'])
-    expect(groups.get('A')!.map((s) => s.id)).toEqual([1, 3])
+    expect([...groups.keys()]).toEqual(['a', 'b'])
+    expect(groups.get('a')!.map((s) => s.id)).toEqual([1, 3])
+  })
+
+  it('is keyed by shooterKey, so spellings of one person are one group', () => {
+    const groups = byPlayer([{ player: 'yuly', id: 1 }, { player: ' YULY', id: 2 }, { player: 'Ben', id: 3 }])
+    expect([...groups.keys()]).toEqual(['yuly', 'ben'])
+    expect(groups.get('yuly')!.map((s) => s.id)).toEqual([1, 2])
   })
 })

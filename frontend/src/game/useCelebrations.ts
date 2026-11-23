@@ -4,6 +4,7 @@ import { byPlayer, diffSnap, EMPTY_SNAP, snapOf } from './celebrate'
 import type { Snap } from './celebrate'
 import type { TrophyShot } from './achievements'
 import { play } from './audio'
+import { shooterNames } from '../shooter'
 import { rankTitle } from './xp'
 
 export interface GameToast {
@@ -42,15 +43,17 @@ export function useCelebrations(shots: Shots | null, truncated = false) {
   useEffect(() => {
     if (!shots) return
     const now = new Map<string, Snap>()
-    for (const [player, list] of byPlayer(shots)) now.set(player, snapOf(list))
+    // Snapshots are keyed by the person (shooterKey), not by the spelling shown, which can change as shots arrive.
+    const display = shooterNames(shots)
+    for (const [key, list] of byPlayer(shots)) now.set(key, snapOf(list))
     const before = seen.current
     const priorAnnounced = new Map([...announced.current].map(([k, v]) => [k, new Set(v)]))
     seen.current = now
     // Everything unlocked so far counts as announced.
-    for (const [player, snap] of now) {
-      const set = announced.current.get(player) ?? new Set<string>()
+    for (const [key, snap] of now) {
+      const set = announced.current.get(key) ?? new Set<string>()
       for (const id of snap.unlocked) set.add(id)
-      announced.current.set(player, set)
+      announced.current.set(key, set)
     }
     // The first load is silent, and so is a list cut short (the numbers are not the whole truth then).
     // When the list goes from cut short to whole (or back) the difference is the missing shots, not a new one.
@@ -61,14 +64,15 @@ export function useCelebrations(shots: Shots | null, truncated = false) {
     const fresh: GameToast[] = []
     const announcedBefore = priorAnnounced
     let gain: XpPop | null = null
-    for (const [player, snap] of now) {
-      const change = diffSnap(before.get(player) ?? EMPTY_SNAP, snap)
+    for (const [key, snap] of now) {
+      const player = display.get(key) ?? key
+      const change = diffSnap(before.get(key) ?? EMPTY_SNAP, snap)
       if (change.xpGain > 0) gain = { key: nextId.current++, amount: change.xpGain, player }
       if (change.levelUp !== null) {
         fresh.push({ id: nextId.current++, kind: 'level', title: `LEVEL ${change.levelUp}`, sub: `${rankTitle(change.levelUp)} · ${player}`, level: { level: change.levelUp, rank: rankTitle(change.levelUp) } })
       }
       for (const id of change.newTrophyIds) {
-        if (announcedBefore.get(player)?.has(id)) continue
+        if (announcedBefore.get(key)?.has(id)) continue
         const trophy = TROPHIES.find((t) => t.id === id)
         if (trophy) fresh.push({ id: nextId.current++, kind: 'trophy', title: trophy.title, sub: `TROPHY UNLOCKED · ${trophy.how}` })
       }

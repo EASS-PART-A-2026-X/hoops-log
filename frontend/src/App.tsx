@@ -8,7 +8,7 @@ import Logo from './Logo'
 import ShooterSelect from './ShooterSelect'
 import { tabTarget } from './focusTrap'
 import { deletedText, withShooterSwitch } from './notices'
-import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
+import { listShooters, pickDefaultShooter, resolveShooter, sameShooter, shooterKey } from './shooter'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
 import { useChat } from './coach/useChat'
@@ -234,7 +234,7 @@ export default function App() {
     if (id === null) return
     // A shot by someone else is hidden on the map, so show that player's shots.
     const player = shots?.find((s) => s.id === id)?.player
-    if (player !== undefined && shooter !== '' && player !== shooter) setShooterChoice(player)
+    if (player !== undefined && shooter !== '' && !sameShooter(player, shooter)) setShooterChoice(player)
     setDrawerOpen(false) // the drawer would cover the map
     setScrollTarget({ id: 'map-title', block: 'start' })
   }
@@ -247,7 +247,8 @@ export default function App() {
   // (Set during render, which React allows for a component's own state.)
   if (shooters.length > 0 && !loadError && shooter !== shooterChoice) {
     setShooterChoice(shooter)
-    if (shooterChoice !== null) {
+    // Another spelling of the same person (only capitals or edge spaces differ) is not "no shots left".
+    if (shooterChoice !== null && !sameShooter(shooter, shooterChoice)) {
       // A delete confirmation stays visible: the sentence is added to it (and adding twice is a no-op).
       setNotice((prev) => ({
         kind: 'ok',
@@ -255,7 +256,11 @@ export default function App() {
       }))
     }
   }
-  const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
+  const shooterShots = useMemo(() => {
+    if (shots === null || !shooter) return shots
+    const who = shooterKey(shooter)
+    return shots.filter((s) => shooterKey(s.player) === who)
+  }, [shots, shooter])
   const shooterPicker = <ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
 
   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)

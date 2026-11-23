@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import Odometer from './Odometer'
+import { shooterKey } from './shooter'
 import { useTicker } from './game/useTicker'
 import { isMuted, play, setMuted, subscribeMuted } from './game/audio'
 import type { XpPop } from './game/useCelebrations'
@@ -35,7 +36,7 @@ export default function ScoreBug({ armed, partial = false, name, picker, trophie
   const pct = !armed || attempts === 0 ? 0 : Math.round((made / attempts) * 100)
   const shownXp = useTicker(armed ? level.into : 0)
   const fill = level.span === 0 ? 0 : Math.min(100, (shownXp / level.span) * 100)
-  const showPop = pop !== null && (name === '' || pop.player === name)
+  const showPop = pop !== null && (name === '' || shooterKey(pop.player) === shooterKey(name))
 
   return (
     <div className="scorebug-wrap">

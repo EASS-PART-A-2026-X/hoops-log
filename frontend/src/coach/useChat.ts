@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, SENT_TURNS, deleteChatHistory, getChatHistory, sendChat } from '../api'
 import type { ChatTurn, Shot, ShotInput } from '../api'
 import type { MapShot } from '../court/stats'
+import { shooterKey } from '../shooter'
 import { today } from '../today'
 import { buildStats } from './chatStats'
 import type { Line } from './lines'
@@ -45,6 +46,9 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
   // Who the saved shots are for when no player is chosen yet (a new log): a name typed in the chat.
   const [typedPlayer, setTypedPlayer] = useState('')
   const savingFor = player !== '' ? player : typedPlayer.trim()
+  // Chats and saved-history requests are kept per PERSON (shooterKey), not per spelling: the spelling shown can
+  // change (yuly / YULY) and the conversation must not seem to vanish.
+  const chatKey = shooterKey(player)
   // The latest chats for the callbacks below, which run later (events, after awaits) and must not read old ones.
   const chatsRef = useRef(chats)
   useEffect(() => {
@@ -63,35 +67,37 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
   const asked = useRef(new Set<string>())
   const startedOver = useRef(0)
   useEffect(() => {
-    if (player === '' || asked.current.has(player)) return
-    asked.current.add(player)
+    if (player === '' || asked.current.has(chatKey)) return
+    asked.current.add(chatKey)
     const startedAt = startedOver.current
     getChatHistory(player)
       .then((lines) => {
         if (lines.length === 0 || startedAt !== startedOver.current) return
         // The saved lines come BEFORE anything said while they were loading.
         const earlier: ChatMessage[] = lines.map((line) => ({ id: nextId.current++, role: line.role, text: line.text }))
-        setChats((all) => ({ ...all, [player]: [...earlier, ...(all[player] ?? [])] }))
+        setChats((all) => ({ ...all, [chatKey]: [...earlier, ...(all[chatKey] ?? [])] }))
       })
       .catch(() => {
         // No saved conversation to show (the backend may be down): start empty, and ask again next time.
-        asked.current.delete(player)
+        asked.current.delete(chatKey)
       })
-  }, [player])
+  }, [player, chatKey])
 
-  const messages = chats[player] ?? []
+  const messages = chats[chatKey] ?? []
 
   const append = useCallback((who: string, message: Omit<ChatMessage, 'id'>) => {
     const full = { ...message, id: nextId.current++ }
-    setChats((all) => ({ ...all, [who]: [...(all[who] ?? []), full] }))
+    const key = shooterKey(who)
+    setChats((all) => ({ ...all, [key]: [...(all[key] ?? []), full] }))
     return full.id
   }, [])
 
   /** Change one card from what it is NOW (not from a copy taken earlier, which Save all would make stale). */
   const patchCard = useCallback((who: string, messageId: number, index: number, patch: Partial<Card>) => {
+    const key = shooterKey(who)
     setChats((all) => ({
       ...all,
-      [who]: (all[who] ?? []).map((m) =>
+      [key]: (all[key] ?? []).map((m) =>
         m.id === messageId ? { ...m, cards: m.cards?.map((old, i) => (i === index ? { ...old, ...patch } : old)) } : m,
       ),
     }))
@@ -103,7 +109,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
       if (text === '' || pending.current !== null) return
       const who = player
       // What the AI is shown: the chat so far (not the app's own error notes) and the new message, at most SENT_TURNS.
-      const history: ChatTurn[] = (chatsRef.current[who] ?? [])
+      const history: ChatTurn[] = (chatsRef.current[shooterKey(who)] ?? [])
         .filter((m) => !m.failed)
         .map((m) => ({ role: m.role, text: m.text }))
       const turns = [...history, { role: 'user' as const, text }].slice(-SENT_TURNS)
@@ -148,7 +154,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
   const reset = useCallback(() => {
     cancel()
     startedOver.current++
-    setChats((all) => ({ ...all, [player]: [] }))
+    setChats((all) => ({ ...all, [chatKey]: [] }))
     if (player !== '') {
       const who = player
       deleteChatHistory(who).catch(() => {
@@ -156,12 +162,12 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
         append(who, { role: 'deni', failed: true, text: 'I could not forget our earlier chat just now. It may come back when you reopen this. Try Start over again.' })
       })
     }
-  }, [append, cancel, player])
+  }, [append, cancel, player, chatKey])
 
   /** Create one proposed shot; the card shows how it went. Returns the saved shot, or null when it failed. */
   const create = useCallback(
     async (messageId: number, index: number): Promise<Shot | null> => {
-      const card = chatsRef.current[player]?.find((m) => m.id === messageId)?.cards?.[index]
+      const card = chatsRef.current[chatKey]?.find((m) => m.id === messageId)?.cards?.[index]
       if (!card || savingFor === '') return null
       const { shot } = card
       patchCard(player, messageId, index, { status: 'saving', message: undefined })
@@ -176,7 +182,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
         return null
       }
     },
-    [onCreate, patchCard, player, savingFor],
+    [onCreate, patchCard, player, chatKey, savingFor],
   )
 
   /**
@@ -188,7 +194,8 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
     setChats((all) => {
       const moved = all[''] ?? []
       if (moved.length === 0) return all
-      return { ...all, '': [], [savingFor]: [...(all[savingFor] ?? []), ...moved] }
+      const to = shooterKey(savingFor)
+      return { ...all, '': [], [to]: [...(all[to] ?? []), ...moved] }
     })
   }, [player, savingFor])
 
@@ -212,7 +219,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
 
   const saveAll = useCallback(
     async (messageId: number) => {
-      const cards = chatsRef.current[player]?.find((m) => m.id === messageId)?.cards ?? []
+      const cards = chatsRef.current[chatKey]?.find((m) => m.id === messageId)?.cards ?? []
       // One at a time, in order, so the shot numbers follow the order of the chat; then ONE refresh and ONE notice.
       const todo = cards.flatMap((card, index) => (isOpen(card) ? [index] : []))
       const saved: Shot[] = []
@@ -225,7 +232,7 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
         await onSaved(saved)
       }
     },
-    [adopt, create, onSaved, player],
+    [adopt, create, onSaved, chatKey],
   )
 
   return { messages, thinking, savingFor, typedPlayer, setTypedPlayer, send, cancel, reset, save, discard, saveAll }

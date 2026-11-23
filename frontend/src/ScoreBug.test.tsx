@@ -31,6 +31,12 @@ describe('ScoreBug', () => {
     expect(screen.getByRole('group').querySelector('.bug-fg b')!.textContent).toBe('–')
   })
 
+  it('shows the XP pop when the shown name and the pop differ only in capitals or edge spaces', () => {
+    const pop = { key: 1, amount: 25, player: 'YULY' }
+    const { container } = render(<ScoreBug picker={<span>picker</span>} armed name=" yuly" made={1} attempts={1} level={level} pop={pop} />)
+    expect(container.querySelector('.xp-pop')?.textContent).toBe('+25 XP')
+  })
+
   it('shows the XP pop only for the shown player', () => {
     const pop = { key: 1, amount: 25, player: 'Ann' }
     const { rerender, container } = render(<ScoreBug picker={<span>picker</span>} armed name="Ann" made={1} attempts={1} level={level} pop={pop} />)

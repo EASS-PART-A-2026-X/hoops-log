@@ -1,5 +1,6 @@
 import type { ProposedShot } from '../api'
 import { zoneLabel } from '../court/stats'
+import { shooterKey } from '../shooter'
 
 /** One shot Deni proposed in a reply, and what the player did with it. */
 export interface Card {
@@ -18,7 +19,7 @@ export function describeShot(shot: ProposedShot): string {
 
 /** What makes two proposals the same shot, for the "you just saved this" marker. */
 export const keyOf = (player: string, shot: ProposedShot): string =>
-  `${player}|${shot.x}|${shot.y}|${shot.made}|${shot.game_date}`
+  `${shooterKey(player)}|${shot.x}|${shot.y}|${shot.made}|${shot.game_date}`
 
 /**
  * Which of `proposals` look like shots already saved (`savedKeys`). Identical shots in one reply are counted one

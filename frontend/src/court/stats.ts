@@ -1,4 +1,5 @@
 import { COURT_L, COURT_W } from './geometry'
+import { shooterKey } from '../shooter'
 
 /** The few fields the map needs. A `Shot` from the API fits this. */
 export interface MapShot {
@@ -24,8 +25,9 @@ const MID_ZONES = new Set(['mid_range', 'left_elbow', 'right_elbow'])
 const PAINT_ZONES = new Set(['paint', 'restricted_area'])
 
 export function applyFilters<T extends MapShot>(shots: T[], f: Filters): T[] {
+  const who = f.player ? shooterKey(f.player) : null
   return shots.filter((s) => {
-    if (f.player && s.player !== f.player) return false
+    if (who !== null && shooterKey(s.player) !== who) return false
     if (f.result === 'made' && !s.made) return false
     if (f.result === 'missed' && s.made) return false
     if (f.area === 'threes') return s.shot_type === '3PT'
