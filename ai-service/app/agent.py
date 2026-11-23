@@ -87,9 +87,10 @@ def to_proposals(result: AgentChatResult) -> list[ProposedShot]:
 def model_settings_for(model: str) -> dict[str, object]:
     """Settings for one model.
 
-    A rate limit must fail FAST (the player is told it is busy), not be retried quietly
-    by the provider's own client for ten seconds or more: that hidden retrying is the
-    likely cause of the unexplained 12-30 s waits seen with the real model.
+    The provider's own client must not retry quietly (max_retries=0): ten seconds or
+    more of hidden retrying was the likely cause of the unexplained 12-30 s waits seen
+    with the real model. A short rate limit is waited out by the service instead, once,
+    where it is logged and bounded (app/routers/chat.py).
     """
     settings: dict[str, object] = {
         "timeout": 30.0,

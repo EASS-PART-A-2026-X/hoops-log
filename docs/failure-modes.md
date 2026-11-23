@@ -10,19 +10,20 @@ The path of one chat message: `browser -> backend (POST /chat) -> ai-service (PO
 
 | Layer | Retries? | Why |
 |---|---|---|
-| The model provider's client | **No** (`max_retries=0`) | A rate limit must fail fast and tell the player it is busy. Hidden retries caused unexplained 12-30 s waits. |
+| The model provider's client | **No** (`max_retries=0`) | A hidden retry inside the client caused unexplained 12-30 s waits. Any waiting is done by our own code, below, where it is logged and bounded. |
 | Pydantic AI, when the model's output breaks the contract | **Yes, up to 2 times** (`retries=2`), inside one request | The model gets the validation error and repairs its answer. Bounded by the usage limit below. |
+| The AI service, when the provider's rate limit says how long to wait | **Yes, once**, after waiting what the provider says (at most 15 s, plus half a second) | The free tier allows 8,000 tokens a minute (a message costs about 1,500-1,900), and the provider's own answer is usually "try again in 2-11 s". A longer wait (a daily quota says minutes or hours), or a second rate limit, is a 429. The wait is logged, and it is inside the 60 s deadline. |
 | The backend | **No** | `POST /chat` is not safe to repeat: with a `player` it saves the exchange, so a retry after a lost reply could save it twice, and every call spends the shared 10-per-minute budget. |
 | The browser | **No** | The player presses send again when they choose to. |
 
-So there is exactly one retrying layer, and it only repeats work that stores nothing.
+So there is exactly one retrying layer, the AI service, and it only repeats work that stores nothing: the model's output repair, and one wait-and-ask-again on a short rate limit.
 
 ## Time budget
 
 Each layer waits longer than the one inside it, so the inner layer speaks first and says what
 happened:
 
-`30 s` one call to the model < `60 s` the whole request in the AI service (answers 504) < `70 s` the
+`30 s` one call to the model < `60 s` the whole request in the AI service, which includes a possible rate-limit wait of up to 15.5 s and the second call (answers 504) < `70 s` the
 backend's read timeout < `90 s` the browser waits. The backend's 70 s is a timeout *per read*, not a
 hard cap on the whole call: a server that trickled bytes could outlast it. Our own AI service
 never does, because its 60 s deadline covers the whole request.
@@ -35,7 +36,7 @@ never does, because its 60 s deadline covers the whole request.
 | 2 | AI service accepts the call, then never answers | backend read timeout | **504** "took too long" | **real socket** `test_a_server_that_never_answers_is_a_quick_504`; ai-service `test_a_request_that_takes_too_long_is_a_504_and_the_model_is_cut_off` |
 | 3 | While the AI service hangs, nothing else stalls | one event loop in the backend | shots still save and list while the chat call is still waiting | **real server** `test_while_the_ai_service_hangs_plain_shot_logging_still_answers` |
 | 4 | AI service hangs up, or sends something that is not HTTP | backend | **502** "could not give a usable answer" | **real socket** `test_a_server_that_hangs_up_is_a_502`, `test_a_server_that_does_not_speak_http_is_a_502` |
-| 5 | The model provider says "too many requests" or "quota used" | ai-service | **429** "busy, try in a minute" (no hidden retry) | ai-service `test_rate_limit_and_quota_are_429` (the mapping); `test_a_rate_limit_fails_fast_instead_of_being_retried_quietly` checks the `max_retries=0` setting, it does not call a real provider |
+| 5 | The model provider says "too many requests" or "quota used" | ai-service | a short wait (up to 15 s) is waited out once and asked again; otherwise **429** "busy: the free AI model has a usage limit, try again in a minute" | ai-service `tests/test_rate_limit_wait.py` (waits once; never longer than 15 s; a second limit, a used-up quota, an unparsable message and other errors are not retried; a wait past the deadline is a 504); `test_rate_limit_and_quota_are_429` (the mapping); `test_a_rate_limit_fails_fast_instead_of_being_retried_quietly` checks the `max_retries=0` setting. None of them calls a real provider |
 | 6 | Too many chat requests (10 a minute, everybody together) | backend | **429** "wait a minute"; the AI service is not called | backend `test_the_eleventh_request_in_a_minute_is_refused_without_calling_the_ai` |
 | 7 | AI service runs, but the model is set up wrong (no key, unknown provider) | ai-service | **503** "not available". The chat shows that sentence; the manual form does **not** appear by itself, because `/health` only says a model name is set, so `/chat/status` still reports available (see Known limits) | ai-service `test_a_missing_provider_key_is_503`, `test_an_unknown_provider_is_503_too`; **real stack** `compose_check.py` "broken model setting" (the service is up, yet `/chat` is 503) |
 | 8 | No model configured at all | ai-service | **503**; `/chat/status` says not available, so the manual form shows | ai-service `test_chat_without_a_configured_model_is_503` |

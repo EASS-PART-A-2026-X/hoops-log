@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, MAX_TURNS, deleteChatHistory, getChatHistory, sendChat } from '../api'
+import { ApiError, SENT_TURNS, deleteChatHistory, getChatHistory, sendChat } from '../api'
 import type { ChatTurn, Shot, ShotInput } from '../api'
 import type { MapShot } from '../court/stats'
 import { today } from '../today'
@@ -102,11 +102,11 @@ export function useChat({ shots, player, say, onCreate, onSaved, onOutcome }: Op
       const text = raw.trim()
       if (text === '' || pending.current !== null) return
       const who = player
-      // What the AI is shown: the chat so far (not the app's own error notes) and the new message, at most MAX_TURNS.
+      // What the AI is shown: the chat so far (not the app's own error notes) and the new message, at most SENT_TURNS.
       const history: ChatTurn[] = (chatsRef.current[who] ?? [])
         .filter((m) => !m.failed)
         .map((m) => ({ role: m.role, text: m.text }))
-      const turns = [...history, { role: 'user' as const, text }].slice(-MAX_TURNS)
+      const turns = [...history, { role: 'user' as const, text }].slice(-SENT_TURNS)
       append(who, { role: 'user', text })
       const ticket = ++latest.current
       const controller = new AbortController()

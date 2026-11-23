@@ -191,7 +191,7 @@ test.describe('the chat, with his AI helper there', () => {
       await api.seed(makeShots('Yuly', 6, { seed: 91 }))
       await openChat(page)
       await say(page, 'simulate busy')
-      await expect(log(page).getByRole('alert')).toContainText("Deni's AI helper is busy. Try again in a minute.")
+      await expect(log(page).getByRole('alert')).toContainText("Deni's AI helper is busy: the free AI model has a usage limit")
     })
 
     test('an answer that breaks the rules is refused, not shown or saved', async ({ page, api, guard }) => {
@@ -214,6 +214,8 @@ test.describe('when his AI helper is offline', () => {
     await openDrawer(page, 'list')
     await expect(drawer(page).getByRole('button', { name: 'Tell Deni about a shot' })).toHaveCount(0)
     await addShotViaForm(page, { player: 'Yuly', x: 25, y: 6, made: true })
+    // Wait for the save to finish: the click only starts it, and reading the list too early sees six shots.
+    await expect(notice(page)).toContainText('Saved shot #')
     expect(await api.list()).toHaveLength(7)
 
     await page.keyboard.press('Escape')

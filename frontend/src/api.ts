@@ -215,6 +215,12 @@ export interface ChatReply {
 export const MAX_TURNS = 12
 
 /**
+ * How many the app really sends: the newest six (three exchanges). Every message re-sends the whole conversation, and the
+ * free AI model allows 8,000 tokens a minute, so a long history is paid for again with each new message.
+ */
+export const SENT_TURNS = 6
+
+/**
  * Ask the backend (which asks the AI service) for Deni's reply to the last message of `messages`. Saves nothing.
  * `today` is the player's own date, so "yesterday" is theirs.
  */

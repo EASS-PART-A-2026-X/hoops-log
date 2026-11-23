@@ -44,7 +44,10 @@ UNAVAILABLE = (
     "Deni's AI helper is not available right now. You can still add shots by hand."
 )
 TIMED_OUT = "Deni's AI helper took too long to answer. Try again."
-BUSY = "Deni's AI helper is busy. Try again in a minute."
+BUSY = (
+    "Deni's AI helper is busy: the free AI model has a usage limit and it is used "
+    "up for now. Try again in a minute."
+)
 UNUSABLE = (
     "Deni's AI helper could not give a usable answer. "
     "Try again, or add the shots by hand."

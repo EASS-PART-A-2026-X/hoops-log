@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, BACKEND_URL, CHAT_TIMEOUT_MS, MAX_TURNS, chatAvailable, sendChat } from './api'
+import { ApiError, BACKEND_URL, CHAT_TIMEOUT_MS, MAX_TURNS, SENT_TURNS, chatAvailable, sendChat } from './api'
 import type { ChatTurn, StatsSummary } from './api'
 
 afterEach(() => {
@@ -37,6 +37,10 @@ describe('sendChat', () => {
 
   it('takes at most twelve messages, the number the backend allows', () => {
     expect(MAX_TURNS).toBe(12)
+    // The app sends fewer (the free AI model has a small token budget), but never more than the backend takes, and enough
+    // to carry a question and its answer and the follow-up.
+    expect(SENT_TURNS).toBeLessThanOrEqual(MAX_TURNS)
+    expect(SENT_TURNS).toBeGreaterThanOrEqual(4)
   })
 
   it.each([429, 502, 503, 504])('shows the backends own sentence for a %i', async (status) => {
