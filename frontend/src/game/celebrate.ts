@@ -2,7 +2,7 @@
 import { unlockedIds } from './achievements'
 import type { TrophyShot } from './achievements'
 import { levelInfo, totalXp } from './xp'
-import { shooterKey, shooterNames } from '../shooter'
+import { shooterKey } from '../shooter'
 
 export interface Snap {
   xp: number
@@ -33,15 +33,17 @@ export function diffSnap(prev: Snap, next: Snap): Change {
   }
 }
 
-/** The shots of each person (names that differ only in capitals or edge spaces are one), in the order the players first appear. */
+/**
+ * The shots of each person, keyed by shooterKey (names that differ only in capitals or edge spaces are one),
+ * in the order the players first appear. The spelling to show for a key is `shooterNames(shots).get(key)`.
+ */
 export function byPlayer<T extends { player: string }>(shots: T[]): Map<string, T[]> {
   const map = new Map<string, T[]>()
-  const names = shooterNames(shots)
   for (const s of shots) {
-    const name = names.get(shooterKey(s.player)) ?? s.player
-    const list = map.get(name)
+    const key = shooterKey(s.player)
+    const list = map.get(key)
     if (list) list.push(s)
-    else map.set(name, [s])
+    else map.set(key, [s])
   }
   return map
 }

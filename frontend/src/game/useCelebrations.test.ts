@@ -55,24 +55,40 @@ describe('useCelebrations', () => {
     expect(result.current.pop?.player).toBe('B')
   })
 
-  it('one person stays one person when another spelling becomes the most used', () => {
-    // 'yuly' has 6 shots (3 made, 3 missed: no level yet), then 'YULY' overtakes it with 4 more.
+  it('adds the spellings of one person up: a level up is seen once, and not missed because the XP is split', () => {
+    // 'yuly' and 'YULY' have 14 misses each: 56 XP together (level 1, and 28 + 28 apart). One made shot makes 66.
     const first = [
-      ...Array.from({ length: 3 }, () => shot('yuly', { made: false })),
-      ...Array.from({ length: 3 }, () => shot('YULY', { made: false })),
-      shot('yuly', { made: false }),
+      ...Array.from({ length: 14 }, () => shot('yuly', { made: false })),
+      ...Array.from({ length: 14 }, () => shot('YULY', { made: false })),
     ]
     const { result, rerender } = setup(first)
-    const more = [shot('YULY', { made: false }), shot('YULY', { made: false })]
-    rerender({ shots: [...first, ...more], truncated: false })
-    // The display spelling flipped to 'YULY', but nothing is celebrated: misses earn no level or trophy.
-    expect(result.current.toasts).toEqual([])
-    // Only the two new shots' XP (a few points), never the person's whole total.
-    expect(result.current.pop?.amount ?? 0).toBeLessThanOrEqual(4)
-    // A made shot now earns only its own XP, not the person's whole total.
-    rerender({ shots: [...first, ...more, shot('YULY')], truncated: false })
+    rerender({ shots: [...first, shot('YULY')], truncated: false })
+    expect(result.current.toasts.filter((t) => t.kind === 'level').map((t) => t.title)).toEqual(['LEVEL 2'])
+    expect(result.current.toasts.filter((t) => t.title === 'First Bucket')).toHaveLength(1)
+    // Only that shot's XP, never the person's whole total.
     expect(result.current.pop).toMatchObject({ amount: 10, player: 'YULY' })
-    expect(result.current.toasts.some((t) => t.kind === 'level')).toBe(false)
+  })
+
+  it('does not announce a trophy again when it is unlocked under another spelling of the same person', () => {
+    const first = [shot('yuly', { made: false }), shot('YULY', { made: false })]
+    const { result, rerender } = setup(first)
+    const withMake = [...first, shot('yuly')]
+    rerender({ shots: withMake, truncated: false })
+    expect(result.current.toasts.map((t) => t.title)).toEqual(['First Bucket'])
+    for (let i = 0; i < 3; i++) act(() => void vi.advanceTimersByTime(5300))
+    expect(result.current.toasts).toEqual([])
+    rerender({ shots: [...withMake, shot('YULY')], truncated: false })
+    expect(result.current.toasts).toEqual([])
+    expect(result.current.pop).toMatchObject({ amount: 10 })
+  })
+
+  it('a different spelling becoming the most used earns exactly the new shots XP, no toast', () => {
+    // 'yuly' has 4 misses and 'YULY' 3; two more 'YULY' misses make 'YULY' the most used spelling (5 against 4).
+    const first = [...Array.from({ length: 4 }, () => shot('yuly', { made: false })), ...Array.from({ length: 3 }, () => shot('YULY', { made: false }))]
+    const { result, rerender } = setup(first)
+    rerender({ shots: [...first, shot('YULY', { made: false }), shot('YULY', { made: false })], truncated: false })
+    expect(result.current.toasts).toEqual([])
+    expect(result.current.pop).toMatchObject({ amount: 4, player: 'YULY' }) // 2 shots x 2 XP
   })
 
   it('does not announce a trophy twice when it is lost and won again', () => {

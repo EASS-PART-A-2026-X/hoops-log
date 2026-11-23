@@ -270,6 +270,28 @@ describe('one chat per player', () => {
   })
 })
 
+describe('one person whatever the spelling', () => {
+  it('keeps the chat, and does not ask for the saved conversation again, when the spelling shown changes', async () => {
+    chatCall.mockResolvedValue(answer('Hi.'))
+    const { result, rerender, props, send } = setup({ player: 'yuly' })
+    await send('hello')
+    expect(result.current.messages.map((m) => m.text)).toEqual(['hello', 'Hi.'])
+    rerender({ ...props, player: 'YULY' })
+    expect(result.current.messages.map((m) => m.text)).toEqual(['hello', 'Hi.'])
+    expect(historyCall).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks a proposal as a look-alike of a shot saved while another spelling was shown', async () => {
+    chatCall.mockResolvedValue(answer('Got it.', [elbow]))
+    const { result, rerender, props, send } = setup({ player: 'yuly' })
+    await send('one')
+    await act(async () => void (await result.current.save(result.current.messages[1]!.id, 0)))
+    rerender({ ...props, player: 'YULY' })
+    await send('again')
+    expect(result.current.messages.at(-1)!.cards![0]!.lookalike).toBe(true)
+  })
+})
+
 describe('saving the shots he proposed', () => {
   const proposed = async (proposals = [corner, elbow], over: { shots?: MapShot[]; player?: string } = {}) => {
     chatCall.mockResolvedValue(answer('Got it.', proposals))

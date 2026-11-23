@@ -188,6 +188,28 @@ describe('adding a shot through the chat', () => {
     expect(await screen.findByText('Saved shot #99 for Ann.')).toBeTruthy()
   })
 
+  it('does not say the shown player has no shots left when only the capitals of the shown spelling change', async () => {
+    const mk = (id: number, player: string): Shot => ({ id, player, x: 25, y: 8, made: false, game_date: '2026-11-01', note: '', zone: 'paint', shot_type: '2PT' })
+    // Three 'ann' and three 'Ann' (the tie shows 'Ann'); after the save, six 'ann' make 'ann' the most used spelling.
+    const before = [1, 2, 3].map((i) => mk(i, 'ann')).concat([4, 5, 6].map((i) => mk(i, 'Ann')))
+    const after = before.concat([7, 8, 9].map((i) => mk(i, 'ann')))
+    chat.mockResolvedValue({ reply: 'Got it.', proposals: [corner], model: 'm' })
+    create.mockImplementation(async (input) => ({ ...input, id: 99, zone: 'right_corner_3', shot_type: '3PT' }) as Shot)
+    list.mockResolvedValue({ shots: before, truncated: false })
+    try {
+      await open()
+      await userEvent.click(face())
+      await userEvent.type(screen.getByRole('textbox', { name: 'Message to Deni' }), 'one{Enter}')
+      list.mockResolvedValue({ shots: after, truncated: false })
+      await userEvent.click(await screen.findByRole('button', { name: 'Save shot 1' }))
+      await waitFor(() => expect(document.querySelector('.drawer-count')?.textContent).toBe('9'))
+      expect(await screen.findByText(/Saved shot #99 for/)).toBeTruthy()
+      expect(screen.queryByText(/has no shots left/)).toBeNull()
+    } finally {
+      list.mockResolvedValue({ shots, truncated: false })
+    }
+  })
+
   it('refreshes the list once and says one thing for a whole Save all', async () => {
     chat.mockResolvedValue({ reply: 'Two shots.', proposals: [corner, { ...corner, x: 17, y: 19, zone: 'left_elbow', shot_type: '2PT' as const }], model: 'm' })
     let id = 100

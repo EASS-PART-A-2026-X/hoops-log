@@ -33,6 +33,17 @@ describe('keyOf', () => {
   })
 })
 
+describe('keyOf and the spelling of the name', () => {
+  it('is the same for one person written differently', () => {
+    expect(keyOf('yuly', corner)).toBe(keyOf('YULY', corner))
+    expect(keyOf(' Yuly ', corner)).toBe(keyOf('yuly', corner))
+  })
+
+  it('still marks a shot saved under another spelling as a look-alike', () => {
+    expect(markLookalikes('YULY', [elbow], [keyOf('yuly', elbow)])).toEqual([true])
+  })
+})
+
 describe('markLookalikes', () => {
   it('marks nothing when nothing was saved', () => {
     expect(markLookalikes('Yuly', [corner, elbow], [])).toEqual([false, false])

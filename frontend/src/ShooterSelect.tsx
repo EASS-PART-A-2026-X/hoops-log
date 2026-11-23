@@ -20,7 +20,10 @@ const shotsLabel = (n: number) => `${n} ${n === 1 ? 'shot' : 'shots'}`
 export default function ShooterSelect({ shots, value, onChange, compact = false }: Props) {
   const options = useMemo<PickerOption[]>(() => {
     const counts = new Map<string, number>()
-    for (const s of shots ?? []) counts.set(shooterKey(s.player), (counts.get(shooterKey(s.player)) ?? 0) + 1)
+    for (const s of shots ?? []) {
+      const key = shooterKey(s.player)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
     return [
       {
         id: '',

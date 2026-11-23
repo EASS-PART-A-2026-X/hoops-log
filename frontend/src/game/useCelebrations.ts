@@ -4,7 +4,7 @@ import { byPlayer, diffSnap, EMPTY_SNAP, snapOf } from './celebrate'
 import type { Snap } from './celebrate'
 import type { TrophyShot } from './achievements'
 import { play } from './audio'
-import { shooterKey } from '../shooter'
+import { shooterNames } from '../shooter'
 import { rankTitle } from './xp'
 
 export interface GameToast {
@@ -44,12 +44,8 @@ export function useCelebrations(shots: Shots | null, truncated = false) {
     if (!shots) return
     const now = new Map<string, Snap>()
     // Snapshots are keyed by the person (shooterKey), not by the spelling shown, which can change as shots arrive.
-    const display = new Map<string, string>()
-    for (const [player, list] of byPlayer(shots)) {
-      const key = shooterKey(player)
-      display.set(key, player)
-      now.set(key, snapOf(list))
-    }
+    const display = shooterNames(shots)
+    for (const [key, list] of byPlayer(shots)) now.set(key, snapOf(list))
     const before = seen.current
     const priorAnnounced = new Map([...announced.current].map(([k, v]) => [k, new Set(v)]))
     seen.current = now
