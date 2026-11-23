@@ -62,8 +62,21 @@ def diff(repo: Path, base: str, head: str) -> str:
     return git("diff", "--no-color", f"{base}..{head}", cwd=repo)
 
 
-def changed_files(repo: Path, base: str, head: str) -> list[str]:
-    return [p for p in git("diff", "--name-only", f"{base}..{head}", cwd=repo).splitlines() if p]
+def changed_files(repo: Path, base: str, head: str, still_there: bool = False) -> list[str]:
+    """Paths that differ between base and head. `still_there` leaves out deleted files."""
+    args = ["diff", "--name-only", "-z"]
+    if still_there:
+        args.append("--diff-filter=ACMR")
+    out = subprocess.run(["git", *args, f"{base}..{head}"], cwd=repo, capture_output=True, text=True, check=True).stdout
+    return [p for p in out.split("\0") if p]
+
+
+def file_at(repo: Path, rev: str, path: str) -> bytes:
+    """The exact bytes of a file at a commit (git() strips text, which would change the file)."""
+    done = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=repo, capture_output=True, check=False)
+    if done.returncode != 0:
+        raise RuntimeError(f"git show {rev}:{path} failed: {done.stderr.decode(errors='replace').strip()}")
+    return done.stdout
 
 
 def tool_path() -> str:

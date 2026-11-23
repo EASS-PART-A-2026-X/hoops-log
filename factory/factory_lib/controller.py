@@ -183,15 +183,19 @@ class Controller:
         except Exception as error:  # a bug in the factory must never look like a result
             self._record_failure(error)
             raise
+        except BaseException:  # Ctrl-C or a kill signal: the run did not finish, and it must say so
+            self._record_failure(RuntimeError("the controller was interrupted"), status="stopped")
+            raise
 
-    def _record_failure(self, error: Exception) -> None:
+    def _record_failure(self, error: Exception, status: str = "error") -> None:
         if hasattr(self, "log"):
-            self.log.emit("referee", "foul", f"The factory itself failed: {error}")
+            what = "The factory itself failed" if status == "error" else "The run was interrupted"
+            self.log.emit("referee", "foul", f"{what}: {error}")
         if (self.run_dir / "run.json").exists():
             if hasattr(self, "log"):
-                self._finish("error", str(error))
+                self._finish(status, str(error))
             else:
-                update_run(self.run_dir, status="error", reason=str(error), finished_at=self.opts.clock())
+                update_run(self.run_dir, status=status, reason=str(error), finished_at=self.opts.clock())
 
     def _play(self) -> str:
         opening = announce("order", order_id=self.wo.id, title=self.wo.title)

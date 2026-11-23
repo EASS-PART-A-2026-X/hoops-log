@@ -23,8 +23,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from factory_lib import scope  # noqa: E402
-from factory_lib.events import append_event  # noqa: E402
+try:
+    from factory_lib import scope
+    from factory_lib.events import append_event
+except BaseException as error:  # noqa: BLE001  Claude Code lets an edit through on any exit code but 2
+    print(f"Blocked by the referee: the scope guard could not start ({error}).", file=sys.stderr)
+    sys.exit(2)
 
 
 def decide(payload: dict, worktree: Path, patterns: list[str]) -> tuple[bool, str]:

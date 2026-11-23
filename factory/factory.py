@@ -14,6 +14,7 @@ Runs are saved in factory/runs/<run-id>/ (see factory/README.md for what is in t
 
 import argparse
 import os
+import re
 import sys
 import threading
 import time
@@ -31,6 +32,24 @@ from factory_lib.serve import make_server, serve  # noqa: E402
 
 RUNS = Path(os.environ.get("FACTORY_RUNS", HERE / "runs"))  # tests point this at a temp folder
 DASHBOARD = HERE / "dashboard" / "dashboard.html"
+
+
+RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def run_folder(run_id: str) -> Path:
+    """A run's folder, for an id typed on the command line: a plain name, and it must exist."""
+    if not RUN_ID.fullmatch(run_id) or ".." in run_id:
+        sys.exit(f"Not a run id: {run_id!r}")
+    folder = RUNS / run_id
+    if not (folder / "run.json").exists():
+        sys.exit(f"No such run: {run_id}. `factory status` lists them.")
+    return folder
+
+
+def _stop_server(server) -> None:
+    server.shutdown()
+    server.server_close()
 
 
 def next_run_id(wo_id: str) -> str:
@@ -76,7 +95,7 @@ def _wait_for_the_gm(server, run_dir: Path, port: int) -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        server.shutdown()
+        _stop_server(server)
 
 
 def cmd_run(args) -> int:
@@ -105,7 +124,7 @@ def cmd_run(args) -> int:
         status = Controller(wo, opts, builder, reviewer, commentator).run()
     except BaseException:
         if server:
-            server.shutdown()
+            _stop_server(server)
         raise
     run = read_run(opts.run_dir)
     print(f"{run_id}: {status}. {run.get('reason', '')}")
@@ -113,12 +132,12 @@ def cmd_run(args) -> int:
     if server and status == "waiting":
         _wait_for_the_gm(server, opts.run_dir, args.serve_port)
     elif server:
-        server.shutdown()
+        _stop_server(server)
     return 0 if status == "waiting" else 1
 
 
 def cmd_watch(args) -> int:
-    folder = RUNS / args.run_id
+    folder = run_folder(args.run_id)
     if not (folder / "index.html").exists():  # the live page is rebuilt, not stored with the evidence
         report.write_live_page(folder, DASHBOARD)
     serve(folder, args.port, REPO, DASHBOARD)
@@ -126,12 +145,12 @@ def cmd_watch(args) -> int:
 
 
 def cmd_export(args) -> int:
-    print(report.export(RUNS / args.run_id, DASHBOARD))
+    print(report.export(run_folder(args.run_id), DASHBOARD))
     return 0
 
 
 def cmd_status(args) -> int:
-    runs = [RUNS / args.run_id] if args.run_id else sorted(p for p in RUNS.glob("*") if (p / "run.json").exists())
+    runs = [run_folder(args.run_id)] if args.run_id else sorted(p for p in RUNS.glob("*") if (p / "run.json").exists())
     for folder in runs:
         run = read_run(folder)
         status = run["status"]
@@ -154,13 +173,16 @@ def _alive(pid: int | None) -> bool:
 
 
 def cmd_stop(args) -> int:
-    (RUNS / args.run_id / "STOP").write_text("stop\n")
+    folder = run_folder(args.run_id)
+    if read_run(folder)["status"] != "running":
+        sys.exit(f"{args.run_id} is not running ({read_run(folder)['status']}): nothing to stop.")
+    (folder / "STOP").write_text("stop\n")
     print("Stop order written. The controller kills the agent's process group within a second.")
     return 0
 
 
 def cmd_approve(args) -> int:
-    folder = RUNS / args.run_id
+    folder = run_folder(args.run_id)
     try:
         if read_run(folder)["status"] == "approved" and args.open_pr:  # approved earlier, never delivered
             print(f"Delivered: {deliver(folder, REPO, DASHBOARD)}")
@@ -179,7 +201,7 @@ def cmd_approve(args) -> int:
 
 def cmd_reject(args) -> int:
     try:
-        decide(RUNS / args.run_id, REPO, DASHBOARD, "reject", reason=args.reason)
+        decide(run_folder(args.run_id), REPO, DASHBOARD, "reject", reason=args.reason)
     except DecisionError as error:
         sys.exit(str(error))
     print("Rejected. The branch and the evidence stay for the record.")

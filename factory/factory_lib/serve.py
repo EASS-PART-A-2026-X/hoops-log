@@ -15,7 +15,7 @@ import secrets
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from .decide import DecisionError, decide
+from .decide import BadRequest, DecisionError, WrongState, decide
 
 TOKEN_SLOT = "window.FACTORY_TOKEN = null;"
 MAX_BODY = 4096
@@ -38,6 +38,9 @@ class _Handler(SimpleHTTPRequestHandler):
     # ------------------------------------------------------------ the page: the token goes in here
 
     def do_GET(self) -> None:
+        if not self._from_this_server(get=True):  # DNS rebinding: the page carries the token
+            self._json(403, {"ok": False, "error": "this address is not this server's"})
+            return
         if self.path.split("?")[0] in ("/", "/index.html"):
             page = self.run_dir / "index.html"
             if page.exists():
@@ -60,10 +63,12 @@ class _Handler(SimpleHTTPRequestHandler):
     def _json(self, code: int, payload: dict) -> None:
         self._send(code, json.dumps(payload).encode("utf-8"))
 
-    def _from_this_server(self) -> bool:
+    def _from_this_server(self, get: bool = False) -> bool:
         port = self.server.server_address[1]
         own = {f"127.0.0.1:{port}", f"localhost:{port}"}
         origin = self.headers.get("Origin")
+        if get:  # a page load carries no Origin; only the Host says where it was sent
+            return self.headers.get("Host") in own
         return self.headers.get("Host") in own and (origin is None or origin in {f"http://{h}" for h in own})
 
     def do_POST(self) -> None:
@@ -77,7 +82,13 @@ class _Handler(SimpleHTTPRequestHandler):
         if not hmac.compare_digest(sent.encode(), self.token.encode()):
             self._json(403, {"ok": False, "error": "missing or wrong token: reload the page"})
             return
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0:
+            self._json(400, {"ok": False, "error": "a Content-Length that is a whole number is needed"})
+            return
         if length > MAX_BODY:
             self._json(413, {"ok": False, "error": "request too large"})
             return
@@ -99,7 +110,7 @@ class _Handler(SimpleHTTPRequestHandler):
                 open_pr=bool(body.get("open_pr")),
             )
         except DecisionError as error:
-            code = 409 if "only a run waiting" in str(error) else 502
+            code = 409 if isinstance(error, WrongState) else 400 if isinstance(error, BadRequest) else 502
             self._json(code, {"ok": False, "error": str(error)})
             return
         self._json(200, {"ok": True, **result})
@@ -118,3 +129,4 @@ def serve(run_dir: Path, port: int, repo: Path, dashboard: Path) -> None:
     print(f"Watching {run_dir.name}: http://127.0.0.1:{port}/  (Ctrl+C to stop)")
     with contextlib.suppress(KeyboardInterrupt):
         server.serve_forever()
+    server.server_close()

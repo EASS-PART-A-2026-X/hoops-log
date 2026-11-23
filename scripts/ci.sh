@@ -2,7 +2,7 @@
 # One command that says whether this repo is safe to merge.
 #
 #   scripts/ci.sh            lint, format, tests, mutation score   (about 1 minute)
-#                            (backend and ai-service; mutation score is backend only)
+#                            (backend, ai-service and factory; mutation score is backend only)
 #   scripts/ci.sh --docker   ...plus the Docker persistence/kill test and the Compose stack test
 #   scripts/ci.sh --fast     lint, format and tests only           (a few seconds)
 #

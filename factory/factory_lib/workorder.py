@@ -7,6 +7,7 @@ holds path patterns (`*` inside a folder, `**` across folders), one per line or 
 separated. `Verify with` holds one check per line as `label | folder | command`.
 """
 
+import posixpath
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -67,7 +68,10 @@ def _parse_checks(text: str) -> tuple[Check, ...]:
         pieces = [piece.strip() for piece in line.split("|")]
         if len(pieces) != 3 or not all(pieces):
             raise WorkOrderError(f"a check must be `label | folder | command`, got: {line!r}")
-        checks.append(Check(*pieces))
+        folder = posixpath.normpath(pieces[1])
+        if folder.startswith(("/", "..")):
+            raise WorkOrderError(f"a check's folder must be inside the repo, got: {pieces[1]!r}")
+        checks.append(Check(pieces[0], folder, pieces[2]))
     return tuple(checks)
 
 

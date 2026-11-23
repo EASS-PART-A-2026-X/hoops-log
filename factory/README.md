@@ -48,11 +48,11 @@ The course asks to say which rules the system really enforces. Here is the hones
 | Rule | Enforced by | Is it a real fence? |
 |---|---|---|
 | The builder has no shell | `--tools Read,Glob,Grep,Edit,Write`: the tool is not available | **Yes.** See the experiment below |
-| Edits only to the work order's `Files` | an edit hook before every Edit/Write, *and* the controller reverts anything else after the builder stops | **Yes**, twice. The hook fails closed |
+| Edits only to the work order's `Files` | an edit hook before every Edit/Write, *and* the controller reverts anything else after the builder stops (new, staged, renamed and deleted files, accents and spaces in names included) | **Yes**, in two layers. The hook blocks when it cannot start or cannot decide, too (Claude Code lets an edit through on any exit code but 2, so the hook exits 2 on every failure). Git-ignored files are not reverted because git never commits them: they cannot reach a candidate |
 | The gate runs on the exact candidate | a clean checkout of the commit, made by the controller | **Yes** |
 | The new tests must fail without the change | the gate's `fails-first` check runs them on the original code | **Yes** |
 | Time is limited; STOP works | the controller owns the process group and kills it (`runner.py`) | **Yes**: a real kill, not a message |
-| Nothing is pushed or merged | no push code on the run path; only a decision by a person (the page's "Approve and open the PR" after a confirmation, or `factory approve --open-pr`) | **Yes** by construction; **not** by GitHub (`main` and `ex3` have no branch protection) |
+| Nothing is pushed or merged | the builder has no shell and no push code; the checks run without credentials in their environment; only a decision by a person (the page's "Approve and open the PR" after a confirmation, or `factory approve --open-pr`) | **Mostly.** By construction, and by GitHub only if you turn on branch protection (`main` and `ex3` have none). The gate runs the builder's own test files, so the checks are the soft spot: see the next section |
 | Only the page the server gave you can decide | the server (`127.0.0.1` only) puts a secret token in the page it serves and checks it, the Host and the Origin on every decision | **Yes**: another website, or a copy of the page, cannot decide |
 | "Do not use git", "keep the change small" | the builder's prompt | **Advice only** |
 | The reviewer's verdict | a small model's reading | **Evidence, not proof** |
@@ -62,9 +62,13 @@ model to write a forbidden file, and it wrote it through **Bash**; the edit hook
 still available. An allow-list in a flag is guidance. Removing the tool with `--tools` is the fence. This is
 the course's point that guidance is not enforcement, found by running it.
 
-What a worktree is **not**: it separates edited files, not processes or credentials. The builder runs as you.
-It cannot push because it has no shell and no push code, not because it is sandboxed. A container would add real
-isolation; this version does not have one.
+What a worktree is **not**: it separates edited files, not processes or credentials. The builder itself has no
+shell, but **the gate runs the tests the builder wrote**, as you, on your computer. A test file could run any
+command. Two things shrink that, neither closes it: the gate's environment has no tokens or keys (anything named
+like `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `SSH_AUTH_SOCK`, `ANTHROPIC`, `GROQ` is left out), and the reviewer reads
+the diff for exactly this. A test can still read files in your home folder and use the network. Real isolation
+needs a container with no credentials; this version does not have one, so read a candidate's new test files
+before approving.
 
 ## What is written where
 
@@ -109,7 +113,8 @@ waiting for the GM, the panel *The GM's call* has real buttons:
 ![The confirmation before an approval](../docs/factory/gm-confirm.png)
 
 The buttons and `factory approve` call the same code (`factory_lib/decide.py`), so they cannot disagree. A run
-can be decided once. An offline copy (`report.html` opened from a file) cannot decide: it shows the command.
+can be decided once, even if two requests arrive together (a double click, two tabs, the page and the command):
+the check and the write happen under a lock (a thread lock, and a file lock for another process). An offline copy (`report.html` opened from a file) cannot decide: it shows the command.
 If pushing fails (for example, no network), the approval stays recorded, the page says delivery failed, and
 `factory approve <run-id> --open-pr` retries only the delivery.
 
@@ -182,11 +187,15 @@ factory.
 - A worktree is not a sandbox (see above). There is no container.
 - One commentary line in WO-002's log ends with a stray "(16 words)" that the small model added. It is kept
   as recorded; the factory now strips such lines.
-- If a controller process is killed, `run.json` stays `running`; `factory status` shows `died`.
+- Ctrl-C ends a run as `stopped` with a note. If the process is killed hard (`kill -9`), `run.json` stays `running`
+  and `factory status` shows `died`.
+- The pull request that `approve --open-pr` opens holds only the candidate's change. The run's evidence stays in
+  `factory/runs/<run-id>/` of the checkout that ran it (it reaches the repository with the factory's own PR).
+- `--open-pr` only knows `github.com` remotes and needs `gh` logged in; otherwise it says so and the approval stays.
 
 ## Tests
 
-`python3 -m pytest factory/tests` (also run by `scripts/ci.sh`): 101 tests, no model and no network. They
+`python3 -m pytest factory/tests` (also run by `scripts/ci.sh`): 160 tests, no model and no network. They
 cover the announcer table, the scope rules, the hook (it fails closed), the process kill and the stop file, the
 gate and the fails-first check, every path through the controller (good run, repairs, the repair limit, scope
 violations, stop, out of time, a crash), and the GM commands. Each of the main rules was broken on purpose to see

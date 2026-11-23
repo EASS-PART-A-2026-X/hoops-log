@@ -12,7 +12,7 @@ from factory_lib import events
 from factory_lib.decide import DecisionError, decide, deliver
 from factory_lib.serve import TOKEN_SLOT, make_server
 
-from .conftest import DASHBOARD, git
+from .conftest import DASHBOARD
 
 
 def waiting_run(tmp_path: Path, status: str = "waiting") -> Path:
@@ -233,8 +233,78 @@ def test_a_decision_with_a_pr_from_the_page_uses_the_delivery_code(tmp_path, mon
         server.server_close()
 
 
-def test_git_is_not_needed_to_decide(tmp_path):
+def test_deciding_needs_no_git_repository(tmp_path):
     # decide() only touches the run folder unless a PR is asked for: it works outside any repository
     run_dir = waiting_run(tmp_path)
     assert decide(run_dir, tmp_path / "no-repo", DASHBOARD, "approve")["status"] == "approved"
-    assert git is not None
+
+
+def raw(port, lines, body=b""):
+    """A request written by hand, so a header can be wrong in ways http.client would not allow."""
+    import socket
+
+    with socket.create_connection(("127.0.0.1", port), timeout=10) as sock:
+        sock.sendall(("\r\n".join(lines) + "\r\n\r\n").encode() + body)
+        reply = b""
+        while chunk := sock.recv(65536):
+            reply += chunk
+    return int(reply.split(b" ", 2)[1]), reply
+
+
+def test_the_page_and_the_run_files_are_only_given_to_this_servers_own_address(served):
+    run_dir, port = served
+    status, reply = raw(port, ["GET / HTTP/1.1", "Host: evil.example", "Connection: close"])
+    assert status == 403 and b"secret-token" not in reply  # DNS rebinding cannot read the token
+    assert raw(port, ["GET /run.json HTTP/1.1", "Host: evil.example", "Connection: close"])[0] == 403
+    assert raw(port, ["GET / HTTP/1.1", f"Host: localhost:{port}", "Connection: close"])[0] == 200
+
+
+@pytest.mark.parametrize("length", ["abc", "-5", "1.5"])
+def test_a_bad_content_length_is_a_400_and_does_not_hang(served, length):
+    run_dir, port = served
+    status, _ = raw(
+        port,
+        [
+            "POST /decide HTTP/1.1",
+            f"Host: 127.0.0.1:{port}",
+            "X-Factory-Token: secret-token",
+            f"Content-Length: {length}",
+            "Connection: close",
+        ],
+    )
+    assert status == 400 and events.read_run(run_dir)["status"] == "waiting"
+
+
+def test_the_status_code_comes_from_the_kind_of_error_not_its_wording(tmp_path, monkeypatch):
+    from factory_lib import decide as decide_module
+
+    monkeypatch.setattr(decide_module, "open_pr_for", lambda run, repo: (_ for _ in ()).throw(OSError("no network")))
+    run_dir = waiting_run(tmp_path)
+    server = make_server(run_dir, 0, tmp_path, DASHBOARD, token="t")
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        port = server.server_address[1]
+        status, body, _ = decision(port, {"decision": "approve", "open_pr": True}, token="t")
+        assert status == 502 and "delivery failed" in json.loads(body)["error"]
+        assert decision(port, {"decision": "reject"}, token="t")[0] == 409
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_a_wrong_state_is_a_409_whatever_its_wording(tmp_path, monkeypatch):
+    from factory_lib import decide as decide_module
+    from factory_lib import serve as serve_module
+
+    def reworded(*args, **kwargs):
+        raise decide_module.WrongState("the run is somewhere else now")
+
+    monkeypatch.setattr(serve_module, "decide", reworded)
+    run_dir = waiting_run(tmp_path)
+    server = make_server(run_dir, 0, tmp_path, DASHBOARD, token="t")
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        assert decision(server.server_address[1], {"decision": "approve"}, token="t")[0] == 409
+    finally:
+        server.shutdown()
+        server.server_close()

@@ -9,6 +9,8 @@ test the change.
 
 import fnmatch
 import os
+import posixpath
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,8 +32,15 @@ class CheckResult:
     note: str = ""
 
 
+SECRET_NAME = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|^SSH_AUTH_SOCK$|^GIT_ASKPASS$|^ANTHROPIC|^GROQ", re.I)
+
+
 def _env(extra: dict[str, str] | None = None) -> dict[str, str]:
-    env = dict(os.environ)
+    """The checks run code the builder wrote (its tests), so credentials in the environment are left out.
+
+    This is not a sandbox: such a test can still read files in your home folder.
+    """
+    env = {name: value for name, value in os.environ.items() if not SECRET_NAME.search(name)}
     env["PATH"] = gitwork.tool_path()
     env["CI"] = "1"
     env.update(extra or {})
@@ -52,10 +61,11 @@ def fails_first(
     stop_file: Path | None = None,
 ) -> CheckResult:
     """The candidate's tests, run on the original code: at least one must fail there."""
-    folder = check.cwd.strip("./")
+    folder = posixpath.normpath(check.cwd)
+    folder = "" if folder == "." else folder  # "." is the repo root; ".github" is a real folder
     changed = [
         p
-        for p in gitwork.changed_files(repo, base, candidate)
+        for p in gitwork.changed_files(repo, base, candidate, still_there=True)
         if _is_test(p) and (not folder or p.startswith(folder + "/"))
     ]
     if not changed:
@@ -66,16 +76,26 @@ def fails_first(
     try:
         gitwork.link_dependencies(scratch, repo)
         for path in changed:
-            source = gitwork.git("show", f"{candidate}:{path}", cwd=repo)
             target = scratch / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(source + "\n", encoding="utf-8")
+            target.write_bytes(gitwork.file_at(repo, candidate, path))
         relative = " ".join(p[len(folder) + 1 :] if folder else p for p in changed)
         command = check.command[len(FAILS_FIRST) :].strip().replace("{files}", relative)
         outcome = run_bounded(command, scratch / folder, _env(), timeout, stop_file, shell=True)
     finally:
         gitwork.remove_worktree(repo, scratch)
-    failed_there = outcome.returncode not in (0, None) and not outcome.timed_out
+    if outcome.stopped or outcome.timed_out:
+        return CheckResult(check.label, False, outcome.output, outcome.seconds, "Stopped before the tests finished.")
+    code = outcome.returncode
+    if code is None or code < 0 or code in (126, 127):  # killed by a signal, or the command could not run
+        return CheckResult(
+            check.label,
+            False,
+            outcome.output,
+            outcome.seconds,
+            f"The tests could not run on the original code (exit {code}).",
+        )
+    failed_there = code != 0
     note = (
         "Tests failed on the original code, as they should: " + ", ".join(changed)
         if failed_there

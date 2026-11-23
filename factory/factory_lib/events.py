@@ -11,7 +11,8 @@ record of who said or did what, and the live dashboard follows it. An event is:
              receipt, files, box   (the dashboard reads these; see dashboard/)
 
 The hook that blocks out-of-scope edits runs in another process and appends to the same
-file, so every write is one whole line, flushed, under a lock.
+file. Every event is ONE os.write to a file opened with O_APPEND, so lines from two processes
+cannot be interleaved; a lock only keeps threads of one process in order.
 """
 
 import json
@@ -52,11 +53,14 @@ def append_event(
     if started_at is None:
         started_at = read_run(run_dir)["started_at"]
     stored = {"t": round(now() - started_at, 1), **event}
-    line = json.dumps(stored, ensure_ascii=False)
-    with _LOCK, open(run_dir / "events.jsonl", "a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
+    data = (json.dumps(stored, ensure_ascii=False) + "\n").encode("utf-8")
+    with _LOCK:
+        fd = os.open(run_dir / "events.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, data)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
     return stored
 
 

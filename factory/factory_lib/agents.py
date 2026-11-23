@@ -16,6 +16,7 @@ list in a flag is guidance. Only removing the tool (`--tools`) is a fence.
 import json
 import os
 import re
+import shlex
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -180,7 +181,7 @@ class ClaudeBuilder:
         self.label = model
 
     def argv(self, prompt: str) -> list[str]:
-        hook = {"type": "command", "command": f"{sys.executable} {HOOK}"}
+        hook = {"type": "command", "command": shlex.join([sys.executable, str(HOOK)])}
         settings = {"hooks": {"PreToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit", "hooks": [hook]}]}}
         return [
             self.claude,

@@ -10,7 +10,7 @@ import pytest
 from factory_lib import agents, gitwork, report, workorder
 from factory_lib.agents import AgentReport, ScriptedBuilder, ScriptedReviewer
 from factory_lib.controller import Controller, Options
-from factory_lib.events import read_events, read_run
+from factory_lib.events import read_events, read_run, write_run
 
 from .conftest import DASHBOARD, HERE, git
 
@@ -350,6 +350,7 @@ def test_a_rejection_keeps_the_reason(repo, tmp_path, write_order):
 def test_the_stop_command_writes_the_stop_file(repo, tmp_path, write_order):
     runs = tmp_path / "runs"
     (runs / "r9").mkdir(parents=True)
+    write_run(runs / "r9", {"id": "r9", "status": "running"})
     assert cli(runs, "stop", "r9").returncode == 0 and (runs / "r9" / "STOP").exists()
 
 
