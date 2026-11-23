@@ -85,16 +85,21 @@ def run_bounded(
     reader = threading.Thread(target=read, daemon=True)
     reader.start()
     timed_out = stopped = False
-    while process.poll() is None:
-        if time.monotonic() - started > timeout:
-            timed_out = True
-            _kill_group(process)
-            break
-        if stop_file is not None and stop_file.exists():
-            stopped = True
-            _kill_group(process)
-            break
-        time.sleep(0.2)
+    try:
+        while process.poll() is None:
+            if time.monotonic() - started > timeout:
+                timed_out = True
+                _kill_group(process)
+                break
+            if stop_file is not None and stop_file.exists():
+                stopped = True
+                _kill_group(process)
+                break
+            time.sleep(0.2)
+    except BaseException:  # Ctrl-C: the agent must not go on running after the factory says "stopped"
+        _kill_group(process)
+        process.wait()
+        raise
     process.wait()
     reader.join(timeout=5)
     return Outcome(process.returncode, "".join(chunks), time.monotonic() - started, timed_out, stopped)

@@ -57,7 +57,7 @@ def _nul_list(text: str) -> list[str]:
 def changed_paths(worktree: Path) -> tuple[list[str], list[str]]:
     """(tracked files that differ from HEAD, new files git does not know yet)."""
     # -z: git otherwise quotes and octal-escapes names with accents or spaces, and they would never match
-    tracked = _nul_list(_git(worktree, "diff", "--name-only", "-z", "HEAD"))
+    tracked = _nul_list(_git(worktree, "diff", "--name-only", "--no-renames", "-z", "HEAD"))
     new = _nul_list(_git(worktree, "ls-files", "--others", "--exclude-standard", "-z"))
     return tracked, new
 

@@ -187,7 +187,8 @@ factory.
 - A worktree is not a sandbox (see above). There is no container.
 - One commentary line in WO-002's log ends with a stray "(16 words)" that the small model added. It is kept
   as recorded; the factory now strips such lines.
-- Ctrl-C ends a run as `stopped` with a note. If the process is killed hard (`kill -9`), `run.json` stays `running`
+- Ctrl-C ends a run as `stopped` with a note and kills the agent's process group. The builder's worktree and
+  its branch are kept on purpose, as part of the record. If the process is killed hard (`kill -9`), `run.json` stays `running`
   and `factory status` shows `died`.
 - The pull request that `approve --open-pr` opens holds only the candidate's change. The run's evidence stays in
   `factory/runs/<run-id>/` of the checkout that ran it (it reaches the repository with the factory's own PR).
@@ -195,7 +196,7 @@ factory.
 
 ## Tests
 
-`python3 -m pytest factory/tests` (also run by `scripts/ci.sh`): 160 tests, no model and no network. They
+`python3 -m pytest factory/tests` (also run by `scripts/ci.sh`): 163 tests, no model and no network. They
 cover the announcer table, the scope rules, the hook (it fails closed), the process kill and the stop file, the
 gate and the fails-first check, every path through the controller (good run, repairs, the repair limit, scope
 violations, stop, out of time, a crash), and the GM commands. Each of the main rules was broken on purpose to see

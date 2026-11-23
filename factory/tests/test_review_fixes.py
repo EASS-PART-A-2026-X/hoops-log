@@ -1,6 +1,7 @@
 """Rules a fresh-eyes review found missing. Each test fails if its fix is taken out. No model, no network."""
 
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -308,3 +309,43 @@ def test_the_built_dashboard_matches_its_template():
     built = DASHBOARD.read_text(encoding="utf-8")
     head, tail = template.split("/*FONTS*/")
     assert built.startswith(head) and built.endswith(tail), "run: python3 factory/dashboard/build.py"
+
+
+def test_ctrl_c_kills_the_running_command_too(tmp_path):
+    import time
+
+    from factory_lib import runner
+
+    marker = tmp_path / "pid"
+    original_sleep = time.sleep
+    calls = {"n": 0}
+
+    def interrupt(seconds):
+        calls["n"] += 1
+        if marker.exists() and calls["n"] > 3:
+            raise KeyboardInterrupt
+        original_sleep(seconds)
+
+    runner.time.sleep = interrupt
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            runner.run_bounded(f"echo $$ > {marker}; sleep 60", tmp_path, timeout=60, shell=True)
+    finally:
+        runner.time.sleep = original_sleep
+    pid = int(marker.read_text())
+    original_sleep(0.5)
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)  # gone, not still running
+
+
+def test_a_staged_move_of_a_forbidden_file_to_an_allowed_name_is_undone(repo):
+    git(repo, "mv", "backend/other.py", "frontend/src/shooter.test.ts.bak")
+    scope.enforce(repo, ["frontend/src/*.bak"])
+    assert (repo / "backend/other.py").exists()  # the forbidden file's deletion was seen and undone
+
+
+def test_a_run_id_that_leaves_the_runs_folder_is_refused_when_starting_a_run(tmp_path, write_order):
+    from .test_controller import cli
+
+    done = cli(tmp_path / "runs", "run", str(write_order(2, 30)), "--run-id", "../x")
+    assert done.returncode != 0 and "Not a usable run id" in done.stderr

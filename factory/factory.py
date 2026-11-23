@@ -101,6 +101,8 @@ def _wait_for_the_gm(server, run_dir: Path, port: int) -> None:
 def cmd_run(args) -> int:
     wo = workorder.parse(Path(args.work_order))
     run_id = args.run_id or next_run_id(wo.id)
+    if not RUN_ID.fullmatch(run_id) or ".." in run_id:
+        sys.exit(f"Not a usable run id: {run_id!r}")
     if args.agents == "scripted":
         builder, reviewer = _dry_run_agents()
     else:
