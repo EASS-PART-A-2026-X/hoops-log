@@ -29,6 +29,7 @@ step "pytest"            uv run pytest
 step "ai-service ruff check"  uv run --directory ../ai-service ruff check .
 step "ai-service ruff format" uv run --directory ../ai-service ruff format --check .
 step "ai-service pytest"      uv run --directory ../ai-service pytest
+step "ai-service evals (baseline)" uv run --directory ../ai-service python -m evals.run_evals
 if [ "$mode" != "--fast" ]; then
   step "mutation score >= 95%" uv run python ../scripts/mutation_score.py --min 95
 fi

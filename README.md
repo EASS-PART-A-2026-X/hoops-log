@@ -141,6 +141,23 @@ uv run ruff format --check .
 ## How the AI path fails
 Shots keep working when the AI does not. [docs/failure-modes.md](docs/failure-modes.md) lists each way the AI path can break (service stopped, silent, hanging up, rate-limited, mis-set, bad answers, wrong token), which layer notices, which single layer retries (only the model's own output repair, up to 2 times), the status code and sentence the player gets, and the test that proves it. Five of those tests use a real misbehaving server on a real socket (and one runs a real backend while the AI service hangs), and `scripts/compose_check.py` stops the AI service and breaks its model setting in the real stack.
 
+## How I evaluate the AI
+The tests prove the code handles an answer. An **evaluation** asks how good the model is at the job. `ai-service/evals/` holds 41 cases (33 development, 8 held out) in nine slices, so one weak group cannot hide behind an average: named places in English and Hebrew, feet, a two-turn follow-up, unclear shots (propose nothing, ask one question), things that are not a field goal, dates ("yesterday"), questions answered from the app's numbers, and text that tries to change Deni's rules. Each case has the player's words, the numbers the app would send, the expected behaviour, and a hand-written gold reply.
+
+- **Checks, no model as judge.** Schema and control flow: the service answered 200, how long it took. Domain quality: shots matched by place and result (F1), dates, the reply language, the "Got it" opening, never "saved" before the player taps Save, exactly one question when something is missing, every number in a reply is one the app computed, nothing stated about the real Deni, injected text not obeyed. A case the service could not answer scores zero on every check; an error never earns credit.
+- **The checks are tested.** A perfect fake model must score 100%, a deliberately bad one must score low, and each check is tried on a good and a bad answer (`ai-service/tests/test_evals.py`).
+- **Baseline.** A keyword parser behind a fake model, written against the development cases only. It is the floor a real model must beat, and it runs in CI: `uv run python -m evals.run_evals` prints the table with an Averages row, then pass rates per check, per slice, and for development versus held-out cases.
+- **Held-out cases** are not used to tune the prompt or the baseline; they check a frozen configuration on cases it never saw.
+- **Every result says what was run:** model, REAL or FAKE, settings, date, git commit (marked `+uncommitted` if the code had changes), dataset and prompt hashes, library versions. `--save` writes it to `ai-service/evals/results/`. The committed [baseline result](ai-service/evals/results/2026-11-23-baseline.md) is a FAKE model: it measures the checks, not a model. A real-model result is added separately and is the only one that says anything about quality.
+- **Not measured:** tone and helpfulness (no judge, so no number), a real model's speed under load, and Hebrew phrasing by a native reader (the Hebrew cases still need that check).
+
+```bash
+cd ai-service
+uv run python -m evals.run_evals                        # the baseline
+uv run python -m evals.run_evals --model oracle         # must be 100%: tests the checks
+uv run python -m evals.run_evals --model groq:openai/gpt-oss-120b --pause 8 --save   # a real model
+```
+
 ## How I know the tests are good
 Passing tests only show that the cases I thought of work. Three tools, all in this repo, check the rest. Everything below runs from a fresh clone with only `uv` (and Docker for the last step).
 
