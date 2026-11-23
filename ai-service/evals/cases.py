@@ -19,8 +19,15 @@ Slices (groups scored separately, so an average cannot hide a weak group):
 `held_out` cases are NOT used while the prompt or the baseline parser is being tuned.
 They are only read when a configuration is frozen, to check it on cases it never saw.
 
-The Hebrew cases and their gold replies were drafted by an assistant and need a native
-reader's check before the numbers from a real-model run are quoted.
+The Hebrew cases were drafted by an assistant and are being reviewed by the author, a
+native speaker, who has already reworded several of them (the wording of cases such as
+`he-left-elbow` is his). A real-model run should wait until that review is finished.
+
+Hebrew court slang used by the cases (the author's convention, not something the
+service's prompt teaches): "45" is the 45-degree angle on a side, so "חצי מרחק ב45 שמאל"
+(a mid-range at the 45 on the left) is the left elbow, and "שלשה מ45 ימין" (a three from
+the 45 on the right) is the right wing three. "מהאמצע" is the top of the key and "לייאפ"
+a layup. These test whether a model understands how players talk.
 """
 
 from dataclasses import dataclass, field
@@ -206,13 +213,13 @@ CASES: tuple[EvalCase, ...] = (
         _hebrew_got_it("שלשה שלא נכנסה מהפינה השמאלית"),
     ),
     _spot_he(
-        "he-left-elbow",
+        "he-left-elbow",  # "חצי מרחק ב45 שמאל": see the slang note in the docstring
         "קלעתי זריקה מחצי מרחק ב45 שמאל.",
         (_shot("left_elbow", True),),
         _hebrew_got_it("זריקה שנכנסה מחצי מרחק ב45 שמאל"),
     ),
     _spot_he(
-        "he-free-throw-line-jumper",
+        "he-free-throw-line-shot",
         "זריקה מקו העונשין, נכנסה.",
         (_shot("free_throw_line", True),),
         _hebrew_got_it("זריקה שנכנסה מקו העונשין"),
@@ -234,6 +241,13 @@ CASES: tuple[EvalCase, ...] = (
         "החטאתי שלשה מ45 ימין.",
         (_shot("right_wing_three", False),),
         _hebrew_got_it("שלשה שלא נכנסה מ45 ימין"),
+    ),
+    _spot_he(
+        "he-left-wing-three",
+        "קלעתי שלשה מ45 שמאל.",
+        (_shot("left_wing_three", True),),
+        _hebrew_got_it("שלשה שנכנסה מ45 שמאל"),
+        held_out=True,
     ),
     # --- feet given directly ---
     EvalCase(
@@ -308,7 +322,7 @@ CASES: tuple[EvalCase, ...] = (
         "unclear",
         "זרקתי חצי מרחק מפינה שמאל.",
         Expect(question=True, language="he"),
-        "מאיפה בדיוק זה היה, והאם הזריקה נכנסה?",
+        "האם הזריקה נכנסה, ואיפה בדיוק מהפינה השמאלית?",
         held_out=True,
     ),
     # --- not a field goal: not tracked here ---

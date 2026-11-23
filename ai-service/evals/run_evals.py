@@ -86,7 +86,9 @@ def summarize(report: EvaluationReport) -> dict:
     }
 
 
-def control_flow(report: EvaluationReport) -> dict:
+def control_flow(report: EvaluationReport, fake: bool = False) -> dict:
+    """Statuses and latency. A fake model answers in milliseconds that differ on every
+    run, so its latency is recorded as None: it says nothing and only adds noise."""
     seconds = [case.output.seconds for case in report.cases]
     statuses: dict[str, int] = {}
     for case in report.cases:
@@ -100,8 +102,8 @@ def control_flow(report: EvaluationReport) -> dict:
     return {
         "statuses": statuses,
         "unanswered": unanswered,
-        "latency_median_s": round(statistics.median(seconds), 2),
-        "latency_max_s": round(max(seconds), 2),
+        "latency_median_s": None if fake else round(statistics.median(seconds), 2),
+        "latency_max_s": None if fake else round(max(seconds), 2),
     }
 
 
@@ -126,7 +128,9 @@ def _git_commit() -> str:
     commit = _git("rev-parse", "--short", "HEAD")
     if commit is None:
         return "unknown"
-    return f"{commit}+uncommitted" if _git("status", "--porcelain") else commit
+    # The results folder is what a run writes, so its files do not make the code dirty.
+    dirty = _git("status", "--porcelain", "--", ".", ":(exclude)results")
+    return f"{commit}+uncommitted" if dirty else commit
 
 
 def _digest(text: str) -> str:
@@ -150,6 +154,12 @@ def metadata(model: str, cases: tuple[EvalCase, ...]) -> dict:
     }
 
 
+def _latency(flow: dict) -> str:
+    if flow["latency_median_s"] is None:
+        return "latency not recorded (a fake model's speed means nothing)"
+    return f"median {flow['latency_median_s']} s, max {flow['latency_max_s']} s"
+
+
 def render_markdown(meta: dict, summary: dict, flow: dict) -> str:
     lines = [f"# Evaluation: {meta['model']} on {meta['date']}", ""]
     lines += [f"- **Condition:** {meta['condition']}"]
@@ -160,10 +170,7 @@ def render_markdown(meta: dict, summary: dict, flow: dict) -> str:
             f"- **versions:** pydantic-ai {meta['pydantic_ai']}, "
             f"pydantic-evals {meta['pydantic_evals']}"
         ),
-        (
-            f"- **control flow:** statuses {flow['statuses']}, median "
-            f"{flow['latency_median_s']} s, max {flow['latency_max_s']} s"
-        ),
+        f"- **control flow:** statuses {flow['statuses']}, {_latency(flow)}",
         "",
         "## Cases fully passed",
         "",
@@ -228,7 +235,9 @@ def save(meta: dict, summary: dict, flow: dict, report: EvaluationReport) -> lis
             "slice": case.metadata["slice"],
             "held_out": case.metadata["held_out"],
             "status": case.output.status,
-            "seconds": round(case.output.seconds, 2),
+            "seconds": None
+            if flow["latency_median_s"] is None
+            else round(case.output.seconds, 2),
             "reply": case.output.reply,
             "proposals": case.output.proposals,
             "failed_checks": case_failures(case),
@@ -265,7 +274,8 @@ def main(argv: list[str] | None = None) -> int:
     )  # a failing case is reported below
     report = run_report(args.model, CASES, pause=args.pause)
     meta = metadata(args.model, CASES)
-    summary, flow = summarize(report), control_flow(report)
+    summary = summarize(report)
+    flow = control_flow(report, fake=is_fake(args.model))
 
     if flow["unanswered"]:
         print(
