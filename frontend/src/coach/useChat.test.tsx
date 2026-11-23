@@ -149,12 +149,12 @@ describe('the conversation it sends', () => {
     ])
   })
 
-  it('sends at most the last twelve messages, the newest being the players', async () => {
+  it('sends at most the last six messages, the newest being the players', async () => {
     chatCall.mockResolvedValue(answer('ok'))
     const { send } = setup()
     for (let i = 0; i < 8; i++) await send(`m${i}`)
     const turns = chatCall.mock.calls[7]![0]
-    expect(turns).toHaveLength(12)
+    expect(turns).toHaveLength(6)
     expect(turns.at(-1)).toEqual({ role: 'user', text: 'm7' })
     expect(turns[0]).toEqual({ role: 'deni', text: 'ok' }) // the oldest are dropped, not the newest
   })

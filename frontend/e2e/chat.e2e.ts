@@ -191,7 +191,7 @@ test.describe('the chat, with his AI helper there', () => {
       await api.seed(makeShots('Yuly', 6, { seed: 91 }))
       await openChat(page)
       await say(page, 'simulate busy')
-      await expect(log(page).getByRole('alert')).toContainText("Deni's AI helper is busy. Try again in a minute.")
+      await expect(log(page).getByRole('alert')).toContainText("Deni's AI helper is busy: the free AI model has a usage limit")
     })
 
     test('an answer that breaks the rules is refused, not shown or saved', async ({ page, api, guard }) => {
