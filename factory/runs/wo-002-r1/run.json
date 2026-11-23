@@ -6,7 +6,7 @@
     "path": "factory/workorders/WO-002-same-person-everywhere.md"
   },
   "factory_version": "0e1c4f5",
-  "status": "waiting",
+  "status": "approved",
   "pid": 1825667,
   "mode": "live",
   "started_at": 1795469654.25005,
@@ -46,5 +46,6 @@
   },
   "reason": "candidate 835739f is ready for the GM",
   "finished_at": 1795469950.6042686,
-  "final_candidate": "835739f08ffe057b8f38216c30b0ce8371d2f050"
+  "final_candidate": "835739f08ffe057b8f38216c30b0ce8371d2f050",
+  "decided_at": 1795471713.5431483
 }

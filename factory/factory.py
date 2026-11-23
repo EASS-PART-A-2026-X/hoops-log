@@ -136,10 +136,12 @@ def _decide(args, decision: str, text: str) -> dict:
 
 def cmd_approve(args) -> int:
     run = _decide(args, "approved", "The GM approved candidate {sha}.")
-    print(f"Approved {run['final_candidate'][:7]} on branch {run['branch']}. Nothing was pushed.")
+    print(f"Approved {run['final_candidate'][:7]} on branch {run['branch']}.")
     if args.open_pr:
+        print(f"Pushing only that branch, and opening a PR into {run['base_ref']}:")
         _open_pr(run)
     else:
+        print("Nothing was pushed.")
         print(
             f"To deliver it: git push -u origin {run['branch']}, then open a PR into {run['base_ref']} (or re-run with --open-pr)."
         )
