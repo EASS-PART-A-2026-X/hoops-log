@@ -394,3 +394,17 @@ def test_the_saved_evidence_has_no_machine_specific_paths_and_names_the_factory_
     for value in (run["worktree"], *run["where"].values()):
         assert not value.startswith("/") or str(repo) not in value, value
     assert run["where"]["event_log"].endswith("events.jsonl")
+
+
+def test_the_factory_version_ignores_run_folders_but_not_edited_factory_code(repo, tmp_path, write_order):
+    (repo / "factory" / "runs").mkdir(parents=True)
+    (repo / "factory" / "runs" / "old.txt").write_text("evidence")
+    (repo / "factory" / "factory_lib").mkdir()
+    (repo / "factory" / "factory_lib" / "x.py").write_text("x = 1\n")
+    git(repo, "add", "factory/factory_lib")
+    git(repo, "commit", "-q", "-m", "factory code")
+    _, run_dir, *_ = play(repo, tmp_path, write_order, [fix], run_id="clean")
+    assert "+uncommitted" not in read_run(run_dir)["factory_version"]
+    (repo / "factory" / "factory_lib" / "x.py").write_text("x = 2\n")  # edited, not committed
+    _, run_dir, *_ = play(repo, tmp_path, write_order, [fix], run_id="dirty")
+    assert read_run(run_dir)["factory_version"].endswith("+uncommitted")

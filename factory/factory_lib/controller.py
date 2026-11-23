@@ -66,7 +66,17 @@ class Controller:
 
     def _version(self) -> str:
         sha = gitwork.git("rev-parse", "--short", "HEAD", cwd=self.opts.repo, check=False) or "unknown"
-        dirty = gitwork.git("status", "--porcelain", "--", "factory", cwd=self.opts.repo, check=False)
+        # The run folders are evidence, not factory code: they must not make the version look edited.
+        dirty = gitwork.git(
+            "status",
+            "--porcelain",
+            "--",
+            "factory",
+            ":(exclude)factory/runs",
+            ":(exclude)factory/work",
+            cwd=self.opts.repo,
+            check=False,
+        )
         return f"{sha}+uncommitted" if dirty else sha
 
     def _remaining(self) -> float:
