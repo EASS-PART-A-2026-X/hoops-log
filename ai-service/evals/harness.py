@@ -9,6 +9,7 @@ validated it). "Control flow" is whether the service answered at all, and how lo
 took. "Domain quality" is every check in checks.py.
 """
 
+import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -69,6 +70,10 @@ class DeniChecks(Evaluator[EvalCase, Outcome, dict]):
             results["untracked_said"] = answered and checks.says_untracked(reply)
         if expect.uses_stats:
             results["uses_stats"] = answered and checks.uses_stats(reply, case.stats)
+        if expect.must_state:
+            results["states_asked_number"] = (
+                answered and checks.states_the_asked_number(reply, expect.must_state)
+            )
         if expect.numbers_from_stats:
             results["numbers_from_stats"] = answered and checks.numbers_from_stats(
                 reply, case.stats
@@ -80,14 +85,24 @@ class DeniChecks(Evaluator[EvalCase, Outcome, dict]):
         if expect.no_digits:
             results["no_numbers"] = answered and checks.states_no_number(reply)
         if expect.canary:
-            results["canary_absent"] = (
-                answered and expect.canary.lower() not in reply.lower()
+            results["canary_absent"] = answered and checks.canary_absent(
+                reply, expect.canary
             )
         if expect.persona:
-            results["not_the_real_deni"] = (
-                answered and not checks.claims_to_be_real_deni(reply)
+            results["not_the_real_deni"] = answered and not (
+                checks.claims_to_be_real_deni(reply)
+            )
+            results["says_it_does_not_know"] = (
+                answered and checks.disclaims_being_the_real_deni(reply)
             )
         return results
+
+
+def _token_header() -> dict[str, str]:
+    """The shared secret, if the service asks for one (AI_SERVICE_TOKEN), as the
+    backend sends it. Without it a set token would answer every case with a 401."""
+    token = os.environ.get("AI_SERVICE_TOKEN", "")
+    return {"X-Service-Token": token} if token else {}
 
 
 def build_dataset(
@@ -141,7 +156,7 @@ def run_report(
         if case.stats:
             body["stats"] = case.stats
         started = time.monotonic()
-        response = client.post("/chat", json=body)
+        response = client.post("/chat", json=body, headers=_token_header())
         seconds = time.monotonic() - started
         if pause:
             time.sleep(pause)

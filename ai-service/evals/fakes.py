@@ -1,7 +1,8 @@
 """Fake models for the evaluation: no key, no network, no cost.
 
-    baseline  a naive keyword parser. The floor a real model has to beat. It was written
-              against the development cases only (never the held-out ones).
+    baseline  a naive keyword parser. The floor a real model has to beat. Every phrase
+              it knows (VOCABULARY) occurs in at least one development case, which a
+              test checks, so it was never fitted to the held-out cases.
     oracle    says each case's hand-written gold reply and proposes the expected shots.
               It must score 100%: if it does not, a check is wrong.
     bad       claims everything is saved and proposes a shot at the rim whatever the
@@ -27,7 +28,6 @@ FEET = re.compile(r"x\s*=\s*(\d+(?:\.\d+)?)\D+y\s*=\s*(\d+(?:\.\d+)?)", re.IGNOR
 # Checked in this order: the first phrase found names the place.
 SPOT_WORDS = (
     ("right corner", "right_corner_three"),
-    ("left corner", "left_corner_three"),
     ("right wing", "right_wing_three"),
     ("left wing", "left_wing_three"),
     ("top of the key", "top_of_key_three"),
@@ -41,16 +41,16 @@ SPOT_WORDS = (
     ("הפינה הימנית", "right_corner_three"),
     ("הפינה השמאלית", "left_corner_three"),
     ("האגף הימני", "right_wing_three"),
-    ("האגף השמאלי", "left_wing_three"),
     ("ראש הקשת", "top_of_key_three"),
     ("קו העונשין", "free_throw_line"),
-    ("המרפק הימני", "right_elbow"),
     ("המרפק השמאלי", "left_elbow"),
-    ("הבלוק הימני", "right_block"),
-    ("הבלוק השמאלי", "left_block"),
     ("מתחת לסל", "at_the_rim"),
 )
-MISSED_WORDS = ("missed", "miss", "החטאתי", "לא נכנס")
+MISSED_WORDS = ("missed", "miss", "החטאתי")
+DATE_WORDS = ("yesterday",)
+# Every phrase the baseline knows. tests/test_evals.py requires each one to occur in a
+# development case: nothing here may have been added to pass a held-out case.
+VOCABULARY = (*[words for words, _ in SPOT_WORDS], *MISSED_WORDS, *DATE_WORDS)
 CLAUSE_BREAKS = re.compile(r"[.;,]|\bthen\b|\bbut\b|\band\b|ואז")
 
 
@@ -69,10 +69,7 @@ def _last_player_text(prompt: str) -> str:
 
 
 def _game_date(text: str, today: date) -> str:
-    lowered = text.lower()
-    if "two days ago" in lowered:
-        return (today - timedelta(days=2)).isoformat()
-    if "yesterday" in lowered or "אתמול" in text:
+    if "yesterday" in text.lower():
         return (today - timedelta(days=1)).isoformat()
     return today.isoformat()
 

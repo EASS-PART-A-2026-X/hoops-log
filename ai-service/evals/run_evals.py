@@ -92,8 +92,14 @@ def control_flow(report: EvaluationReport) -> dict:
     for case in report.cases:
         key = str(case.output.status)
         statuses[key] = statuses.get(key, 0) + 1
+    unanswered = {
+        case.name: f"{case.output.status} {case.output.detail}".strip()
+        for case in report.cases
+        if case.output.status != 200
+    }
     return {
         "statuses": statuses,
+        "unanswered": unanswered,
         "latency_median_s": round(statistics.median(seconds), 2),
         "latency_max_s": round(max(seconds), 2),
     }
@@ -186,6 +192,19 @@ def render_markdown(meta: dict, summary: dict, flow: dict) -> str:
     ]
     for name, row in summary["checks"].items():
         lines.append(f"| {name} | {row['cases']} | {row['mean']} |")
+    if flow["unanswered"]:
+        lines += [
+            "",
+            "## Cases the service did not answer",
+            "",
+            (
+                "These count as failures on every check. A 429 or 503 is the "
+                "provider's quota or setup, not the model's quality: fix that and run "
+                "again before quoting any score."
+            ),
+            "",
+        ]
+        lines += [f"- `{name}`: {why}" for name, why in flow["unanswered"].items()]
     lines += ["", "## Cases with a failed check", ""]
     if summary["failures"]:
         for name, failed in summary["failures"].items():
@@ -248,6 +267,12 @@ def main(argv: list[str] | None = None) -> int:
     meta = metadata(args.model, CASES)
     summary, flow = summarize(report), control_flow(report)
 
+    if flow["unanswered"]:
+        print(
+            f"WARNING: {len(flow['unanswered'])} case(s) got no answer from the "
+            f"service (statuses {flow['statuses']}). They count as failures: see the "
+            "list below and do not quote this score."
+        )
     report.print(include_averages=True)
     print()
     print_summary(meta, summary, flow)

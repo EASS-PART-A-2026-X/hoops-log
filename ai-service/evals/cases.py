@@ -77,11 +77,14 @@ class Expect:
     untracked: bool = False  # says this kind of stat is not tracked
     uses_stats: bool = False  # states at least one number from the stats
     numbers_from_stats: bool = False  # every number in the reply is in the stats
+    # Groups of numbers: from each group, at least one must be stated. Ties the answer
+    # to the question (the right-corner percentage, not just any number).
+    must_state: tuple[tuple[str, ...], ...] = ()
     small_sample: bool = False  # warns that the sample is too small
     no_shots_yet: bool = False  # says there are no shots logged yet
     no_digits: bool = False  # states no number at all (nothing to know)
     canary: str | None = None  # text an injection asks for; it must NOT appear
-    persona: bool = False  # must not claim to be the real Deni Avdija
+    persona: bool = False  # must not claim to be the real Deni, and must say so
 
 
 @dataclass(frozen=True)
@@ -194,58 +197,58 @@ CASES: tuple[EvalCase, ...] = (
         "he-right-corner",
         "קלעתי שלשה מהפינה הימנית.",
         (_shot("right_corner_three", True),),
-        _hebrew_got_it("שלשה קלועה מהפינה הימנית"),
+        _hebrew_got_it("שלשה שנכנסה מהפינה הימנית"),
     ),
     _spot_he(
         "he-left-corner-miss",
         "החטאתי שלשה מהפינה השמאלית.",
         (_shot("left_corner_three", False),),
-        _hebrew_got_it("שלשה מוחטאת מהפינה השמאלית"),
+        _hebrew_got_it("שלשה שלא נכנסה מהפינה השמאלית"),
     ),
     _spot_he(
         "he-left-elbow",
         "קלעתי קפיצה מהמרפק השמאלי.",
         (_shot("left_elbow", True),),
-        _hebrew_got_it("קפיצה קלועה מהמרפק השמאלי"),
+        _hebrew_got_it("קפיצה שנכנסה מהמרפק השמאלי"),
     ),
     _spot_he(
         "he-free-throw-line-jumper",
         "זריקת קפיצה מקו העונשין, נכנסה.",
         (_shot("free_throw_line", True),),
-        _hebrew_got_it("זריקת קפיצה קלועה מקו העונשין"),
+        _hebrew_got_it("זריקת קפיצה שנכנסה מקו העונשין"),
     ),
     _spot_he(
         "he-top-of-key",
-        "שלשה מראש הקשת, פגעתי.",
+        "שלשה מראש הקשת, קלעתי.",
         (_shot("top_of_key_three", True),),
-        _hebrew_got_it("שלשה קלועה מראש הקשת"),
+        _hebrew_got_it("שלשה שנכנסה מראש הקשת"),
     ),
     _spot_he(
         "he-rim",
-        "הנחתי הרמה מתחת לסל וקלעתי.",
+        "קלעתי הרמה מתחת לסל.",
         (_shot("at_the_rim", True),),
-        _hebrew_got_it("הרמה קלועה מתחת לסל"),
+        _hebrew_got_it("הרמה שנכנסה מתחת לסל"),
     ),
     _spot_he(
         "he-right-wing-miss",
         "החטאתי שלשה מהאגף הימני.",
         (_shot("right_wing_three", False),),
-        _hebrew_got_it("שלשה מוחטאת מהאגף הימני"),
+        _hebrew_got_it("שלשה שלא נכנסה מהאגף הימני"),
     ),
     _spot_he(
         "he-left-block",
         "קלעתי מהבלוק השמאלי.",
         (_shot("left_block", True),),
-        _hebrew_got_it("זריקה קלועה מהבלוק השמאלי"),
+        _hebrew_got_it("זריקה שנכנסה מהבלוק השמאלי"),
         held_out=True,
     ),
     # --- feet given directly ---
     EvalCase(
         "feet-made",
         "feet",
-        "Shot from x=30, y=10 and made it.",
-        Expect(shots=(ExpectedShot(made=True, x=30.0, y=10.0),), date=TODAY),
-        _got_it("a made shot from x=30, y=10"),
+        "Shot from x=34, y=12 and made it.",
+        Expect(shots=(ExpectedShot(made=True, x=34.0, y=12.0),), date=TODAY),
+        _got_it("a made shot from x=34, y=12"),
     ),
     EvalCase(
         "feet-miss",
@@ -324,7 +327,7 @@ CASES: tuple[EvalCase, ...] = (
         "not-a-shot-he-free-throws",
         "not-a-shot",
         "קלעתי שתי זריקות עונשין.",
-        Expect(language="he"),
+        Expect(language="he", untracked=True),
         "זריקות עונשין לא נספרות באפליקציה הזו, רק זריקות מהשדה.",
     ),
     # --- dates come from the player's today ---
@@ -355,7 +358,7 @@ CASES: tuple[EvalCase, ...] = (
         "stats-right-corner",
         "stats",
         "How am I shooting from the right corner?",
-        Expect(uses_stats=True, numbers_from_stats=True),
+        Expect(uses_stats=True, numbers_from_stats=True, must_state=(("50",),)),
         "From the right corner you are 3 of 6, 50%. The league is about 38% "
         "(an estimate), so you are doing well there.",
         stats=STATS_MAIN,
@@ -364,7 +367,7 @@ CASES: tuple[EvalCase, ...] = (
         "stats-overall",
         "stats",
         "What is my overall field goal percentage?",
-        Expect(uses_stats=True, numbers_from_stats=True),
+        Expect(uses_stats=True, numbers_from_stats=True, must_state=(("45",),)),
         "You are shooting 45% overall: 18 makes on 40 attempts. The league is "
         "about 46% (an estimate).",
         stats=STATS_MAIN,
@@ -388,15 +391,20 @@ CASES: tuple[EvalCase, ...] = (
         "stats-he-right-corner",
         "stats",
         "איך אני קולע מהפינה הימנית?",
-        Expect(uses_stats=True, numbers_from_stats=True, language="he"),
-        "מהפינה הימנית אתה קולע 3 מתוך 6, כלומר 50%. ממוצע הליגה הוא בערך 38% (הערכה).",
+        Expect(
+            uses_stats=True,
+            numbers_from_stats=True,
+            must_state=(("50",),),
+            language="he",
+        ),
+        "מהפינה הימנית: 3 מתוך 6, כלומר 50%. ממוצע הליגה הוא בערך 38% (הערכה).",
         stats=STATS_MAIN,
     ),
     EvalCase(
         "stats-three-vs-nba",
         "stats",
         "How does my three point shooting compare to the NBA?",
-        Expect(uses_stats=True, numbers_from_stats=True),
+        Expect(uses_stats=True, numbers_from_stats=True, must_state=(("33.3",),)),
         "You are at 33.3% on threes (4 of 12). The league is about 36% (an "
         "estimate), so you are a bit below it.",
         stats=STATS_MAIN,
