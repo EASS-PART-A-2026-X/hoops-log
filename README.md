@@ -89,13 +89,13 @@ docker compose up --build
 |---|---|---|
 | frontend | http://localhost:5173 | the built site, served by nginx |
 | backend | http://localhost:8000 | docs at `/docs`; the database is the named volume `backend-data` |
-| ai-service | http://localhost:8001 | stateless; the backend reaches it as `http://ai-service:8001` |
+| ai-service | *(not published)* | stateless; only the backend calls it, as `http://ai-service:8001`. Not on a host port on purpose: from your machine it would skip the backend's rate limit and could spend a real model key. |
 
 - **No setup needed.** The AI service starts with `AI_MODEL=test`, the library's fake model: no key, no network, canned answers. For a real model copy `.env.example` to `.env` (git-ignored), set `AI_MODEL=groq:openai/gpt-oss-120b` and your own `GROQ_API_KEY`, then `docker compose up --build` again.
 - **Healthchecks.** Each service has one (`docker compose ps` shows `healthy`). The frontend waits for a healthy backend. The backend does **not** wait for the AI service: with the AI service down, shots still work and `/chat` answers 503 with a plain message. `docker compose stop ai-service` shows it; `docker compose start ai-service` brings it back.
 - **Data survives.** `docker compose down` then `up` keeps the shots (the volume). `docker compose down -v` deletes them.
-- **Ports.** Set `BACKEND_PORT`, `AI_PORT` or `FRONTEND_PORT` to move a service on your machine (everything is published on `127.0.0.1` only). The browser app only works on its default ports, because the backend's CORS list names `localhost:5173`.
-- **Check it.** `python3 scripts/compose_check.py` builds the stack on spare ports and checks health, the frontend, persistence, and the AI service being stopped and restarted (about a minute). `scripts/ci.sh --docker` runs it too.
+- **Ports.** Set `BACKEND_PORT` or `FRONTEND_PORT` to move a service on your machine (everything is published on `127.0.0.1` only; the frontend follows `BACKEND_PORT` by itself). The browser app only works on its default ports, because the backend's CORS list names `localhost:5173`.
+- **Check it.** `python3 scripts/compose_check.py` builds the stack on spare ports and checks health, the frontend (and that its bundle points at the backend), CORS, persistence, and the AI service being stopped and restarted (about a minute). `scripts/ci.sh --docker` runs it too.
 
 ### Settings
 | Variable | Default | Meaning |

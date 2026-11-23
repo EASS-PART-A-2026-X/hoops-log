@@ -1,8 +1,8 @@
 # One command starts the whole app:   docker compose up --build
 #   frontend  http://localhost:5173   (static site, nginx)
 #   backend   http://localhost:8000   (FastAPI + SQLite on a named volume)
-#   ai-service http://localhost:8001  (FastAPI + Pydantic AI; stateless, no database)
-# Ports are published on 127.0.0.1 only (change them with BACKEND_PORT, AI_PORT, FRONTEND_PORT;
+#   ai-service (not published; only the backend calls it; FastAPI + Pydantic AI, no database)
+# Ports are published on 127.0.0.1 only (change them with BACKEND_PORT and FRONTEND_PORT;
 # the browser app only works on its default ports, because of the backend's CORS list). Settings come from the shell or a root `.env`
 # file (see .env.example); every one has a safe default, so no file is required.
 
@@ -28,7 +28,10 @@ services:
 
   ai-service:
     build: ./ai-service
-    ports: ["127.0.0.1:${AI_PORT:-8001}:8001"]
+    # No `ports:` on purpose: only the backend calls this service, over the Compose network
+    # (http://ai-service:8001). Publishing it would let anything on this machine skip the
+    # backend's rate limit and validation, and spend the model's quota if a key is set.
+    # To try it by hand, add:   ports: ["127.0.0.1:8001:8001"]   (and set AI_SERVICE_TOKEN).
     environment:
       AI_MODEL: ${AI_MODEL:-test}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
@@ -45,7 +48,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:8000}
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8000}}
     ports: ["127.0.0.1:${FRONTEND_PORT:-5173}:8080"]
     depends_on:
       backend:
