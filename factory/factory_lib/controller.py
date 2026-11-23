@@ -271,7 +271,7 @@ class Controller:
         self._save(tools, "\n".join(report_.tool_log) + "\n")
         summary = self._save(f"builder-{attempt}-summary.txt", report_.text + "\n")
         if report_.text.strip():
-            self.log.emit("builder", "say", report_.text.strip()[:600], huddle=True, receipt=[summary, tools])
+            self.log.emit("builder", "say", clip(report_.text), huddle=True, receipt=[summary, tools])
         self.log.emit(
             "builder",
             "evidence",
@@ -402,7 +402,7 @@ class Controller:
         self.log.emit(
             "reviewer",
             "say",
-            (verdict["summary"] or "No summary.").strip()[:600],
+            clip(verdict["summary"] or "No summary."),
             huddle=True,
             receipt=[receipt],
             review={
@@ -412,6 +412,14 @@ class Controller:
             box={"reviewer": {"turns": answer.turns, "tokens": answer.tokens}},
         )
         return verdict
+
+
+def clip(text: str, limit: int = 600) -> str:
+    """Cut at a word boundary and say so, so a long message never ends mid-word."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rsplit(None, 1)[0].rstrip(",;:- ") + "…"
 
 
 def builder_prompt(wo: WorkOrder, announcement: str, feedback: str) -> str:

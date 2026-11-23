@@ -431,3 +431,13 @@ def test_watch_rebuilds_the_live_page_when_it_is_missing(repo, tmp_path, write_o
     args = type("A", (), {"run_id": "r1", "port": 1})()
     cli_module.cmd_watch(args)
     assert "window.RUN_DATA = null" in (run_dir / "index.html").read_text()
+
+
+def test_a_long_message_is_cut_at_a_word_and_marked():
+    from factory_lib.controller import clip
+
+    assert clip("short") == "short"
+    long = ("word " * 200).strip()
+    out = clip(long, 50)
+    assert len(out) <= 50 and out.endswith("…") and not out[:-1].endswith("wor")
+    assert clip("a" * 100, 50).endswith("…")  # no spaces to cut at: still cut, still marked

@@ -1,0 +1,14 @@
+diff --git a/frontend/src/shooter.test.ts b/frontend/src/shooter.test.ts
+index 7924f77..f7b8482 100644
+--- a/frontend/src/shooter.test.ts
++++ b/frontend/src/shooter.test.ts
+@@ -32,7 +32,8 @@ describe('pickDefaultShooter', () => {
+   })
+ 
+   it('adds the shots of all spellings together', () => {
+-    expect(pickDefaultShooter(shots('ben', 'Ben', ' BEN', 'Ana', 'Ana'))).toBe('Ben')
++    // Ben has 3 shots over three spellings (a tie, so the first alphabetically is shown); Ana has 2
++    expect(pickDefaultShooter(shots('ben', 'Ben', ' BEN', 'Ana', 'Ana'))).toBe('BEN')
+   })
+ 
+   it('is empty when there are no shots', () => {

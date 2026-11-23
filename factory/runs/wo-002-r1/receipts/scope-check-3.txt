@@ -1,0 +1,2 @@
+allowed paths: frontend/src/shooter.ts, frontend/src/shooter.test.ts, frontend/src/ShooterSelect.tsx, frontend/src/ShooterSelect.test.tsx, frontend/src/App.tsx, frontend/src/ShotMap.tsx, frontend/src/court/stats.ts, frontend/src/court/stats.test.ts, frontend/src/game/*.ts, frontend/src/coach/useCoachEvents.ts, frontend/src/coach/useCoachEvents.test.ts, frontend/e2e/validation.e2e.ts
+changed: frontend/src/game/useCelebrations.test.ts, frontend/src/game/useCelebrations.ts

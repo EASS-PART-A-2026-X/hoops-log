@@ -1,0 +1,92 @@
+{"t": 0.0, "actor": "announcer", "kind": "say", "text": "Work order WO-002 is on the floor: One person, whatever the capitals, on every screen. Builder, you are up.", "huddle": true, "stage": "order", "box": {"announcer": {"turns": 1}}, "pass": {"from": "order", "to": "builder"}}
+{"t": 2.2, "actor": "commentator", "kind": "commentary", "text": "Work order WO-002 hits the floor, one person on every screen, and the Builder is up next.", "box": {"commentator": {"turns": 1}}}
+{"t": 2.2, "actor": "builder", "kind": "evidence", "text": "The builder starts reading the code.", "stage": "build"}
+{"t": 23.2, "actor": "builder", "kind": "evidence", "text": "Read 9 files or searches: frontend/src/{shooter*,ShooterSelect*,court/stats*,game/*,coach/useCoachEvents*}, player|shooter, frontend/src/shooter.ts, player|shooter and 5 more."}
+{"t": 23.2, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/shooter.ts.", "files": ["frontend/src/shooter.ts"]}
+{"t": 24.1, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/shooter.ts.", "files": ["frontend/src/shooter.ts"]}
+{"t": 25.1, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/ShooterSelect.tsx.", "files": ["frontend/src/ShooterSelect.tsx"]}
+{"t": 26.0, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/ShooterSelect.tsx.", "files": ["frontend/src/ShooterSelect.tsx"]}
+{"t": 26.7, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/ShooterSelect.tsx.", "files": ["frontend/src/ShooterSelect.tsx"]}
+{"t": 27.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/court/stats.ts.", "files": ["frontend/src/court/stats.ts"]}
+{"t": 28.4, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/court/stats.ts.", "files": ["frontend/src/court/stats.ts"]}
+{"t": 29.7, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/celebrate.ts.", "files": ["frontend/src/game/celebrate.ts"]}
+{"t": 30.6, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/celebrate.ts.", "files": ["frontend/src/game/celebrate.ts"]}
+{"t": 32.5, "actor": "builder", "kind": "evidence", "text": "Read 1 files or searches: frontend/src/game/celebrate.ts."}
+{"t": 32.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/celebrate.ts.", "files": ["frontend/src/game/celebrate.ts"]}
+{"t": 33.3, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/coach/useCoachEvents.ts.", "files": ["frontend/src/coach/useCoachEvents.ts"]}
+{"t": 34.1, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/coach/useCoachEvents.ts.", "files": ["frontend/src/coach/useCoachEvents.ts"]}
+{"t": 35.0, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/coach/useCoachEvents.ts.", "files": ["frontend/src/coach/useCoachEvents.ts"]}
+{"t": 35.7, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/ShotMap.tsx.", "files": ["frontend/src/ShotMap.tsx"]}
+{"t": 36.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/App.tsx.", "files": ["frontend/src/App.tsx"]}
+{"t": 37.2, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/App.tsx.", "files": ["frontend/src/App.tsx"]}
+{"t": 38.1, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/App.tsx.", "files": ["frontend/src/App.tsx"]}
+{"t": 40.7, "actor": "builder", "kind": "evidence", "text": "Read 2 files or searches: ^import, ^import."}
+{"t": 40.7, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/coach/useCoachEvents.ts.", "files": ["frontend/src/coach/useCoachEvents.ts"]}
+{"t": 41.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/ShotMap.tsx.", "files": ["frontend/src/ShotMap.tsx"]}
+{"t": 45.9, "actor": "builder", "kind": "evidence", "text": "Read 2 files or searches: KNOWN GAP, frontend/src/shooter.test.ts."}
+{"t": 45.9, "actor": "builder", "kind": "evidence", "text": "Edited frontend/e2e/validation.e2e.ts.", "files": ["frontend/e2e/validation.e2e.ts"]}
+{"t": 47.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/e2e/validation.e2e.ts.", "files": ["frontend/e2e/validation.e2e.ts"]}
+{"t": 50.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/shooter.test.ts.", "files": ["frontend/src/shooter.test.ts"]}
+{"t": 51.3, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/shooter.test.ts.", "files": ["frontend/src/shooter.test.ts"]}
+{"t": 55.5, "actor": "builder", "kind": "evidence", "text": "Read 1 files or searches: applyFilters|^import."}
+{"t": 55.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/court/stats.test.ts.", "files": ["frontend/src/court/stats.test.ts"]}
+{"t": 61.1, "actor": "builder", "kind": "say", "text": "WO-002 is implemented, but I couldn't run anything, so none of it has been run or type-checked.\n\n- **Folding rule:** `frontend/src/shooter.ts` now has `shooterKey` (strip, then `toUpperCase().toLowerCase()`), `sameShooter` and `shooterNames`. That gives \"Straße\" and \"STRASSE\" as one person. JS has no `casefold`, so I used this approximation of the backend's rule.\n- **Picker:** `listShooters`, `pickDefaultShooter` and `resolveShooter` list each person once, under the spelling with the most shots. A tie goes to the first one alphabetically. `ShooterSelect.tsx` counts shots per person.\n- **Everyw", "huddle": true, "receipt": ["builder-1-summary.txt", "builder-1-tools.txt"]}
+{"t": 61.1, "actor": "builder", "kind": "evidence", "text": "Builder finished attempt 1: 40 turns, 80812 tokens, $0.44.", "box": {"builder": {"turns": 40, "tokens": 80812}}}
+{"t": 61.2, "actor": "builder", "kind": "evidence", "text": "Committed candidate e74f669.", "cand": "e74f669", "newAttempt": true, "stage": "gate", "receipt": ["commit-1.txt", "diff-1.patch"]}
+{"t": 61.2, "actor": "announcer", "kind": "say", "text": "Candidate e74f669 is posted. Stat crew, run the gate.", "huddle": true, "stage": "gate", "box": {"announcer": {"turns": 1}}, "pass": {"from": "builder", "to": "gate"}}
+{"t": 65.4, "actor": "commentator", "kind": "commentary", "text": "Candidate e74f669 is posted, unverified, as the stat crew takes the floor to run the gate.", "box": {"commentator": {"turns": 1}}}
+{"t": 65.9, "actor": "gate", "kind": "shot", "text": "frontend lint passed.", "shot": {"made": true, "label": "frontend lint"}}
+{"t": 66.5, "actor": "gate", "kind": "shot", "text": "frontend types passed.", "shot": {"made": true, "label": "frontend types"}}
+{"t": 72.1, "actor": "gate", "kind": "shot", "text": "frontend tests: see the gate receipt", "shot": {"made": false, "label": "frontend tests"}}
+{"t": 73.5, "actor": "gate", "kind": "shot", "text": "frontend build passed.", "shot": {"made": true, "label": "frontend build"}}
+{"t": 89.7, "actor": "gate", "kind": "shot", "text": "backend tests passed.", "shot": {"made": true, "label": "backend tests"}}
+{"t": 101.7, "actor": "gate", "kind": "shot", "text": "ai-service tests passed.", "shot": {"made": true, "label": "ai-service tests"}}
+{"t": 102.6, "actor": "gate", "kind": "shot", "text": "new tests fail without the change passed.", "shot": {"made": true, "label": "new tests fail without the change"}}
+{"t": 102.6, "actor": "gate", "kind": "evidence", "text": "Gate is red on e74f669: 6 of 7 checks passed.", "receipt": ["gate-1.txt"], "box": {"gate": {"turns": 1}}, "gate": {"status": "red", "text": "6 of 7 checks passed on e74f669"}}
+{"t": 102.6, "actor": "announcer", "kind": "say", "text": "Gate failed on e74f669. Builder, repair attempt 1 of 2.", "huddle": true, "stage": "repair1", "box": {"announcer": {"turns": 1}}, "pass": {"from": "gate", "to": "builder"}}
+{"t": 105.2, "actor": "commentator", "kind": "commentary", "text": "Gate's red on e74f669: six of seven checks passed, and the Builder heads back to the bench for repair attempt 1 of 2.", "box": {"commentator": {"turns": 1}}}
+{"t": 110.6, "actor": "builder", "kind": "evidence", "text": "Read 1 files or searches: frontend/src/court/stats.test.ts."}
+{"t": 110.6, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/court/stats.test.ts.", "files": ["frontend/src/court/stats.test.ts"]}
+{"t": 114.1, "actor": "builder", "kind": "say", "text": "I fixed the one failing test by updating it. I couldn't run anything, so the fix is unchecked until the gate runs.\n\n- **Cause:** `frontend/src/court/stats.test.ts` still expected the old rule, where the player filter `'bob'` matched nothing. The WO-002 change now treats `'bob'` and `'Bob'` as the same person, so the filter returns 3 shots, which is correct under the new rule.\n- **Change:** I renamed the test to \"player filter ignores capitals and an empty name means everyone\". It now expects 3 shots for `'bob'`, and I added a check that `' BOB '` also returns 3. The `'Bob'` and empty-name chec", "huddle": true, "receipt": ["builder-2-summary.txt", "builder-2-tools.txt"]}
+{"t": 114.1, "actor": "builder", "kind": "evidence", "text": "Builder finished attempt 2: 3 turns, 54959 tokens, $0.23.", "box": {"builder": {"turns": 3, "tokens": 54959}}}
+{"t": 114.2, "actor": "builder", "kind": "evidence", "text": "Committed candidate 2fcf4e2.", "cand": "2fcf4e2", "newAttempt": true, "stage": "gate", "receipt": ["commit-2.txt", "diff-2.patch"]}
+{"t": 114.2, "actor": "announcer", "kind": "say", "text": "Candidate 2fcf4e2 is posted. Stat crew, run the gate.", "huddle": true, "stage": "gate", "box": {"announcer": {"turns": 1}}, "pass": {"from": "builder", "to": "gate"}}
+{"t": 119.0, "actor": "commentator", "kind": "commentary", "text": "The builder fixes one failing test, and candidate 2fcf4e2 is on the board, unchecked until the stat crew runs the gate.", "box": {"commentator": {"turns": 1}}}
+{"t": 119.5, "actor": "gate", "kind": "shot", "text": "frontend lint passed.", "shot": {"made": true, "label": "frontend lint"}}
+{"t": 120.3, "actor": "gate", "kind": "shot", "text": "frontend types passed.", "shot": {"made": true, "label": "frontend types"}}
+{"t": 125.5, "actor": "gate", "kind": "shot", "text": "frontend tests passed.", "shot": {"made": true, "label": "frontend tests"}}
+{"t": 127.7, "actor": "gate", "kind": "shot", "text": "frontend build passed.", "shot": {"made": true, "label": "frontend build"}}
+{"t": 142.9, "actor": "gate", "kind": "shot", "text": "backend tests passed.", "shot": {"made": true, "label": "backend tests"}}
+{"t": 155.8, "actor": "gate", "kind": "shot", "text": "ai-service tests passed.", "shot": {"made": true, "label": "ai-service tests"}}
+{"t": 156.6, "actor": "gate", "kind": "shot", "text": "new tests fail without the change passed.", "shot": {"made": true, "label": "new tests fail without the change"}}
+{"t": 156.6, "actor": "gate", "kind": "evidence", "text": "Gate is green on 2fcf4e2: 7 of 7 checks passed.", "receipt": ["gate-2.txt"], "box": {"gate": {"turns": 1}}, "gate": {"status": "green", "text": "7 of 7 checks passed on 2fcf4e2"}}
+{"t": 156.6, "actor": "announcer", "kind": "say", "text": "Gate passed. Coach, review it.", "huddle": true, "stage": "review", "box": {"announcer": {"turns": 1}}, "pass": {"from": "gate", "to": "reviewer"}}
+{"t": 159.0, "actor": "commentator", "kind": "commentary", "text": "Gate is green on 2fcf4e2: all 7 checks passed, and the coach is calling for a review. (16 words)", "box": {"commentator": {"turns": 1}}}
+{"t": 192.3, "actor": "reviewer", "kind": "say", "text": "The shared folding is applied to the picker, filters, stats, trophies, level and coach milestones, but `useCelebrations` still keys its before/after snapshots by the display spelling. When the most-used spelling of one person changes, the diff treats them as a new person, which causes bogus XP pops, level-up toasts and re-announced trophies. No test covers this.", "huddle": true, "receipt": ["review-2.md"], "review": {"status": "gap", "text": "Found a gap on 2fcf4e2"}, "box": {"reviewer": {"turns": 10, "tokens": 91897}}}
+{"t": 192.4, "actor": "announcer", "kind": "say", "text": "The coach found a gap. Builder, repair attempt 2 of 2.", "huddle": true, "stage": "repair2", "box": {"announcer": {"turns": 1}}, "pass": {"from": "reviewer", "to": "builder"}}
+{"t": 195.0, "actor": "commentator", "kind": "commentary", "text": "The coach flagged a gap: the reviewer found that `useCelebrations` still keys snapshots by display spelling, and no test covers it, so Builder gets repair attempt 2 of 2.", "box": {"commentator": {"turns": 1}}}
+{"t": 203.3, "actor": "builder", "kind": "evidence", "text": "Read 5 files or searches: frontend/src/game/useCelebrations.ts, frontend/src/shooter.ts, frontend/src/game/*, frontend/src/game/celebrate.ts and 1 more."}
+{"t": 203.3, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/useCelebrations.ts.", "files": ["frontend/src/game/useCelebrations.ts"]}
+{"t": 204.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/useCelebrations.ts.", "files": ["frontend/src/game/useCelebrations.ts"]}
+{"t": 205.3, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/useCelebrations.ts.", "files": ["frontend/src/game/useCelebrations.ts"]}
+{"t": 206.2, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/useCelebrations.ts.", "files": ["frontend/src/game/useCelebrations.ts"]}
+{"t": 209.7, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/useCelebrations.test.ts.", "files": ["frontend/src/game/useCelebrations.test.ts"]}
+{"t": 215.5, "actor": "builder", "kind": "evidence", "text": "Edited frontend/src/game/useCelebrations.test.ts.", "files": ["frontend/src/game/useCelebrations.test.ts"]}
+{"t": 219.3, "actor": "builder", "kind": "say", "text": "I keyed the celebration snapshots by person instead of by display spelling. I couldn't run any tests, so none of this has been run, including the new test.\n\n- **Fix, in `frontend/src/game/useCelebrations.ts`:** `now`, `seen`, `announced` and `priorAnnounced` now use `shooterKey(player)`. The `byPlayer` display name is kept only for the XP pop's `player` and the level toast text. A spelling change no longer diffs against `EMPTY_SNAP`, so there is no full-total XP pop, no spurious level toast and no re-announced trophies.\n- **Test added in `useCelebrations.test.ts`:** `'yuly'` leads 4 shots to 3", "huddle": true, "receipt": ["builder-3-summary.txt", "builder-3-tools.txt"]}
+{"t": 219.3, "actor": "builder", "kind": "evidence", "text": "Builder finished attempt 3: 12 turns, 63778 tokens, $0.29.", "box": {"builder": {"turns": 12, "tokens": 63778}}}
+{"t": 219.3, "actor": "builder", "kind": "evidence", "text": "Committed candidate 835739f.", "cand": "835739f", "newAttempt": true, "stage": "gate", "receipt": ["commit-3.txt", "diff-3.patch"]}
+{"t": 219.3, "actor": "announcer", "kind": "say", "text": "Candidate 835739f is posted. Stat crew, run the gate.", "huddle": true, "stage": "gate", "box": {"announcer": {"turns": 1}}, "pass": {"from": "builder", "to": "gate"}}
+{"t": 221.9, "actor": "commentator", "kind": "commentary", "text": "Builder commits candidate 835739f after a fix to celebration tracking, but the tests have not run yet, so the stat crew must decide.", "box": {"commentator": {"turns": 1}}}
+{"t": 222.2, "actor": "gate", "kind": "shot", "text": "frontend lint passed.", "shot": {"made": true, "label": "frontend lint"}}
+{"t": 223.0, "actor": "gate", "kind": "shot", "text": "frontend types passed.", "shot": {"made": true, "label": "frontend types"}}
+{"t": 229.2, "actor": "gate", "kind": "shot", "text": "frontend tests passed.", "shot": {"made": true, "label": "frontend tests"}}
+{"t": 230.4, "actor": "gate", "kind": "shot", "text": "frontend build passed.", "shot": {"made": true, "label": "frontend build"}}
+{"t": 245.5, "actor": "gate", "kind": "shot", "text": "backend tests passed.", "shot": {"made": true, "label": "backend tests"}}
+{"t": 257.9, "actor": "gate", "kind": "shot", "text": "ai-service tests passed.", "shot": {"made": true, "label": "ai-service tests"}}
+{"t": 259.1, "actor": "gate", "kind": "shot", "text": "new tests fail without the change passed.", "shot": {"made": true, "label": "new tests fail without the change"}}
+{"t": 259.1, "actor": "gate", "kind": "evidence", "text": "Gate is green on 835739f: 7 of 7 checks passed.", "receipt": ["gate-3.txt"], "box": {"gate": {"turns": 1}}, "gate": {"status": "green", "text": "7 of 7 checks passed on 835739f"}}
+{"t": 259.1, "actor": "announcer", "kind": "say", "text": "Gate passed. Coach, review it.", "huddle": true, "stage": "review", "box": {"announcer": {"turns": 1}}, "pass": {"from": "gate", "to": "reviewer"}}
+{"t": 261.6, "actor": "commentator", "kind": "commentary", "text": "The gate is green on 835739f: all 7 of 7 checks pass, and the coach is calling for a review.", "box": {"commentator": {"turns": 1}}}
+{"t": 293.6, "actor": "reviewer", "kind": "say", "text": "The change routes the picker, the shooter filter, the map, the stats, the level and trophies, the celebrations and the coach milestones through one folding rule (`shooterKey`, trim plus case-fold), and the tests cover those paths. I found no major gap, only two exact-spelling comparisons that are harmless in practice.", "huddle": true, "receipt": ["review-3.md"], "review": {"status": "approved", "text": "Approved on 835739f"}, "box": {"reviewer": {"turns": 6, "tokens": 88119}}}
+{"t": 293.7, "actor": "announcer", "kind": "say", "text": "Ready for the GM. The call is yours.", "huddle": true, "stage": "decision", "box": {"announcer": {"turns": 1}}, "pass": {"from": "reviewer", "to": "gm"}}
+{"t": 296.3, "actor": "commentator", "kind": "commentary", "text": "The coach has approved the change: the gate is green with all 7 of 7 checks passing, and the reviewer found no major gaps.", "box": {"commentator": {"turns": 1}}}

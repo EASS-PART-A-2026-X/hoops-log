@@ -1,0 +1,11 @@
+WO-002 is implemented, but I couldn't run anything, so none of it has been run or type-checked.
+
+- **Folding rule:** `frontend/src/shooter.ts` now has `shooterKey` (strip, then `toUpperCase().toLowerCase()`), `sameShooter` and `shooterNames`. That gives "Straße" and "STRASSE" as one person. JS has no `casefold`, so I used this approximation of the backend's rule.
+- **Picker:** `listShooters`, `pickDefaultShooter` and `resolveShooter` list each person once, under the spelling with the most shots. A tie goes to the first one alphabetically. `ShooterSelect.tsx` counts shots per person.
+- **Everywhere else:** player matching now uses `sameShooter` in `court/stats.ts` (map filter and statistics), `ShotMap.tsx`, and `App.tsx` (the shooter's shots). The level and trophies use `byPlayer` in `game/celebrate.ts`, which now groups by person. The milestones use `coach/useCoachEvents.ts`, which now matches with `sameShooter`.
+- **Tests:**
+  - New tests: a `shooter.test.ts` block and an `applyFilters by player` block in `court/stats.test.ts`. They fail on the original code because `sameShooter` doesn't exist and the old filter treats the spellings as different players.
+  - Pinned e2e test: rewritten in `validation.e2e.ts` and renamed (no more "KNOWN GAP"). It now expects the picker options "Every player" and one person, and a SHOTS count of 2.
+  - Not added: tests for `byPlayer`, the trophies, or the coach milestones.
+- **Not checked:** the e2e run, and the existing `celebrate`, `profile` and `useCelebrations` tests with the changed `byPlayer`.
+- **Open point:** spellings that differ only by edge spaces count as separate spellings when choosing which one to show. The person is still one.

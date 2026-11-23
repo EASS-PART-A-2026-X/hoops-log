@@ -1,0 +1,11 @@
+WO-001 is edited but untested. I can't run commands, so nothing has been run, including the unit tests and the e2e test.
+
+- **`shooter.ts`:** Players are now matched by trimmed, lower-cased name, the backend filter's rule, through new exports `shooterKey`, `sameShooter` and `shooterCounts`. `listShooters` lists each person once, under the spelling with the most shots (a tie goes to the first alphabetically). `pickDefaultShooter` adds all spellings together. `resolveShooter` accepts a choice that differs only in case or spaces and returns the listed spelling.
+- **`ShooterSelect.tsx`:** The per-person counts now come from `shooterCounts`, so all spellings are summed.
+- **`App.tsx`:** The shot filter uses `sameShooter`, so choosing a person shows all their spellings on the map and in the stats. The "shooter switched" notice and the `locate` switch also compare with `sameShooter`, so a spelling-only difference no longer triggers them.
+- **Unit tests added to `shooter.test.ts`:** one-person listing with the most-shots spelling, the alphabetical tie, summed default pick, and `resolveShooter` with a different case or spaces. These should fail on the original code.
+- **e2e:** I renamed the "KNOWN GAP" test in `validation.e2e.ts`. It now expects Every player plus one `yuly … 2 shots` entry, and the SHOTS KPI to read 2.
+- **Not checked:**
+  - The tie spelling: `YULY` sorts before `yuly`, so it wins a tie.
+  - The e2e regex `/yuly.*2 shots/i`, which assumes the option text contains both the name and the count.
+- **Not added:** I wrote no `ShooterSelect.test.tsx` case.

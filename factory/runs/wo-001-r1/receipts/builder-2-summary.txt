@@ -1,0 +1,6 @@
+I fixed the one failing test, which had a wrong expectation. The code in `shooter.ts` is unchanged.
+
+- **Cause:** in "adds the shots of all spellings together", `ben`, `Ben` and ` BEN` have one shot each. That is a tie, and the rule gives a tie to the first spelling alphabetically, which is `BEN`. The test expected `Ben`.
+- **Fix:** the expectation in `frontend/src/shooter.test.ts` is now `BEN`, with a comment. It now matches the existing `YULY` tie test.
+- **Tests added:** none this round. The tests from the first attempt stay as they were, and the gate already confirmed they fail on the original code.
+- **Not checked:** I can't run anything here, so I haven't confirmed the fix passes the gate.

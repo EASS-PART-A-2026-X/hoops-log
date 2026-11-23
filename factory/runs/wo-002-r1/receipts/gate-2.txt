@@ -1,0 +1,11 @@
+candidate 2fcf4e2c618dbaa8b932a5be0206df55d1d933ee
+PASS  frontend lint  (0.4 s)
+PASS  frontend types  (0.8 s)
+PASS  frontend tests  (5.2 s)
+PASS  frontend build  (2.2 s)
+PASS  backend tests  (15.2 s)
+PASS  ai-service tests  (12.8 s)
+PASS  new tests fail without the change  (0.8 s)
+      Tests failed on the original code, as they should: frontend/src/court/stats.test.ts, frontend/src/shooter.test.ts
+
+7 of 7 checks passed

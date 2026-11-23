@@ -1,0 +1,73 @@
+candidate e74f669fd3c04079021c84e7d0563bd1d832e284
+PASS  frontend lint  (0.4 s)
+PASS  frontend types  (0.6 s)
+FAIL  frontend tests  (5.6 s)
+PASS  frontend build  (1.4 s)
+PASS  backend tests  (16.2 s)
+PASS  ai-service tests  (12.0 s)
+PASS  new tests fail without the change  (0.8 s)
+      Tests failed on the original code, as they should: frontend/src/court/stats.test.ts, frontend/src/shooter.test.ts
+
+--- output of: frontend tests (last 60 lines)
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+(node:1826853) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/court/stats.test.ts (27 tests | 1 failed) 52ms
+     × player filter matches the exact name and an empty name means everyone 12ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+(node:1826939) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1826971) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/court/stats.test.ts > applyFilters > player filter matches the exact name and an empty name means everyone
+AssertionError: expected [ Array(3) ] to have a length of +0 but got 3
+
+- Expected
++ Received
+
+- 0
++ 3
+
+ ❯ src/court/stats.test.ts:62:60
+     60|   it('player filter matches the exact name and an empty name means eve…
+     61|     expect(applyFilters(shots, { ...ALL, player: 'Bob' })).toHaveLengt…
+     62|     expect(applyFilters(shots, { ...ALL, player: 'bob' })).toHaveLengt…
+       |                                                            ^
+     63|     expect(applyFilters(shots, { ...ALL, player: '' })).toHaveLength(6)
+     64|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 46 passed (47)
+      Tests  1 failed | 536 passed (537)
+   Start at  23:35:21
+   Duration  4.96s (transform 4.29s, setup 0ms, import 8.80s, tests 21.76s, environment 24.80s)
+
+
+6 of 7 checks passed

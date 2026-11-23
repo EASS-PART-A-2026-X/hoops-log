@@ -158,6 +158,40 @@ uv run python -m evals.run_evals --model oracle         # must be 100%: tests th
 uv run python -m evals.run_evals --model groq:openai/gpt-oss-120b --pause 8 --save   # a real model
 ```
 
+## The software factory
+The factory turns a **work order** into a **checked candidate change** and then stops and waits for a person.
+A controller written in plain Python owns the clock, the commits and the checks; an AI builder (no shell, an
+edit hook) writes the change, the **gate** runs the checks on a clean checkout of that exact commit (including
+"the new tests must fail without the change"), and a separate read-only AI reviewer looks for gaps. Repairs are
+limited to two, the run can be stopped for real (the agent's process group is killed), and nothing is pushed or
+merged unless the GM runs `factory approve`.
+
+![A real factory run, replayed on the live page](docs/factory/factory-run.gif)
+
+The page is drawn live from the run's append-only log. The court is the play: each pass is a hand-off between
+the builder, the gate, the reviewer and the GM; each ring or cross is one gate check on one candidate; the shot
+clock is the run's budget. [Watch the whole 27-second replay (MP4)](docs/factory/factory-run.mp4).
+
+| | WO-001: the picker treats `yuly` and `YULY` as one person | WO-002: the same person on every screen |
+|---|---|---|
+| Result | **stopped**: the repairs ran out | **waiting for the GM** (candidate `835739f`, 12 files) |
+| Candidates, time, builder cost | 3, 4.0 min, $0.84 | 3, 4.9 min, $0.96 |
+
+WO-001 stopped because the **work order contradicted itself**: the reviewer found real gaps (the map's
+statistics, the trophies, the coach's milestones) in files the order did not allow the builder to touch. The fix
+was a better order (WO-002), not a looser fence. Everything a run writes is in `factory/runs/<run-id>/`
+(`run.json`, `events.jsonl`, `receipts/`, `report.html`), and the page itself has a panel, **Where this run
+lives**, that lists every path and command.
+
+| | |
+|---|---|
+| ![The gate failed; the builder repairs](docs/factory/game-night-red-gate.png) | ![The reviewer found a gap](docs/factory/game-night-review-gap.png) |
+| ![The GM's call](docs/factory/the-gms-call.png) | ![The phone layout](docs/factory/phone.png) |
+
+What is a real fence and what is only advice, the experiment that showed `--allowedTools` does not stop a
+shell, the limits (the gate does not run the e2e tests; a worktree is not a sandbox), and the commands are in
+[factory/README.md](factory/README.md). The factory's own tests run in CI (no model is called).
+
 ## How I know the tests are good
 Passing tests only show that the cases I thought of work. Three tools, all in this repo, check the rest. Everything below runs from a fresh clone with only `uv` (and Docker for the last step).
 

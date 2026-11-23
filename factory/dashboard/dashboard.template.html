@@ -63,6 +63,7 @@ h2 { font-size: 21px; }
   font-size: 13px; font-weight: 600; color: var(--muted); background: rgba(255, 255, 255, 0.03);
 }
 .chip b { color: var(--chalk); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip[hidden] { display: none; }
 .chip.mode { color: var(--amber); border-color: rgba(245, 185, 66, 0.5); }
 .chip.mode.live { color: var(--red); border-color: rgba(229, 69, 78, 0.6); }
 .chip.mode.live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: blink 1.4s infinite; }
@@ -142,7 +143,7 @@ body[data-view='season'] .run-only { display: none; }
   border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; background: rgba(7, 11, 20, 0.9);
 }
 .lower .who { display: flex; align-items: center; gap: 8px; padding: 0 14px; min-width: 150px; font: 700 20px/1 var(--display); color: #0a1020; }
-.lower .what { padding: 8px 14px; font-size: 15px; line-height: 1.35; align-self: center; }
+.lower .what { padding: 8px 14px; font-size: 15px; line-height: 1.35; align-self: center; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .lower.comm .what { font-style: italic; color: var(--muted); }
 .legend { position: absolute; top: 12px; right: 14px; margin: 0; font-size: 13px; color: var(--muted); max-width: 250px; text-align: right; }
 .legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 0; vertical-align: -1px; }
@@ -518,6 +519,8 @@ function s(tag, attrs = {}, parent) {
   return e;
 }
 const color = (a) => (CAST[a] || {}).color || '#eef2f7';
+// The log keeps the agent's words as written (clipped at 600 characters by the controller); the page only tidies them.
+const shown = (t) => String(t).replace(/\*\*/g, '') + (String(t).length >= 598 ? '…' : '');
 const badge = (a) => { const b = h('span', { class: 'badge', text: CAST[a].jersey.length > 2 ? '' : CAST[a].jersey }); b.style.background = color(a); b.setAttribute('aria-hidden', 'true'); return b; };
 
 /* ---------- court drawing ---------- */
@@ -682,12 +685,12 @@ function renderLower(st) {
   const c = CAST[e.actor];
   box.className = 'lower' + (e.kind === 'commentary' ? ' comm' : '');
   const who = h('div', { class: 'who', text: c.name }); who.style.background = c.color;
-  box.append(who, h('div', { class: 'what', text: (e.kind === 'commentary' ? '' : '') + e.text }));
+  box.append(who, h('div', { class: 'what', text: shown(e.text) }));
 }
 function evNode(e, fresh) {
   const c = CAST[e.actor];
   const kindTag = e.kind === 'decision' ? 'Decision' : e.kind === 'commentary' ? 'Commentary' : e.kind === 'foul' ? 'Foul' : e.actor === 'announcer' ? 'Announcer' : e.kind === 'shot' ? (e.shot.made ? 'Made' : 'Missed') : c.name;
-  const body = h('div', { class: 'body' }, [h('p', {}, [h('span', { class: 'tag', text: kindTag + ':' }), document.createTextNode(e.text)])]);
+  const body = h('div', { class: 'body' }, [h('p', {}, [h('span', { class: 'tag', text: kindTag + ':' }), document.createTextNode(shown(e.text))])]);
   if (e.receipt) body.append(h('div', { class: 'receipts' }, e.receipt.map((f) => { const b = h('button', { class: 'receipt', type: 'button', text: f }); b.addEventListener('click', () => openReceipt(f)); return b; })));
   const li = h('li', { class: `ev ${e.kind}${fresh ? ' fresh' : ''}` }, [h('span', { class: 't', text: mmss(BUDGET - e.t) }), badge(e.actor), body]);
   return li;
@@ -707,7 +710,7 @@ function renderHuddle(st, typing) {
   st.huddle.forEach((e) => {
     const m = h('li', { class: `msg ${e.actor}` });
     if (e.actor !== 'announcer') m.append(h('span', { class: 'from', text: CAST[e.actor].name }));
-    m.append(h('span', { class: 'bubble', text: e.text }));
+    m.append(h('span', { class: 'bubble', text: shown(e.text) }));
     ol.append(m);
   });
   if (typing) {
@@ -776,7 +779,7 @@ function render(animate) {
 /* ---------- playback ---------- */
 function gapFor(i) { const e = events[i], p = events[i - 1]; if (!p) return 700; if (e.kind === 'shot') return 520; return Math.min(2700, Math.max(900, (e.t - p.t) * 38)); }
 function setPlaying(on) {
-  playing = on; clearTimeout(timer);
+  playing = on; clearTimeout(timer); clearTimeout(autoTimer);
   $('play').setAttribute('aria-label', on ? 'Pause' : 'Play');
   $('playIcon').innerHTML = on ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
   if (on) { if (idx >= events.length) idx = 0; schedule(); }
@@ -789,7 +792,7 @@ function schedule() {
   render(false);
   timer = setTimeout(() => { idx++; render(true); schedule(); }, gapFor(idx) / speed);
 }
-function seek(i) { idx = Math.max(0, Math.min(events.length, i)); render(false); if (playing) schedule(); }
+function seek(i) { clearTimeout(autoTimer); idx = Math.max(0, Math.min(events.length, i)); render(false); if (playing) schedule(); }
 function buildTicks() {
   const t = $('ticks'); t.replaceChildren();
   events.forEach((e) => { const i = h('i'); i.style.background = e.kind === 'foul' ? '#e5454e' : e.kind === 'shot' ? (e.shot.made ? '#3ddc84' : '#e5454e') : color(e.actor); t.append(i); });
@@ -895,6 +898,7 @@ function renderWhere() {
   });
 }
 let pollTimer = null;
+let autoTimer = null;   // the pending autoplay: any move by the viewer cancels it
 function poll() {
   clearInterval(pollTimer);
   pollTimer = setInterval(async () => {
@@ -926,7 +930,7 @@ async function boot() {
   if (!reduced) {
     document.body.classList.add('intro');
     setTimeout(() => document.body.classList.remove('intro'), 2600);
-    setTimeout(() => setPlaying(true), 2200);
+    autoTimer = setTimeout(() => setPlaying(true), 2200);
   } else { idx = events.length; render(false); }
 }
 $('play').addEventListener('click', () => setPlaying(!playing));

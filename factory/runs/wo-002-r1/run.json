@@ -1,0 +1,50 @@
+{
+  "id": "wo-002-r1",
+  "work_order": {
+    "id": "WO-002",
+    "title": "One person, whatever the capitals, on every screen",
+    "path": "factory/workorders/WO-002-same-person-everywhere.md"
+  },
+  "factory_version": "0e1c4f5",
+  "status": "waiting",
+  "pid": 1825667,
+  "mode": "live",
+  "started_at": 1795469654.25005,
+  "budget_seconds": 2700,
+  "max_repairs": 2,
+  "checks": [
+    "frontend lint",
+    "frontend types",
+    "frontend tests",
+    "frontend build",
+    "backend tests",
+    "ai-service tests",
+    "new tests fail without the change"
+  ],
+  "models": {
+    "builder": "sonnet",
+    "reviewer": "haiku",
+    "commentator": "haiku"
+  },
+  "base": "ca5710993b3f32b99a2a23546a8ebf8dc758dc68",
+  "base_ref": "ex3",
+  "branch": "factory-run/wo-002-r1",
+  "worktree": "factory/work/wo-002-r1",
+  "candidates": [
+    "e74f669fd3c04079021c84e7d0563bd1d832e284",
+    "2fcf4e2c618dbaa8b932a5be0206df55d1d933ee",
+    "835739f08ffe057b8f38216c30b0ce8371d2f050"
+  ],
+  "where": {
+    "run_folder": "factory/runs/wo-002-r1",
+    "work_order": "factory/workorders/WO-002-same-person-everywhere.md",
+    "event_log": "factory/runs/wo-002-r1/events.jsonl",
+    "receipts": "factory/runs/wo-002-r1/receipts",
+    "live_page": "factory/runs/wo-002-r1/index.html",
+    "report": "factory/runs/wo-002-r1/report.html",
+    "builder_worktree": "factory/work/wo-002-r1"
+  },
+  "reason": "candidate 835739f is ready for the GM",
+  "finished_at": 1795469950.6042686,
+  "final_candidate": "835739f08ffe057b8f38216c30b0ce8371d2f050"
+}

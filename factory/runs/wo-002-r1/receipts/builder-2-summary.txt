@@ -1,0 +1,6 @@
+I fixed the one failing test by updating it. I couldn't run anything, so the fix is unchecked until the gate runs.
+
+- **Cause:** `frontend/src/court/stats.test.ts` still expected the old rule, where the player filter `'bob'` matched nothing. The WO-002 change now treats `'bob'` and `'Bob'` as the same person, so the filter returns 3 shots, which is correct under the new rule.
+- **Change:** I renamed the test to "player filter ignores capitals and an empty name means everyone". It now expects 3 shots for `'bob'`, and I added a check that `' BOB '` also returns 3. The `'Bob'` and empty-name checks are unchanged.
+- **Other tests:** I added no new tests this round. The earlier ones in `shooter.test.ts` and `stats.test.ts` already failed on the original code, as the gate required.
+- **Not checked:** whether the rewritten e2e test in `validation.e2e.ts` passes, since the gate only ran the unit tests.

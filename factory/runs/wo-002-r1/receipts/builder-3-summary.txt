@@ -1,0 +1,6 @@
+I keyed the celebration snapshots by person instead of by display spelling. I couldn't run any tests, so none of this has been run, including the new test.
+
+- **Fix, in `frontend/src/game/useCelebrations.ts`:** `now`, `seen`, `announced` and `priorAnnounced` now use `shooterKey(player)`. The `byPlayer` display name is kept only for the XP pop's `player` and the level toast text. A spelling change no longer diffs against `EMPTY_SNAP`, so there is no full-total XP pop, no spurious level toast and no re-announced trophies.
+- **Test added in `useCelebrations.test.ts`:** `'yuly'` leads 4 shots to 3, then `'YULY'` overtakes it. The test asserts no toasts, a pop of at most 4 XP, and then that one made shot pops exactly 10 XP with no level toast.
+- **Unchecked assumptions:** the test relies on 2 XP per miss and 10 XP for a paint make, taken from the existing tests. It also assumes level 2 is well above about 24 XP.
+- **Unchecked failure:** I haven't confirmed the new test fails on the old keying.
