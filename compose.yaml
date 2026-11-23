@@ -1,0 +1,61 @@
+# One command starts the whole app:   docker compose up --build
+#   frontend  http://localhost:5173   (static site, nginx)
+#   backend   http://localhost:8000   (FastAPI + SQLite on a named volume)
+#   ai-service http://localhost:8001  (FastAPI + Pydantic AI; stateless, no database)
+# Ports are published on 127.0.0.1 only (change them with BACKEND_PORT, AI_PORT, FRONTEND_PORT;
+# the browser app only works on its default ports, because of the backend's CORS list). Settings come from the shell or a root `.env`
+# file (see .env.example); every one has a safe default, so no file is required.
+
+services:
+  backend:
+    build: ./backend
+    ports: ["127.0.0.1:${BACKEND_PORT:-8000}:8000"]
+    environment:
+      DATABASE_URL: sqlite:////app/data/app.db
+      AI_SERVICE_URL: http://ai-service:8001
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
+      AI_RATE_LIMIT: ${AI_RATE_LIMIT:-10}
+    volumes:
+      - backend-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    # Deliberately NO depends_on ai-service: shots must work with the AI service down.
+
+  ai-service:
+    build: ./ai-service
+    ports: ["127.0.0.1:${AI_PORT:-8001}:8001"]
+    environment:
+      AI_MODEL: ${AI_MODEL:-test}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8001/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:8000}
+    ports: ["127.0.0.1:${FRONTEND_PORT:-5173}:8080"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  backend-data:

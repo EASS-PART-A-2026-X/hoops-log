@@ -43,10 +43,12 @@ One stateless service (FastAPI + Pydantic AI); it never touches the database. Th
 ## Data flow
 browser -> frontend (:5173) -> backend (:8000) -> ai-service (:8001)
 
+(The browser calls the backend directly; the frontend is only the static site. `docker compose up` starts all three.)
+
 Only the backend touches the database (SQLite) and calls the AI service.
 
 ## How to run
-Shots are stored in SQLite, so they survive a restart. Every command runs from `backend/`.
+Shots are stored in SQLite, so they survive a restart. Every command runs from `backend/`, except the Compose ones, which run from the repo root.
 
 ### Locally
 Requires [uv](https://docs.astral.sh/uv/) (0.12 or newer); uv installs Python 3.14 from `backend/.python-version`.
@@ -75,6 +77,25 @@ curl -sS --retry 10 --retry-all-errors --retry-delay 1 localhost:8000/health   #
 ```
 
 The named volume `backend-data` holds the database, so shots survive `docker rm -f backend` followed by the same `docker run` again. Without `-v backend-data:/app/data`, a new container starts with an empty database (only the demo shots). `docker volume rm backend-data` deletes the data.
+
+### The whole app with Docker Compose
+One command starts all three services (run it from the repo root; stop `fastapi dev` and `vite` first, they use the same ports):
+
+```bash
+docker compose up --build
+```
+
+| Service | Address | Notes |
+|---|---|---|
+| frontend | http://localhost:5173 | the built site, served by nginx |
+| backend | http://localhost:8000 | docs at `/docs`; the database is the named volume `backend-data` |
+| ai-service | http://localhost:8001 | stateless; the backend reaches it as `http://ai-service:8001` |
+
+- **No setup needed.** The AI service starts with `AI_MODEL=test`, the library's fake model: no key, no network, canned answers. For a real model copy `.env.example` to `.env` (git-ignored), set `AI_MODEL=groq:openai/gpt-oss-120b` and your own `GROQ_API_KEY`, then `docker compose up --build` again.
+- **Healthchecks.** Each service has one (`docker compose ps` shows `healthy`). The frontend waits for a healthy backend. The backend does **not** wait for the AI service: with the AI service down, shots still work and `/chat` answers 503 with a plain message. `docker compose stop ai-service` shows it; `docker compose start ai-service` brings it back.
+- **Data survives.** `docker compose down` then `up` keeps the shots (the volume). `docker compose down -v` deletes them.
+- **Ports.** Set `BACKEND_PORT`, `AI_PORT` or `FRONTEND_PORT` to move a service on your machine (everything is published on `127.0.0.1` only). The browser app only works on its default ports, because the backend's CORS list names `localhost:5173`.
+- **Check it.** `python3 scripts/compose_check.py` builds the stack on spare ports and checks health, the frontend, persistence, and the AI service being stopped and restarted (about a minute). `scripts/ci.sh --docker` runs it too.
 
 ### Settings
 | Variable | Default | Meaning |
