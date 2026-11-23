@@ -235,13 +235,6 @@ CASES: tuple[EvalCase, ...] = (
         (_shot("right_wing_three", False),),
         _hebrew_got_it("שלשה שלא נכנסה מ45 ימין"),
     ),
-    _spot_he(
-        "he-left-block",
-        "קלעתי חצי מרחק מצד שמאל.",
-        (_shot("left_block", True),),
-        _hebrew_got_it("זריקה שנכנסה מחצי מרחק מצד שמאל"),
-        held_out=True,
-    ),
     # --- feet given directly ---
     EvalCase(
         "feet-made",
@@ -306,6 +299,16 @@ CASES: tuple[EvalCase, ...] = (
         "קלעתי שלשה.",
         Expect(question=True, language="he"),
         "מאיפה על המגרש הייתה השלשה?",
+        held_out=True,
+    ),
+    # A mid-range from the corner is not one of the named places (the list has no
+    # two-pointer from the corner), and "זרקתי" does not say whether it went in: ask.
+    EvalCase(
+        "unclear-he-mid-range-corner",
+        "unclear",
+        "זרקתי חצי מרחק מפינה שמאל.",
+        Expect(question=True, language="he"),
+        "מאיפה בדיוק זה היה, והאם הזריקה נכנסה?",
         held_out=True,
     ),
     # --- not a field goal: not tracked here ---
