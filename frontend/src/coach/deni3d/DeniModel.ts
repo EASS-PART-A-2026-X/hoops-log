@@ -4,10 +4,11 @@
  * the recording, so it is worked out from his right hand (dribbleBall.ts). Other recorded motions play once on top of
  * the dribble when something happens (a wave when the dialog opens, a cheer for a hype, a scratch of the head or a hold
  * of it for a "hmm"): the dribble fades out, the ball drops to the floor, and it is picked up when the dribble returns.
- * He does not dribble non-stop: after a while he stands (the first moment of the dribble recording, where he stands
- * upright), the ball at his feet, and after a rest he picks it up and dribbles again. What the recordings cannot know
- * is added in code: his left arm gestures while he talks (when no other motion is
- * playing), his head follows the pointer and nods while he talks, and he jumps for a hype.
+ * He stands and does nothing until something happens. About once a minute he does a routine on his own: one go
+ * through the dribble, then the push-up recording, then he stands again (the first moment of the dribble recording,
+ * held still, with the ball at his feet). What the recordings cannot know is added in code: his left arm gestures
+ * while he talks (when no other motion is playing), his head follows the pointer and nods while he talks, and he
+ * jumps for a hype.
  *
  * Everything is worked out in the model's own frame (the `root` group), so turning him round changes nothing.
  * A fan-made character inspired by Deni Avdija, not the real Deni.
@@ -36,11 +37,23 @@ export const REACTIONS: Record<Reaction, { clip: string; seconds: number }[]> = 
   ],
 }
 /**
- * How long he dribbles, then stands still, in turn (seconds). Taken one after the other and round again, a little
- * different each time so it does not feel like a clock.
+ * What he does when he is left alone, in seconds. `firstWait` is the pause after the greeting, `waitFor` the stand
+ * between two routines (taken in turn), `dribbleFor` one go through the dribble, and `routine` what he does at each
+ * go, in order: "dribble", or the name of a recording that is played through once (one the file does not have is skipped).
+ * Everything else of the time he stands and does nothing.
  */
-export const DRIBBLE_FOR = [14, 11, 17, 12]
-export const STAND_FOR = [7, 5, 9, 6]
+export interface Schedule {
+  firstWait: number
+  waitFor: number[]
+  dribbleFor: number
+  routine: string[]
+}
+export const SCHEDULE: Schedule = {
+  firstWait: 5,
+  waitFor: [52],
+  dribbleFor: 5,
+  routine: ['dribble', 'idle_to_push_up'],
+}
 /** Seconds for him to ease from the dribble to standing, and back. */
 const REST_BLEND_S = 0.7
 /** Seconds for the dribble to fade into a reaction and back. */
@@ -76,7 +89,7 @@ export interface DeniModel {
    * in the frame of `root`.
    */
   apply(pose: Pose, t: number): { ball: THREE.Vector3 }
-  /** Something happened: he plays the matching recording once, then goes back to dribbling. */
+  /** Something happened: he plays the matching recording once, then goes back to standing. */
   react(what: Reaction): void
 }
 
@@ -88,7 +101,8 @@ export async function loadDeniModel(url: string, maxAnisotropy: number): Promise
 }
 
 /** Exported for testing with a made-up skeleton and a made-up recording. */
-export function buildModel(scene: THREE.Object3D, clips: readonly THREE.AnimationClip[], maxAnisotropy = 1): DeniModel {
+export function buildModel(scene: THREE.Object3D, clips: readonly THREE.AnimationClip[], maxAnisotropy = 1, plan: Partial<Schedule> = {}): DeniModel {
+  const S: Schedule = { ...SCHEDULE, ...plan }
   const found = clips.find((c) => c.name === DRIBBLE_CLIP)
   if (!found) throw new Error(`The model has no ${DRIBBLE_CLIP} recording`)
   const clip: THREE.AnimationClip = found
@@ -195,10 +209,12 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
   stand.play()
   stand.paused = true
   stand.time = 0
-  let resting = false
-  let rest = 0
+  // What he is doing when nothing else is: standing, or one go through the routine (the dribble, a recording).
+  let phase: 'wait' | 'dribble' | 'clip' = 'wait'
   let phaseEnd = -1
-  let cycle = 0
+  let rest = S.firstWait > 0 ? 1 : 0 // he starts standing, unless he is to start dribbling at once
+  let waits = 0
+  let routineAt = 0
   const turns: Record<Reaction, number> = { greet: 0, hype: 0, hmm: 0 }
 
   /** How much the left arm is posed by code instead of by the recording (0 to 1), eased so a gesture comes and goes smoothly. */
@@ -209,6 +225,31 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
   let fall = 0
   let picking = false
   let started = false
+
+  /** Starts the next thing of the routine at `t`, or goes back to standing when it is done. */
+  function nextStep(t: number): void {
+    while (routineAt < S.routine.length) {
+      const name = S.routine[routineAt++]!
+      if (name === 'dribble') {
+        phase = 'dribble'
+        phaseEnd = t + S.dribbleFor
+        // He starts from the beginning of the recording, standing up (it is not seen: its weight is 0 while he stands).
+        base.reset().play()
+        return
+      }
+      const played = clips.find((c) => c.name === name)
+      if (!played) continue
+      const action = actionFor(name)
+      if (shot && shot.action !== action) shot.action.stop()
+      action.reset().setEffectiveWeight(blend).play()
+      shot = { action, endAt: t + played.duration }
+      phase = 'clip'
+      phaseEnd = t + played.duration
+      return
+    }
+    phase = 'wait'
+    phaseEnd = t + S.waitFor[waits++ % S.waitFor.length]!
+  }
 
   function react(what: Reaction): void {
     const options = REACTIONS[what].filter((o) => clips.some((c) => c.name === o.clip))
@@ -224,20 +265,14 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     // Time only goes forward (with reduced motion it stays at 0, and he stands still).
     const dt = Math.max(0, t - lastT)
     lastT = t
-    // Dribbling for a while, then standing for a while.
-    if (phaseEnd < 0) phaseEnd = t + DRIBBLE_FOR[0]!
+    // Standing for a long while, then the routine once.
+    if (phaseEnd < 0) phaseEnd = t + S.firstWait
     if (t >= phaseEnd) {
-      resting = !resting
-      if (resting) {
-        phaseEnd = t + STAND_FOR[cycle % STAND_FOR.length]!
-      } else {
-        cycle++
-        phaseEnd = t + DRIBBLE_FOR[cycle % DRIBBLE_FOR.length]!
-        // He starts the next dribble from the beginning of it, standing up (it is not seen: its weight is 0 now).
-        base.reset().play()
-      }
+      if (phase === 'wait') routineAt = 0
+      nextStep(t)
     }
-    rest = resting ? Math.min(1, rest + dt / REST_BLEND_S) : Math.max(0, rest - dt / REST_BLEND_S)
+    const standing = phase !== 'dribble'
+    rest = standing ? Math.min(1, rest + dt / REST_BLEND_S) : Math.max(0, rest - dt / REST_BLEND_S)
     const active = shot !== null && t < shot.endAt
     const step = dt / BLEND_S
     blend = active ? Math.min(1, blend + step) : Math.max(0, blend - step)
@@ -289,12 +324,18 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     // The ball: in his right hand while he dribbles; on the floor while a reaction plays or he stands; picked up again after.
     const wrist = posOf(bone.rHand)
     const held = new THREE.Vector3(wrist.x, ballCentreY(freeBallY(base.time, tops, clip.duration, ballTop, BALL_R), wrist.y, BELOW_WRIST), wrist.z + 0.02)
-    if (!started || dt === 0) {
+    if (!started) {
+      // He starts standing: the ball is already lying at his feet, not dropped from his hand.
       started = true
+      if (standing && blend === 0) ball.set(held.x, BALL_R, held.z)
+      else ball.copy(held)
+    } else if (dt === 0) {
       ball.copy(held)
     } else if (Math.max(blend, rest) > 0.5) {
-      fall -= GRAVITY * dt
-      ball.y += fall * dt
+      // A step is never longer than a frame or two, or a tab that was hidden for a minute would throw the ball into the air.
+      const fallDt = Math.min(dt, 0.05)
+      fall -= GRAVITY * fallDt
+      ball.y += fall * fallDt
       if (ball.y < BALL_R) {
         ball.y = BALL_R
         fall = Math.abs(fall) * 0.55 > 0.4 ? Math.abs(fall) * 0.55 : 0

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { DRIBBLE_CLIP, DRIBBLE_FOR, REACTIONS, STAND_FOR, buildModel } from './DeniModel'
+import { DRIBBLE_CLIP, REACTIONS, SCHEDULE, buildModel } from './DeniModel'
+import type { Schedule } from './DeniModel'
 import { BALL_R, poseAt } from './pose'
 
 /** A made-up skeleton with the names the real one has, standing in a T with its feet on the floor, about 2 m tall. */
@@ -39,6 +40,10 @@ function recording(name = DRIBBLE_CLIP): THREE.AnimationClip {
   return new THREE.AnimationClip(name, 3.2, [new THREE.VectorKeyframeTrack('mixamorigRightHand.position', times, values)])
 }
 
+/** Dribbling from the first moment and never resting: most of these tests are about what he does while he dribbles. */
+const BUSY: Partial<Schedule> = { firstWait: 0, dribbleFor: 9999 }
+const build = (clips: THREE.AnimationClip[], plan: Partial<Schedule> = BUSY) => buildModel(skeleton(), clips, 1, plan)
+
 /** A made-up reaction: the left hand is held `lift` metres above where it is in the dribble, for `seconds`. */
 function reaction(name: string, lift: number, seconds = 8): THREE.AnimationClip {
   return new THREE.AnimationClip(name, seconds, [new THREE.VectorKeyframeTrack('mixamorigLeftHand.position', [0, seconds], [0.27, lift, 0, 0.27, lift, 0])])
@@ -64,29 +69,29 @@ function run(model: ReturnType<typeof buildModel>, from: number, to: number, ove
 
 describe('the realistic coach', () => {
   it('stands on the floor at his height', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = build([recording()])
     const box = new THREE.Box3().setFromObject(model.root)
     expect(box.min.y).toBeCloseTo(0, 3)
     expect(box.max.y).toBeCloseTo(2.04, 2)
   })
 
   it('fails loudly when the file has no dribble recording or lacks a bone (a wrong file), so the drawn figure carries on', () => {
-    expect(() => buildModel(skeleton(), [])).toThrow(/basketball_dribble/)
-    expect(() => buildModel(skeleton(), [recording('Walking')])).toThrow(/basketball_dribble/)
+    expect(() => build([])).toThrow(/basketball_dribble/)
+    expect(() => build([recording('Walking')])).toThrow(/basketball_dribble/)
     const scene = skeleton()
     find(scene, 'LeftForeArm').name = 'Something'
     expect(() => buildModel(scene, [recording()])).toThrow(/LeftForeArm/)
   })
 
   it('plays the recording: the right hand goes up and down', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = build([recording()])
     const ys: number[] = []
     run(model, 0, 1.6, {}, () => ys.push(at(model.root, 'RightHand').y))
     expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.2)
   })
 
   it('keeps the ball under the hand, lets it fall to the floor and brings it back, and never above the palm', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = build([recording()])
     let lowest = 9
     let held = 0
     run(model, 0, 3.2, {}, (_t, ball) => {
@@ -103,7 +108,7 @@ describe('the realistic coach', () => {
   })
 
   it('jumps for a hype: all of him goes up', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = build([recording()])
     model.apply(pose(), 0.1)
     const rest = at(model.root, 'Hips').y
     model.apply({ ...pose(), rootY: 0.16 }, 0.1)
@@ -111,7 +116,7 @@ describe('the realistic coach', () => {
   })
 
   it('poses the left arm from the mood while he dribbles (overhead for a hype pose), easing in', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = build([recording()])
     run(model, 0, 0.2)
     const rest = at(model.root, 'LeftHand').y
     const hype = { mood: 'hype' as const, moodAge: 0.6 }
@@ -124,7 +129,7 @@ describe('the realistic coach', () => {
   })
 
   it('poses him still with reduced motion, whatever the clock says', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = build([recording()])
     const still = () => poseAt({ t: 3.3, talking: false, mood: 'idle', moodAge: 3, look: { x: 0, y: 0 }, reduced: true })
     const first = model.apply(still(), 0)
     const hand = at(model.root, 'RightHand').clone()
@@ -134,7 +139,7 @@ describe('the realistic coach', () => {
   })
 
   it('moves nothing to NaN in any mood, talking or not, looking anywhere', () => {
-    const model = buildModel(skeleton(), [recording(), ...Object.values(REACTIONS).flat().map((o) => reaction(o.clip, 0.5))])
+    const model = build([recording(), ...Object.values(REACTIONS).flat().map((o) => reaction(o.clip, 0.5))])
     let t = 0
     for (const mood of ['idle', 'happy', 'hype', 'hmm'] as const) {
       for (const talking of [false, true]) {
@@ -152,7 +157,7 @@ describe('the realistic coach', () => {
 })
 
 describe('reactions', () => {
-  const withReactions = () => buildModel(skeleton(), [recording(), reaction('Victory_Cheer', 1.0), reaction('Confused_Scratch', 0.4), reaction('Head_Hold_in_Pain', 0.8), reaction('Wave_One_Hand', 0.6)])
+  const withReactions = () => build([recording(), reaction('Victory_Cheer', 1.0), reaction('Confused_Scratch', 0.4), reaction('Head_Hold_in_Pain', 0.8), reaction('Wave_One_Hand', 0.6)])
   const hand = (m: ReturnType<typeof buildModel>) => at(m.root, 'LeftHand').y
 
   it('plays the recording of the reaction over the dribble, fading it in', () => {
@@ -206,7 +211,7 @@ describe('reactions', () => {
   })
 
   it('does nothing for a recording the file does not have', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = build([recording()])
     run(model, 0, 0.3)
     expect(() => model.react('hype')).not.toThrow()
     expect(() => run(model, 0.32, 1)).not.toThrow()
@@ -225,47 +230,59 @@ describe('reactions', () => {
   })
 })
 
-describe('resting between dribbles', () => {
-  /** The right hand's height and the ball's, every step from `from` to `to`. */
+describe('what he does when left alone', () => {
+  /** Stands 2 s, then the routine (a go of 5 s through the dribble, a 3 s recording), then stands 30 s, and so on. */
+  const PLAN: Partial<Schedule> = { firstWait: 2, dribbleFor: 5, waitFor: [30, 30], routine: ['dribble', 'idle_to_push_up'] }
+  const pushUp = () => reaction('idle_to_push_up', 0.7, 3)
+  const make = (plan: Partial<Schedule> = PLAN, clips: THREE.AnimationClip[] = [recording(), pushUp()]) => build(clips, plan)
+  const range = (v: number[]) => Math.max(...v) - Math.min(...v)
+  /** The right hand's, the ball's and the left hand's heights, every step from `from` to `to`. */
   function watch(model: ReturnType<typeof buildModel>, from: number, to: number) {
     const hand: number[] = []
     const ball: number[] = []
+    const left: number[] = []
     run(model, from, to, {}, (_t, b) => {
       hand.push(at(model.root, 'RightHand').y)
+      left.push(at(model.root, 'LeftHand').y)
       ball.push(b.y)
     })
-    const range = (v: number[]) => Math.max(...v) - Math.min(...v)
-    return { hand, ball, handRange: range(hand), ballRange: range(ball) }
+    return { hand, ball, left, handRange: range(hand), ballRange: range(ball) }
   }
 
-  it('dribbles for a while, then stands still with the ball on the floor, then dribbles again', () => {
-    const model = buildModel(skeleton(), [recording()])
-    const dribble = DRIBBLE_FOR[0]!
-    const stand = STAND_FOR[0]!
-    const first = watch(model, 0, dribble - 1)
-    expect(first.handRange).toBeGreaterThan(0.2) // dribbling
-    // Eased into standing, then really still.
-    run(model, dribble - 0.98, dribble + 1.5)
-    const resting = watch(model, dribble + 1.52, dribble + 3.5)
-    expect(resting.handRange).toBeLessThan(0.01)
-    // The ball bounces a few times on the floor and then lies there.
-    const settled = watch(model, dribble + 3.52, dribble + stand - 0.5)
-    expect(settled.ball.every((y) => Math.abs(y - BALL_R) < 0.02)).toBe(true)
-    // And back to it: the hand moves again and the ball is back in it.
-    run(model, dribble + stand - 0.48, dribble + stand + 2)
-    const again = watch(model, dribble + stand + 2.02, dribble + stand + 4.5)
-    expect(again.handRange).toBeGreaterThan(0.2)
-    expect(again.ballRange).toBeGreaterThan(0.2)
+  it('is set up as asked: about a minute between routines, one dribble then the push-up, and nothing else', () => {
+    const total = SCHEDULE.dribbleFor + 2.6 + SCHEDULE.waitFor[0]!
+    expect(total).toBeGreaterThanOrEqual(58)
+    expect(total).toBeLessThanOrEqual(62)
+    expect(SCHEDULE.routine).toEqual(['dribble', 'idle_to_push_up'])
+  })
+
+  it('stands and does nothing, then does the dribble once and the push-up right after it, then stands again for a long while', () => {
+    const model = make()
+    run(model, 0, 1.9)
+    const rest = at(model.root, 'LeftHand').y
+    expect(watch(model, 1.92, 1.98).handRange).toBeLessThan(0.01) // standing after the greeting
+    const dribble = watch(model, 2.5, 6.5) // the dribble, 2 to 7 s
+    expect(dribble.handRange).toBeGreaterThan(0.2)
+    expect(Math.max(...dribble.left) - rest).toBeLessThan(0.3) // no push-up yet
+    const pushUpBegins = watch(model, 7.5, 9.5) // the push-up, 7 to 10 s
+    expect(Math.max(...pushUpBegins.left) - rest).toBeGreaterThan(0.4)
+    expect(pushUpBegins.handRange).toBeLessThan(0.01) // and he is not dribbling
+    run(model, 9.52, 12)
+    const stand = watch(model, 12.02, 39) // the long stand, 10 to 40 s
+    expect(stand.handRange).toBeLessThan(0.01)
+    expect(Math.max(...stand.left) - rest).toBeLessThan(0.05) // doing nothing at all
+    expect(stand.ball.slice(Math.round(4 / 0.02)).every((y) => Math.abs(y - BALL_R) < 0.02)).toBe(true)
+    // The routine again, after the wait: the dribble from 40 s.
+    run(model, 39.02, 41)
+    expect(watch(model, 41.02, 44).handRange).toBeGreaterThan(0.2)
   })
 
   it('does not go from one to the other in a single frame', () => {
-    const model = buildModel(skeleton(), [recording()])
-    const dribble = DRIBBLE_FOR[0]!
-    let before = 0
-    run(model, 0, dribble - 0.02, {}, () => (before = at(model.root, 'RightHand').y))
+    const model = make()
+    run(model, 0, 1.98)
+    let last = at(model.root, 'RightHand').y
     let biggest = 0
-    let last = before
-    run(model, dribble, dribble + 1.5, {}, () => {
+    run(model, 2, 3.5, {}, () => {
       const y = at(model.root, 'RightHand').y
       biggest = Math.max(biggest, Math.abs(y - last))
       last = y
@@ -273,10 +290,28 @@ describe('resting between dribbles', () => {
     expect(biggest).toBeLessThan(0.15)
   })
 
-  it('never rests with reduced motion (the clock does not move)', () => {
-    const model = buildModel(skeleton(), [recording()])
-    const first = model.apply(poseAt({ t: 0, talking: false, mood: 'idle', moodAge: 0, look: { x: 0, y: 0 }, reduced: true }), 0)
-    for (let i = 0; i < 5; i++) model.apply(poseAt({ t: 99, talking: false, mood: 'idle', moodAge: 0, look: { x: 0, y: 0 }, reduced: true }), 0)
-    expect(model.apply(poseAt({ t: 99, talking: false, mood: 'idle', moodAge: 0, look: { x: 0, y: 0 }, reduced: true }), 0).ball.distanceTo(first.ball)).toBeLessThan(1e-9)
+  it('skips a recording the file does not have, and does nothing at all with no routine', () => {
+    const model = make(PLAN, [recording()]) // no push-up in the file
+    run(model, 0, 8)
+    expect(watch(model, 8.02, 35).handRange).toBeLessThan(0.01) // straight to standing after the dribble
+    const none = make({ ...PLAN, routine: [] })
+    expect(watch(none, 0, 60).handRange).toBeLessThan(0.01)
+  })
+
+  it('a reaction still plays when something happens, whatever he was doing', () => {
+    const model = make(PLAN, [recording(), pushUp(), reaction('Victory_Cheer', 1.0)])
+    run(model, 0, 20)
+    const rest = at(model.root, 'LeftHand').y
+    model.react('hype')
+    run(model, 20.02, 21.6)
+    expect(at(model.root, 'LeftHand').y - rest).toBeGreaterThan(0.8)
+  })
+
+  it('never does anything on his own with reduced motion (the clock does not move)', () => {
+    const model = make(PLAN)
+    const reduced = () => poseAt({ t: 99, talking: false, mood: 'idle', moodAge: 0, look: { x: 0, y: 0 }, reduced: true })
+    const first = model.apply(reduced(), 0)
+    for (let i = 0; i < 5; i++) model.apply(reduced(), 0)
+    expect(model.apply(reduced(), 0).ball.distanceTo(first.ball)).toBeLessThan(1e-9)
   })
 })
