@@ -4289,6 +4289,7 @@ h3 {
   padding: 16px 16px 12px;
   border-left: 1px solid var(--line-strong);
   background: linear-gradient(180deg, #151e2b 0, var(--panel) 120px);
+  overflow-y: auto;
 }
 
 .coach-head {
@@ -4527,6 +4528,12 @@ h3 {
   mask-image: linear-gradient(transparent 0, #000 16px);
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-log {
+    scroll-behavior: auto;
+  }
 }
 
 .chat-msg {
