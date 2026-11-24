@@ -277,6 +277,15 @@ describe('reactions', () => {
     expect(() => run(model, 0.32, 1)).not.toThrow()
   })
 
+  it('plays a greeting asked for before the first frame, even when the clock is already far on (a slow download)', () => {
+    const model = withReactions()
+    const still = withReactions() // the same, asked for nothing
+    model.react('greet') // the file has just loaded: no frame has been drawn yet
+    run(model, 30, 31.6) // the stage clock started long ago
+    run(still, 30, 31.6)
+    expect(Math.abs(hand(model) - hand(still))).toBeGreaterThan(0.3) // the wave is playing, not already cut off
+  })
+
   it('stands the reaction down when a new one starts', () => {
     const model = withReactions()
     run(model, 0, 0.5)

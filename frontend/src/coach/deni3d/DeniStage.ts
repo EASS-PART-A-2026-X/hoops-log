@@ -7,6 +7,9 @@ import * as THREE from 'three'
 import type { Mood } from '../lines'
 import { buildDeni } from './buildDeni'
 import { loadDeniModel } from './DeniModel'
+
+/** How long the model file may take before the drawn figure stands in. */
+const MODEL_TIMEOUT_MS = 45_000
 import type { DeniModel } from './DeniModel'
 import type { DeniRig } from './buildDeni'
 import { BALL_R, poseAt } from './pose'
@@ -98,7 +101,17 @@ export class DeniStage {
 
   private async loadModel(): Promise<void> {
     try {
-      const model = await loadDeniModel(`${import.meta.env.BASE_URL}deni.glb`, this.renderer.capabilities.getMaxAnisotropy())
+      // A stalled download must not keep the loading note up for ever: after a while the drawn figure stands in.
+      let giveUp: ReturnType<typeof setTimeout> | undefined
+      const stalled = new Promise<never>((_, reject) => {
+        giveUp = setTimeout(() => reject(new Error('The model took too long to load')), MODEL_TIMEOUT_MS)
+      })
+      let model: Awaited<ReturnType<typeof loadDeniModel>>
+      try {
+        model = await Promise.race([loadDeniModel(`${import.meta.env.BASE_URL}deni.glb`, this.renderer.capabilities.getMaxAnisotropy()), stalled])
+      } finally {
+        clearTimeout(giveUp)
+      }
       if (this.disposed) return
       // He replaces the drawn body; the ball and the shadows stay (they live in the same root).
       this.rig.body.visible = false

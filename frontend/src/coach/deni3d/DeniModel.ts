@@ -203,7 +203,7 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     }
     return action
   }
-  let shot: { action: THREE.AnimationAction; endAt: number } | null = null
+  let shot: { action: THREE.AnimationAction; endAt: number; seconds?: number } | null = null
   let blend = 0
   // Standing: the first moment of the dribble held still (a copy of the recording, so it can be mixed with the dribble itself).
   const stand = mixer.clipAction(clip.clone())
@@ -228,6 +228,8 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
   /** How much the left arm is posed by code instead of by the recording (0 to 1), eased so a gesture comes and goes smoothly. */
   let gesture = 0
   let lastT = 0
+  // Time starts counting when the stage does, so a reaction asked for before the first frame (the greeting, once the file has loaded) has no start time yet.
+  let framed = false
   // The ball: where it is, how fast it falls while he is busy with a reaction, and whether he is still picking it up again.
   const ball = new THREE.Vector3()
   let fall = 0
@@ -267,13 +269,17 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     const action = actionFor(choice.clip)
     if (shot && shot.action !== action) shot.action.stop()
     action.reset().setEffectiveWeight(blend).play()
-    shot = { action, endAt: lastT + choice.seconds }
+    shot = framed ? { action, endAt: lastT + choice.seconds } : { action, endAt: Infinity, seconds: choice.seconds }
   }
 
   function apply(p: Pose, t: number): { ball: THREE.Vector3 } {
     // Time only goes forward (with reduced motion it stays at 0, and he stands still).
-    const dt = Math.max(0, t - lastT)
+    const dt = framed ? Math.max(0, t - lastT) : 0
     lastT = t
+    if (!framed) {
+      framed = true
+      if (shot?.seconds !== undefined) shot.endAt = t + shot.seconds
+    }
     // Standing for a long while, then the routine once.
     if (phaseEnd < 0) phaseEnd = t + S.firstWait
     if (t >= phaseEnd) {
