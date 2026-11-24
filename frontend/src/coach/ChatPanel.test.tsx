@@ -67,11 +67,39 @@ describe('what it says before anything is said', () => {
     expect(box().placeholder).toBe('Message Deni…')
   })
 
-  it('has ONE way to talk to him: a text box, with no separate buttons for questions', () => {
+  it('has ONE way to talk to him: a text box (the suggestions only send or fill in the same box)', () => {
     panel(stubChat())
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
     expect(screen.queryByRole('list', { name: /questions/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /How am I shooting/ })).toBeNull()
+  })
+
+  it('offers things to try, and a tap sends the question through the chat like a typed one', async () => {
+    const chat = stubChat()
+    panel(chat)
+    await userEvent.click(screen.getByRole('button', { name: 'Where am I strongest?' }))
+    expect(chat.send).toHaveBeenCalledWith('Where am I strongest?')
+  })
+
+  it('"Log a session" only types an example into the box, for you to change (nothing is sent)', async () => {
+    const chat = stubChat()
+    panel(chat)
+    await userEvent.click(screen.getByRole('button', { name: /Log a session/ }))
+    expect(box().value).toMatch(/right corner/i)
+    expect(chat.send).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(box())
+  })
+
+  it('takes the suggestions away once there is a conversation, and while his helper is offline', () => {
+    panel(stubChat({ messages: [message({ id: 1, role: 'user', text: 'Hi' })] }))
+    expect(screen.queryByRole('button', { name: 'Where am I strongest?' })).toBeNull()
+    cleanup()
+    panel(stubChat(), { aiAvailable: false })
+    expect(screen.queryByRole('button', { name: 'Where am I strongest?' })).toBeNull()
+  })
+
+  it('does not let a suggestion send while he is thinking', () => {
+    panel(stubChat({ thinking: true }))
+    expect((screen.getByRole('button', { name: 'Where am I strongest?' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('tells you your messages go to an AI model', () => {
@@ -227,6 +255,18 @@ describe('the shots he understood', () => {
     expect(screen.getByText('caught and shot')).toBeTruthy()
     expect(screen.queryByText('hit one from the right corner')).toBeNull()
     expect(screen.getByText('Left elbow · 2PT · missed · 2026-11-19')).toBeTruthy()
+  })
+
+  it('draws where each shot was on a little court, coloured by the result', () => {
+    const { container } = panel(withCards([card(), card({ shot: elbow })]))
+    const courts = container.querySelectorAll('svg.mini-court')
+    expect(courts).toHaveLength(2)
+    expect(courts[0]!.classList.contains('made')).toBe(true)
+    expect(courts[1]!.classList.contains('missed')).toBe(true)
+    // The spot is the shot's own: 17 feet across, 19 up (the baseline is at the bottom of the drawing).
+    const dot = courts[1]!.querySelector('.mc-dot')!
+    expect(dot.getAttribute('cx')).toBe('17')
+    expect(dot.getAttribute('cy')).toBe('28')
   })
 
   it('Save and Discard act on the right card of the right message', async () => {

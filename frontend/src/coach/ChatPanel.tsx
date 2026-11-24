@@ -18,6 +18,36 @@ interface Props {
 const GREETING = 'Ask me about your shots, or tell me about a session: "hit one from the right corner, missed two from the left elbow".'
 const GREETING_OFFLINE = 'My AI helper is offline right now, so I cannot chat. You can still add a shot by hand from the Shots button.'
 
+/** Questions that are sent as they are, and one example that is only typed in (you finish it with your own shots). */
+const QUESTIONS = ['How am I shooting overall?', 'Where am I strongest?', 'How do I compare with the NBA?']
+const EXAMPLE = 'Hit one from the right corner, missed two from the left elbow'
+
+/** His little round badge beside what he says: the number on his kit. */
+function Avatar() {
+  return (
+    <span className="chat-avatar" aria-hidden="true">
+      8
+    </span>
+  )
+}
+
+/**
+ * Where a shot is, drawn on a half court (the baseline at the bottom, the basket near it). The court is 50 feet
+ * wide and the spot is given in feet from the left sideline and from the baseline, like every shot in the app.
+ */
+function MiniCourt({ x, y, made }: { x: number; y: number; made: boolean }) {
+  const clamp = (v: number, max: number) => Math.min(Math.max(v, 0), max)
+  return (
+    <svg className={`mini-court ${made ? 'made' : 'missed'}`} viewBox="-1 -1 52 49" aria-hidden="true" focusable="false">
+      <rect x="0" y="0" width="50" height="47" rx="2" className="mc-floor" />
+      <rect x="17" y="28" width="16" height="19" className="mc-line" />
+      <path d="M3 47 V33 A23.75 23.75 0 0 1 47 33 V47" className="mc-line" />
+      <circle cx="25" cy="41.75" r="1.6" className="mc-line" />
+      <circle cx={clamp(x, 50)} cy={47 - clamp(y, 47)} r="3.4" className="mc-dot" />
+    </svg>
+  )
+}
+
 /**
  * The chat with Deni: ONE place to talk to him. You type; his AI works out whether you are telling him about shots
  * (he shows them as cards, and nothing is saved until you press Save) or asking about your numbers (he answers).
@@ -26,6 +56,7 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
   const { messages, thinking, savingFor, typedPlayer, setTypedPlayer, send, cancel, reset, save, discard, saveAll } = chat
   const [draft, setDraft] = useState('')
   const logRef = useRef<HTMLOListElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const offline = aiAvailable === false
 
   // Keep the newest message in view.
@@ -56,7 +87,29 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
       <ol className="chat-log" ref={logRef} role="log" aria-live="off" aria-label="Conversation with Deni">
         {/* His first words, in his own bubble. They are not part of the conversation sent to the AI. */}
         <li className="chat-msg deni">
-          <span className="chat-bubble">{offline ? GREETING_OFFLINE : GREETING}</span>
+          <span className="chat-row">
+            <Avatar />
+            <span className="chat-bubble">{offline ? GREETING_OFFLINE : GREETING}</span>
+          </span>
+          {messages.length === 0 && !offline && (
+            <div className="chat-suggest">
+              {QUESTIONS.map((question) => (
+                <button key={question} type="button" className="chat-chip" disabled={thinking} onClick={() => void send(question)}>
+                  {question}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="chat-chip example"
+                onClick={() => {
+                  setDraft(EXAMPLE)
+                  inputRef.current?.focus()
+                }}
+              >
+                Log a session…
+              </button>
+            </div>
+          )}
         </li>
         {messages.map((m) => (
           <Message key={m.id} message={m} player={savingFor} onSave={save} onDiscard={discard} onSaveAll={saveAll} />
@@ -64,6 +117,7 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
         {thinking && (
           // Not a message: three moving dots, so it cannot be mistaken for something Deni said. The words are for screen readers.
           <li className="chat-msg deni typing" role="status">
+            <Avatar />
             <span className="typing-dots" aria-hidden="true">
               <i />
               <i />
@@ -91,15 +145,19 @@ export default function ChatPanel({ chat, aiAvailable, player }: Props) {
         </label>
         <textarea
           id="chat-input"
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           maxLength={MAX_MESSAGE}
-          rows={2}
+          rows={1}
           placeholder={offline ? 'His AI helper is offline' : 'Message Deni…'}
         />
-        <button type="submit" className="btn primary" disabled={thinking || draft.trim() === ''}>
-          Send
+        <button type="submit" className="chat-send" disabled={thinking || draft.trim() === ''}>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+            <path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="sr-only">Send</span>
         </button>
       </form>
       <p className="chat-note">
@@ -142,7 +200,8 @@ function Message({ message, player, onSave, onDiscard, onSaveAll }: MessageProps
     <ul className="chat-cards" aria-label="Shots Deni understood">
       {cards.map((card, index) =>
         card.status === 'discarded' ? null : (
-          <li key={index} className={card.status === 'saved' ? 'shot-chip saved' : 'shot-chip'}>
+          <li key={index} className={`shot-chip ${card.shot.made ? 'made' : 'missed'}${card.status === 'saved' ? ' saved' : ''}`}>
+            <MiniCourt x={card.shot.x} y={card.shot.y} made={card.shot.made} />
             <span className="shot-chip-main">
               <strong>{describeShot(card.shot)}</strong>
               {card.shot.note && <span className="shot-chip-note">{card.shot.note}</span>}
@@ -190,6 +249,11 @@ function Message({ message, player, onSave, onDiscard, onSaveAll }: MessageProps
       {message.failed ? (
         <span className="chat-bubble" role="alert">
           {message.text}
+        </span>
+      ) : message.role === 'deni' ? (
+        <span className="chat-row">
+          <Avatar />
+          <span className="chat-bubble">{message.text}</span>
         </span>
       ) : (
         <span className="chat-bubble">{message.text}</span>
