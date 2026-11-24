@@ -4,7 +4,9 @@
  * the recording, so it is worked out from his right hand (dribbleBall.ts). Other recorded motions play once on top of
  * the dribble when something happens (a wave when the dialog opens, a cheer for a hype, a scratch of the head or a hold
  * of it for a "hmm"): the dribble fades out, the ball drops to the floor, and it is picked up when the dribble returns.
- * What the recordings cannot know is added in code: his left arm gestures while he talks (when no other motion is
+ * He does not dribble non-stop: after a while he stands (the first moment of the dribble recording, where he stands
+ * upright), the ball at his feet, and after a rest he picks it up and dribbles again. What the recordings cannot know
+ * is added in code: his left arm gestures while he talks (when no other motion is
  * playing), his head follows the pointer and nods while he talks, and he jumps for a hype.
  *
  * Everything is worked out in the model's own frame (the `root` group), so turning him round changes nothing.
@@ -33,6 +35,14 @@ export const REACTIONS: Record<Reaction, { clip: string; seconds: number }[]> = 
     { clip: 'Head_Hold_in_Pain', seconds: 3.4 },
   ],
 }
+/**
+ * How long he dribbles, then stands still, in turn (seconds). Taken one after the other and round again, a little
+ * different each time so it does not feel like a clock.
+ */
+export const DRIBBLE_FOR = [14, 11, 17, 12]
+export const STAND_FOR = [7, 5, 9, 6]
+/** Seconds for him to ease from the dribble to standing, and back. */
+const REST_BLEND_S = 0.7
 /** Seconds for the dribble to fade into a reaction and back. */
 const BLEND_S = 0.35
 const GRAVITY = 9.8
@@ -180,6 +190,15 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
   }
   let shot: { action: THREE.AnimationAction; endAt: number } | null = null
   let blend = 0
+  // Standing: the first moment of the dribble held still (a copy of the recording, so it can be mixed with the dribble itself).
+  const stand = mixer.clipAction(clip.clone())
+  stand.play()
+  stand.paused = true
+  stand.time = 0
+  let resting = false
+  let rest = 0
+  let phaseEnd = -1
+  let cycle = 0
   const turns: Record<Reaction, number> = { greet: 0, hype: 0, hmm: 0 }
 
   /** How much the left arm is posed by code instead of by the recording (0 to 1), eased so a gesture comes and goes smoothly. */
@@ -205,6 +224,20 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     // Time only goes forward (with reduced motion it stays at 0, and he stands still).
     const dt = Math.max(0, t - lastT)
     lastT = t
+    // Dribbling for a while, then standing for a while.
+    if (phaseEnd < 0) phaseEnd = t + DRIBBLE_FOR[0]!
+    if (t >= phaseEnd) {
+      resting = !resting
+      if (resting) {
+        phaseEnd = t + STAND_FOR[cycle % STAND_FOR.length]!
+      } else {
+        cycle++
+        phaseEnd = t + DRIBBLE_FOR[cycle % DRIBBLE_FOR.length]!
+        // He starts the next dribble from the beginning of it, standing up (it is not seen: its weight is 0 now).
+        base.reset().play()
+      }
+    }
+    rest = resting ? Math.min(1, rest + dt / REST_BLEND_S) : Math.max(0, rest - dt / REST_BLEND_S)
     const active = shot !== null && t < shot.endAt
     const step = dt / BLEND_S
     blend = active ? Math.min(1, blend + step) : Math.max(0, blend - step)
@@ -212,7 +245,8 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
       shot.action.stop()
       shot = null
     }
-    base.setEffectiveWeight(1 - blend)
+    base.setEffectiveWeight((1 - blend) * (1 - rest))
+    stand.setEffectiveWeight((1 - blend) * rest)
     shot?.action.setEffectiveWeight(blend)
     mixer.update(dt)
     scene.updateMatrixWorld(true)
@@ -252,13 +286,13 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
       bone.lArm.updateWorldMatrix(false, true)
     }
 
-    // The ball: in his right hand while he dribbles; dropped on the floor while a reaction plays; picked up again after.
+    // The ball: in his right hand while he dribbles; on the floor while a reaction plays or he stands; picked up again after.
     const wrist = posOf(bone.rHand)
     const held = new THREE.Vector3(wrist.x, ballCentreY(freeBallY(base.time, tops, clip.duration, ballTop, BALL_R), wrist.y, BELOW_WRIST), wrist.z + 0.02)
     if (!started || dt === 0) {
       started = true
       ball.copy(held)
-    } else if (blend > 0.5) {
+    } else if (Math.max(blend, rest) > 0.5) {
       fall -= GRAVITY * dt
       ball.y += fall * dt
       if (ball.y < BALL_R) {

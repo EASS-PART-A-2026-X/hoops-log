@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { DRIBBLE_CLIP, REACTIONS, buildModel } from './DeniModel'
+import { DRIBBLE_CLIP, DRIBBLE_FOR, REACTIONS, STAND_FOR, buildModel } from './DeniModel'
 import { BALL_R, poseAt } from './pose'
 
 /** A made-up skeleton with the names the real one has, standing in a T with its feet on the floor, about 2 m tall. */
@@ -222,5 +222,61 @@ describe('reactions', () => {
     run(model, 1.52, 2.6)
     expect(hand(model) - rest).toBeGreaterThan(0.45)
     expect(hand(model) - rest).toBeLessThan(0.75) // the wave (0.6), not the cheer (1.0)
+  })
+})
+
+describe('resting between dribbles', () => {
+  /** The right hand's height and the ball's, every step from `from` to `to`. */
+  function watch(model: ReturnType<typeof buildModel>, from: number, to: number) {
+    const hand: number[] = []
+    const ball: number[] = []
+    run(model, from, to, {}, (_t, b) => {
+      hand.push(at(model.root, 'RightHand').y)
+      ball.push(b.y)
+    })
+    const range = (v: number[]) => Math.max(...v) - Math.min(...v)
+    return { hand, ball, handRange: range(hand), ballRange: range(ball) }
+  }
+
+  it('dribbles for a while, then stands still with the ball on the floor, then dribbles again', () => {
+    const model = buildModel(skeleton(), [recording()])
+    const dribble = DRIBBLE_FOR[0]!
+    const stand = STAND_FOR[0]!
+    const first = watch(model, 0, dribble - 1)
+    expect(first.handRange).toBeGreaterThan(0.2) // dribbling
+    // Eased into standing, then really still.
+    run(model, dribble - 0.98, dribble + 1.5)
+    const resting = watch(model, dribble + 1.52, dribble + 3.5)
+    expect(resting.handRange).toBeLessThan(0.01)
+    // The ball bounces a few times on the floor and then lies there.
+    const settled = watch(model, dribble + 3.52, dribble + stand - 0.5)
+    expect(settled.ball.every((y) => Math.abs(y - BALL_R) < 0.02)).toBe(true)
+    // And back to it: the hand moves again and the ball is back in it.
+    run(model, dribble + stand - 0.48, dribble + stand + 2)
+    const again = watch(model, dribble + stand + 2.02, dribble + stand + 4.5)
+    expect(again.handRange).toBeGreaterThan(0.2)
+    expect(again.ballRange).toBeGreaterThan(0.2)
+  })
+
+  it('does not go from one to the other in a single frame', () => {
+    const model = buildModel(skeleton(), [recording()])
+    const dribble = DRIBBLE_FOR[0]!
+    let before = 0
+    run(model, 0, dribble - 0.02, {}, () => (before = at(model.root, 'RightHand').y))
+    let biggest = 0
+    let last = before
+    run(model, dribble, dribble + 1.5, {}, () => {
+      const y = at(model.root, 'RightHand').y
+      biggest = Math.max(biggest, Math.abs(y - last))
+      last = y
+    })
+    expect(biggest).toBeLessThan(0.15)
+  })
+
+  it('never rests with reduced motion (the clock does not move)', () => {
+    const model = buildModel(skeleton(), [recording()])
+    const first = model.apply(poseAt({ t: 0, talking: false, mood: 'idle', moodAge: 0, look: { x: 0, y: 0 }, reduced: true }), 0)
+    for (let i = 0; i < 5; i++) model.apply(poseAt({ t: 99, talking: false, mood: 'idle', moodAge: 0, look: { x: 0, y: 0 }, reduced: true }), 0)
+    expect(model.apply(poseAt({ t: 99, talking: false, mood: 'idle', moodAge: 0, look: { x: 0, y: 0 }, reduced: true }), 0).ball.distanceTo(first.ball)).toBeLessThan(1e-9)
   })
 })
