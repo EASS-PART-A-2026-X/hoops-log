@@ -1,72 +1,65 @@
 /**
  * The realistic coach: a rigged character model (public/deni.glb, a Mixamo-style skeleton with no fingers and no
- * face rig) posed in code every frame from the same `Pose` the drawn figure uses. The model brings no dribble of
- * its own, so the dribble is made here: his right hand is placed on top of the ball with two-bone arm maths
- * (ik.ts), his knees give a little with every bounce (the feet stay planted), and he leans over the ball.
+ * face rig) that dribbles with a recorded motion (the clip `basketball_dribble` in the same file). The ball is not in
+ * the recording, so it is worked out from his right hand (dribbleBall.ts). What the recording cannot know is added on
+ * top, in code: his left arm gestures while he talks, goes to his chin when he is thinking and overhead when he is
+ * hyped (blended in and out smoothly), his head follows the pointer and nods while he talks, and he jumps for a hype.
  *
  * Everything is worked out in the model's own frame (the `root` group), so turning him round changes nothing.
  * A fan-made character inspired by Deni Avdija, not the real Deni.
  */
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { solveLimb } from './ik'
-import { BALL_R, RELEASE_Y, type Pose } from './pose'
+import { ballCentreY, findTops, freeBallY } from './dribbleBall'
+import { BALL_R, type Pose } from './pose'
 
 /** How tall he stands (metres), like the drawn figure. */
 const HEIGHT = 2.04
-/** The hand's thickness plus half the ball's bounce room: how far the wrist stays above the top of the ball. */
-const WRIST_ABOVE_BALL = 0.085
-/** The hand bone's own axis that points out of the palm (checked on this model: with the opposite sign the hand lands palm up). Local Y runs along the hand. */
-const PALM_AXIS = new THREE.Vector3(-1, 0, 0)
-/** How much of the turn that puts the palm flat is made, and the most the forearm and hand are twisted in all (radians). */
-const TWIST_SHARE = 1
-const MAX_TWIST = 1.9
+/** The recorded motion that plays all the time. */
+export const DRIBBLE_CLIP = 'basketball_dribble'
+/** How far the ball's centre is below his wrist while the palm is on it. */
+const BELOW_WRIST = 0.2
+/** The recording is looked at this many times a second to find the bounces. */
+const SAMPLE_FPS = 30
 
-const X = new THREE.Vector3(1, 0, 0)
 const Y = new THREE.Vector3(0, 1, 0)
+const X = new THREE.Vector3(1, 0, 0)
 const Z = new THREE.Vector3(0, 0, 1)
-const DOWN = new THREE.Vector3(0, -1, 0)
 
 /** The bones this uses, by the names in the file (the loader drops the colon of "mixamorig:Hips"). */
 const NAMES = {
   hips: 'Hips',
-  spine: 'Spine',
-  spine1: 'Spine1',
-  spine2: 'Spine2',
   neck: 'Neck',
   head: 'Head',
   lArm: 'LeftArm',
   lFore: 'LeftForeArm',
-  lHand: 'LeftHand',
-  rArm: 'RightArm',
-  rFore: 'RightForeArm',
   rHand: 'RightHand',
-  lUp: 'LeftUpLeg',
-  lLeg: 'LeftLeg',
-  lFoot: 'LeftFoot',
-  rUp: 'RightUpLeg',
-  rLeg: 'RightLeg',
-  rFoot: 'RightFoot',
+  lHand: 'LeftHand',
 } as const
 type BoneKey = keyof typeof NAMES
 
 export interface DeniModel {
   /** Put this in the scene. Its origin is at his feet, he faces +Z. */
   root: THREE.Group
-  /** Poses him for this moment. `ball` is where the ball is, in the same frame. */
-  apply(pose: Pose): void
+  /**
+   * Poses him for this moment (`t` = seconds into the recording, which repeats) and says where the ball is, in the
+   * frame of `root`.
+   */
+  apply(pose: Pose, t: number): { ball: THREE.Vector3 }
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
-const softMax = (a: number, b: number, k: number) => 0.5 * (a + b + Math.sqrt((a - b) * (a - b) + k * k))
 
 export async function loadDeniModel(url: string, maxAnisotropy: number): Promise<DeniModel> {
   const gltf = await new GLTFLoader().loadAsync(url)
-  return buildModel(gltf.scene, maxAnisotropy)
+  return buildModel(gltf.scene, gltf.animations, maxAnisotropy)
 }
 
-/** Exported for testing with a made-up skeleton. */
-export function buildModel(scene: THREE.Object3D, maxAnisotropy = 1): DeniModel {
+/** Exported for testing with a made-up skeleton and a made-up recording. */
+export function buildModel(scene: THREE.Object3D, clips: readonly THREE.AnimationClip[], maxAnisotropy = 1): DeniModel {
+  const found = clips.find((c) => c.name === DRIBBLE_CLIP)
+  if (!found) throw new Error(`The model has no ${DRIBBLE_CLIP} recording`)
+  const clip: THREE.AnimationClip = found
   const root = new THREE.Group()
   root.add(scene)
 
@@ -134,93 +127,67 @@ export function buildModel(scene: THREE.Object3D, maxAnisotropy = 1): DeniModel 
     b.updateWorldMatrix(false, true)
   }
 
-  // ----- what he looks like at rest -----
-  frame()
-  const rest = new Map<THREE.Object3D, { q: THREE.Quaternion; p: THREE.Vector3 }>()
-  scene.traverse((o) => rest.set(o, { q: o.quaternion.clone(), p: o.position.clone() }))
-  const lenOf = (a: THREE.Object3D, b: THREE.Object3D) => posOf(a).distanceTo(posOf(b))
-  const rightArm = { l1: lenOf(bone.rArm, bone.rFore), l2: lenOf(bone.rFore, bone.rHand) }
-  const leg = {
-    left: { l1: lenOf(bone.lUp, bone.lLeg), l2: lenOf(bone.lLeg, bone.lFoot), foot: posOf(bone.lFoot), footQ: quatOf(bone.lFoot) },
-    right: { l1: lenOf(bone.rUp, bone.rLeg), l2: lenOf(bone.rLeg, bone.rFoot), foot: posOf(bone.rFoot), footQ: quatOf(bone.rFoot) },
-  }
-
-  function apply(p: Pose): void {
-    // Back to the resting pose, then pose from the hips up.
-    scene.traverse((o) => {
-      const r = rest.get(o)
-      if (r) {
-        o.quaternion.copy(r.q)
-        o.position.copy(r.p)
-      }
-    })
+  // ----- the recording, and where the dribbling hand goes in it -----
+  const mixer = new THREE.AnimationMixer(scene)
+  mixer.clipAction(clip).play()
+  const height: number[] = []
+  const steps = Math.max(2, Math.round(clip.duration * SAMPLE_FPS))
+  for (let i = 0; i <= steps; i++) {
+    mixer.setTime((i / steps) * clip.duration)
     scene.updateMatrixWorld(true)
     frame()
+    height.push(posOf(bone.rHand).y)
+  }
+  const tops = findTops(height, steps / clip.duration)
+  // The ball is let go from just under his hand at its highest.
+  const ballTop = Math.max(...height) - BELOW_WRIST + 0.02
 
-    // Knees give with the bounce: the lower the ball is pushed, the lower he sits.
-    const push = clamp01((0.98 - softMax(p.ball.y, RELEASE_Y, 0.03)) / (0.98 - RELEASE_Y))
-    const crouch = 0.07 + 0.04 * push
-    moveBy(bone.hips, new THREE.Vector3(p.lean * 0.6, p.rootY - crouch, 0))
-    for (const side of ['left', 'right'] as const) {
-      const up = side === 'left' ? bone.lUp : bone.rUp
-      const lower = side === 'left' ? bone.lLeg : bone.rLeg
-      const foot = side === 'left' ? bone.lFoot : bone.rFoot
-      const l = leg[side]
-      const target = l.foot.clone().add(new THREE.Vector3(0, Math.max(0, p.rootY), 0))
-      const { mid, end } = solveLimb(posOf(up), target, l.l1, l.l2, Z)
-      aim(up, lower, mid.clone().sub(posOf(up)))
-      aim(lower, foot, end.clone().sub(posOf(lower)))
-      // The foot stays flat on the floor whatever the knee does.
-      const here = quatOf(foot)
-      turn(foot, l.footQ.clone().multiply(here.clone().invert()))
-    }
+  /** How much the left arm is posed by code instead of by the recording (0 to 1), eased so a gesture comes and goes smoothly. */
+  let gesture = 0
+  let lastT = 0
 
-    // Over the ball: a forward lean spread up the spine, a breath and a slow sway.
-    const lean = 0.16 + 0.012 * p.breathe
-    turnAbout(bone.spine, X, lean * 0.4)
-    turnAbout(bone.spine1, X, lean * 0.35)
-    turnAbout(bone.spine2, X, lean * 0.25 - 0.015 * p.breathe)
-    turnAbout(bone.spine1, Z, p.lean)
+  function apply(p: Pose, t: number): { ball: THREE.Vector3 } {
+    mixer.setTime(t)
+    scene.updateMatrixWorld(true)
+    frame()
+    const dt = Math.min(0.1, Math.max(0, t - lastT))
+    lastT = t
 
-    // Head: it follows the pointer, nods a little while he talks (there is no face rig to move a mouth).
+    // The hype jump: all of him goes up (the recording keeps his feet on the floor the rest of the time).
+    if (p.rootY > 0) moveBy(bone.hips, new THREE.Vector3(0, p.rootY, 0))
+
+    // Head: it follows the pointer and nods a little while he talks (there is no face rig to move a mouth).
     const nod = 0.05 * p.mouth
-    for (const [b, share] of [[bone.neck, 0.4], [bone.head, 0.6]] as const) {
+    for (const [b, share] of [
+      [bone.neck, 0.4],
+      [bone.head, 0.6],
+    ] as const) {
       turnAbout(b, Y, p.headYaw * share)
-      turnAbout(b, X, (p.headPitch + nod - lean * 0.8) * share)
+      turnAbout(b, X, (p.headPitch + nod) * share)
       turnAbout(b, Z, p.headRoll * share)
     }
 
-    // Right arm: the hand on top of the ball.
-    {
-      const shoulder = posOf(bone.rArm)
-      const ball = new THREE.Vector3(p.ball.x, p.ball.y, p.ball.z)
-      const hold = softMax(p.ball.y, RELEASE_Y, 0.03)
-      const target = new THREE.Vector3(ball.x, hold + BALL_R + WRIST_ABOVE_BALL, ball.z - 0.04)
-      const { mid, end } = solveLimb(shoulder, target, rightArm.l1, rightArm.l2, new THREE.Vector3(-0.5, -0.4, -1))
-      aim(bone.rArm, bone.rFore, mid.clone().sub(shoulder))
-      aim(bone.rFore, bone.rHand, end.clone().sub(mid))
-      // The palm flat toward the floor, and the wrist snapping down as he pushes.
-      const along = end.clone().sub(mid).normalize()
-      const palm = PALM_AXIS.clone().applyQuaternion(quatOf(bone.rHand)).sub(along.clone().multiplyScalar(PALM_AXIS.clone().applyQuaternion(quatOf(bone.rHand)).dot(along))).normalize()
-      const want = DOWN.clone().sub(along.clone().multiplyScalar(DOWN.dot(along))).normalize()
-      const roll = Math.atan2(along.dot(palm.clone().cross(want)), palm.dot(want))
-      // The turn is shared by the forearm and the hand: all of it at the wrist alone pinches the skin there (the sleeve crumples).
-      const twist = Math.min(MAX_TWIST, Math.max(-MAX_TWIST, roll * TWIST_SHARE))
-      turnAbout(bone.rFore, along, twist * 0.5)
-      turnAbout(bone.rHand, along, twist * 0.5)
-      turnAbout(bone.rHand, along.clone().cross(want).normalize(), 0.1 + 0.25 * push)
-    }
-
-    // Left arm: from the angles of the pose (relaxed, gesturing, at the chin or overhead).
-    {
+    // Left arm: the recording's own while he only dribbles; from the angles of the pose (gesturing, at the chin, overhead) otherwise.
+    const wanted = clamp01((p.lShoulder - 0.1) / 0.15)
+    gesture = dt === 0 ? wanted : gesture + (wanted - gesture) * (1 - Math.exp(-dt * 10))
+    if (gesture > 0.002) {
+      const recorded = [bone.lArm.quaternion.clone(), bone.lFore.quaternion.clone()] as const
       // His left is +x (he faces +Z).
       const out = Math.sin(p.lShoulderOut + 0.12)
-      const upper = new THREE.Vector3(out, -Math.cos(p.lShoulder), Math.sin(p.lShoulder)).normalize()
+      const upper = new THREE.Vector3(out, -Math.cos(p.lShoulder), Math.sin(p.lShoulder))
       const total = p.lShoulder + p.lElbow
-      const lower = new THREE.Vector3(out * 0.5, -Math.cos(total), Math.sin(total)).normalize()
+      const lower = new THREE.Vector3(out * 0.5, -Math.cos(total), Math.sin(total))
       aim(bone.lArm, bone.lFore, upper)
       aim(bone.lFore, bone.lHand, lower)
+      bone.lArm.quaternion.slerpQuaternions(recorded[0], bone.lArm.quaternion.clone(), gesture)
+      bone.lFore.quaternion.slerpQuaternions(recorded[1], bone.lFore.quaternion.clone(), gesture)
+      bone.lArm.updateWorldMatrix(false, true)
     }
+
+    // The ball, from his right hand.
+    const wrist = posOf(bone.rHand)
+    const y = ballCentreY(freeBallY(t, tops, clip.duration, ballTop, BALL_R), wrist.y, BELOW_WRIST)
+    return { ball: new THREE.Vector3(wrist.x, y, wrist.z + 0.02) }
   }
 
   return { root, apply }

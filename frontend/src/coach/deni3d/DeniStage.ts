@@ -193,7 +193,9 @@ export class DeniStage {
     const p = poseAt({ t, talking: this.talking, mood: this.mood, moodAge: t - this.moodAt, look: this.lookNow, reduced: this.reduced })
     const r = this.rig
     r.root.rotation.y = this.yaw
-    if (this.model) this.model.apply(p)
+    // With the recorded model the ball follows his hand; the drawn figure's ball is the pose's.
+    const placed = this.model?.apply(p, this.reduced ? 0 : t)
+    const ball = placed ? { x: placed.ball.x, y: placed.ball.y, z: placed.ball.z, spin: p.ball.spin } : p.ball
     r.body.position.y = p.rootY
     r.body.rotation.z = p.lean
     r.body.scale.set(1 + 0.004 * p.breathe, 1, 1 + 0.012 * p.breathe)
@@ -207,12 +209,12 @@ export class DeniStage {
     r.rHand.rotation.set(-p.rWrist, PALM_DOWN, 0)
     r.lShoulder.rotation.set(-p.lShoulder, 0, p.lShoulderOut)
     r.lElbow.rotation.x = -p.lElbow
-    r.ball.position.set(p.ball.x, p.ball.y, p.ball.z)
-    r.ball.rotation.x = p.ball.spin
+    r.ball.position.set(ball.x, ball.y, ball.z)
+    r.ball.rotation.x = ball.spin
     // The ball's shadow tightens and darkens as the ball nears the floor.
-    const height = (p.ball.y - BALL_R) / 0.9
+    const height = Math.min(1, (ball.y - BALL_R) / 0.9)
     const size = 0.3 + 0.25 * height
-    r.ballShadow.position.set(p.ball.x, 0.005, p.ball.z)
+    r.ballShadow.position.set(ball.x, 0.005, ball.z)
     r.ballShadow.scale.set(size, 1, size)
     ;(r.ballShadow.material as THREE.MeshBasicMaterial).opacity = 0.85 - 0.5 * height
     this.renderer.render(this.scene, this.camera)
