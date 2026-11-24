@@ -6,6 +6,8 @@
 import * as THREE from 'three'
 import type { Mood } from '../lines'
 import { buildDeni } from './buildDeni'
+import { loadDeniModel } from './DeniModel'
+import type { DeniModel } from './DeniModel'
 import type { DeniRig } from './buildDeni'
 import { BALL_R, poseAt } from './pose'
 import { KIT, drawFloor } from './textures'
@@ -15,7 +17,7 @@ const PALM_DOWN = Math.PI / 2
 
 const FOV = 27
 /** What the camera must keep in view: the figure with the jump and the raised arm, and his reach sideways. */
-const VIEW_H = 3.2
+const VIEW_H = 2.95
 const VIEW_W = 1.7
 /** He stands in the upper part of the picture: the subtitle sits over the floor under his feet. */
 const LOOK_Y = 0.86
@@ -25,6 +27,8 @@ export class DeniStage {
   private scene = new THREE.Scene()
   private camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 50)
   private rig: DeniRig
+  /** The realistic model, once its file has loaded. Until then (or if it cannot load) the drawn figure stands there. */
+  private model: DeniModel | null = null
   private raf = 0
   private disposed = false
   private start = performance.now()
@@ -56,6 +60,7 @@ export class DeniStage {
 
     this.rig = buildDeni(this.renderer.capabilities.getMaxAnisotropy())
     this.scene.add(this.rig.root)
+    void this.loadModel()
 
     const floorTex = new THREE.CanvasTexture(drawFloor())
     floorTex.colorSpace = THREE.SRGBColorSpace
@@ -85,6 +90,20 @@ export class DeniStage {
     this.resizeObserver.observe(container)
     this.resize()
     this.loop()
+  }
+
+  private async loadModel(): Promise<void> {
+    try {
+      const model = await loadDeniModel(`${import.meta.env.BASE_URL}deni.glb`, this.renderer.capabilities.getMaxAnisotropy())
+      if (this.disposed) return
+      // He replaces the drawn body; the ball and the shadows stay (they live in the same root).
+      this.rig.body.visible = false
+      this.rig.root.add(model.root)
+      this.model = model
+      this.requestFrame()
+    } catch {
+      // No file, or a bad one: the drawn figure carries on.
+    }
   }
 
   setTalking(on: boolean): void {
@@ -174,6 +193,7 @@ export class DeniStage {
     const p = poseAt({ t, talking: this.talking, mood: this.mood, moodAge: t - this.moodAt, look: this.lookNow, reduced: this.reduced })
     const r = this.rig
     r.root.rotation.y = this.yaw
+    if (this.model) this.model.apply(p)
     r.body.position.y = p.rootY
     r.body.rotation.z = p.lean
     r.body.scale.set(1 + 0.004 * p.breathe, 1, 1 + 0.012 * p.breathe)
