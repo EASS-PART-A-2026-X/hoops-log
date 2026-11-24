@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Coach from './Coach'
 import { useChat } from './useChat'
@@ -32,6 +35,16 @@ describe('Coach', () => {
     fireEvent.click(face)
     return face
   }
+
+  it('shows his portrait in the corner, not the drawn face, and the portrait file is really there', () => {
+    const { container } = render(<Harness />)
+    const face = screen.getByRole('button', { name: /Open Deni/ })
+    const picture = face.querySelector('img')
+    expect(picture?.getAttribute('src')).toMatch(/deni-face\.webp$/)
+    expect(picture?.getAttribute('alt')).toBe('') // the button has its own label
+    expect(container.querySelector('svg.deni')).toBeNull()
+    expect(existsSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/deni-face.webp'))).toBe(true)
+  })
 
   it('opens the big view with the chat, and says what he is', () => {
     render(<Harness />)

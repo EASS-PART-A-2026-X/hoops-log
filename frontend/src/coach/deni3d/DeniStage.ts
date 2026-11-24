@@ -42,6 +42,8 @@ export class DeniStage {
   private resizeObserver: ResizeObserver
   private container: HTMLElement
   private reduced: boolean
+  /** Told when the model has loaded (true), or could not (false: the drawn figure is shown instead). */
+  onLoad: ((loaded: boolean) => void) | null = null
   /** Called when the visitor taps him (a press and release without dragging). */
   onPoke: (() => void) | null = null
 
@@ -59,6 +61,8 @@ export class DeniStage {
     container.appendChild(canvas)
 
     this.rig = buildDeni(this.renderer.capabilities.getMaxAnisotropy())
+    // Nothing of him is drawn until the model has loaded; the drawn figure only stands in if it cannot.
+    this.rig.root.visible = false
     this.scene.add(this.rig.root)
     void this.loadModel()
 
@@ -98,13 +102,19 @@ export class DeniStage {
       if (this.disposed) return
       // He replaces the drawn body; the ball and the shadows stay (they live in the same root).
       this.rig.body.visible = false
+      this.rig.root.visible = true
       this.rig.root.add(model.root)
       this.model = model
+      this.onLoad?.(true)
       // He greets you when the dialog opens (or reacts to what he is already feeling).
       if (!this.reduced) model.react(this.mood === 'hype' || this.mood === 'hmm' ? this.mood : 'greet')
       this.requestFrame()
     } catch {
-      // No file, or a bad one: the drawn figure carries on.
+      // No file, or a bad one: the drawn figure stands in.
+      if (this.disposed) return
+      this.rig.root.visible = true
+      this.onLoad?.(false)
+      this.requestFrame()
     }
   }
 

@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
-import DeniAvatar from './DeniAvatar'
 import ChatPanel from './ChatPanel'
 import { POKE_SPAM, poke } from './lines'
 import type { AnswerContext } from './lines'
@@ -90,9 +89,9 @@ export default function CoachDialog({ coach, chat, aiAvailable, context, onClose
           <Suspense
             fallback={
               <div className="deni-stage">
-                <div className="deni-stage-flat">
-                  <DeniAvatar mood={mood} talking={talking} />
-                </div>
+                <p className="deni-loading" role="status">
+                  Getting Deni ready…
+                </p>
               </div>
             }
           >

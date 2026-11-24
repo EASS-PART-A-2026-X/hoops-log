@@ -20,6 +20,8 @@ export default function Deni3D({ mood, talking, beat, onPoke }: Props) {
   const holder = useRef<HTMLDivElement>(null)
   const stage = useRef<DeniStage | null>(null)
   const [failed, setFailed] = useState(false)
+  // The model is a file of several MB: until it is there nothing of him is drawn, only this note.
+  const [loading, setLoading] = useState(true)
   const poke = useRef(onPoke)
   // The latest mood and talking, so a stage made a moment late (after the font loads) starts in the right state.
   const now = useRef({ mood, talking })
@@ -42,6 +44,7 @@ export default function Deni3D({ mood, talking, beat, onPoke }: Props) {
         made.setTalking(now.current.talking)
         made.setMood(now.current.mood)
         made.onPoke = () => poke.current?.()
+        made.onLoad = () => setLoading(false)
       } catch {
         // No WebGL here (or it is switched off). Set from the effect on purpose: only trying tells.
         // oxlint-disable-next-line react-hooks/set-state-in-effect
@@ -73,6 +76,11 @@ export default function Deni3D({ mood, talking, beat, onPoke }: Props) {
 
   return (
     <div className="deni-stage" ref={holder}>
+      {loading && !failed && (
+        <p className="deni-loading" role="status">
+          Getting Deni ready…
+        </p>
+      )}
       {failed && (
         <div className="deni-stage-flat">
           <DeniAvatar mood={mood} talking={talking} />

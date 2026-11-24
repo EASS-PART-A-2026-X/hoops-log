@@ -4032,6 +4032,56 @@ h3 {
   }
 }
 
+.coach-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* He has no mouth to move in the corner: while he talks the ring around his portrait pulses. */
+.coach-face.talking {
+  animation: coach-talking 1s ease-in-out infinite;
+}
+
+@keyframes coach-talking {
+  50% {
+    box-shadow:
+      0 0 0 7px rgba(255, 122, 47, 0.32),
+      0 6px 18px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.deni-loading {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  margin: 0;
+  padding: 7px 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(8, 8, 10, 0.78);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+  animation: deni-loading 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes deni-loading {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deni-loading,
+  .coach-face.talking {
+    animation: none;
+  }
+}
+
 .deni {
   width: 100%;
   height: 100%;
