@@ -100,6 +100,8 @@ export class DeniStage {
       this.rig.body.visible = false
       this.rig.root.add(model.root)
       this.model = model
+      // He greets you when the dialog opens (or reacts to what he is already feeling).
+      if (!this.reduced) model.react(this.mood === 'hype' || this.mood === 'hmm' ? this.mood : 'greet')
       this.requestFrame()
     } catch {
       // No file, or a bad one: the drawn figure carries on.
@@ -114,6 +116,8 @@ export class DeniStage {
   setMood(mood: Mood): void {
     this.mood = mood
     this.moodAt = this.seconds()
+    // A recorded reaction for the moods that have one (with reduced motion he does not move).
+    if (!this.reduced && (mood === 'hype' || mood === 'hmm')) this.model?.react(mood)
     this.requestFrame()
   }
 

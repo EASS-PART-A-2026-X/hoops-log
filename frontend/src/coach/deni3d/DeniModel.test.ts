@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { DRIBBLE_CLIP, buildModel } from './DeniModel'
+import { DRIBBLE_CLIP, REACTIONS, buildModel } from './DeniModel'
 import { BALL_R, poseAt } from './pose'
 
 /** A made-up skeleton with the names the real one has, standing in a T with its feet on the floor, about 2 m tall. */
@@ -39,6 +39,11 @@ function recording(name = DRIBBLE_CLIP): THREE.AnimationClip {
   return new THREE.AnimationClip(name, 3.2, [new THREE.VectorKeyframeTrack('mixamorigRightHand.position', times, values)])
 }
 
+/** A made-up reaction: the left hand is held `lift` metres above where it is in the dribble, for `seconds`. */
+function reaction(name: string, lift: number, seconds = 8): THREE.AnimationClip {
+  return new THREE.AnimationClip(name, seconds, [new THREE.VectorKeyframeTrack('mixamorigLeftHand.position', [0, seconds], [0.27, lift, 0, 0.27, lift, 0])])
+}
+
 const find = (root: THREE.Object3D, name: string) => root.getObjectByName(`mixamorig${name}`)!
 const at = (root: THREE.Object3D, name: string) => {
   root.updateMatrixWorld(true)
@@ -46,6 +51,16 @@ const at = (root: THREE.Object3D, name: string) => {
 }
 const pose = (over: Partial<Parameters<typeof poseAt>[0]> = {}) =>
   poseAt({ t: 0.9, talking: false, mood: 'idle', moodAge: 3, look: { x: 0, y: 0 }, reduced: false, ...over })
+
+/** Plays the stage clock from `from` to `to` in small steps (it only goes forward), with the same pose all the time. */
+function run(model: ReturnType<typeof buildModel>, from: number, to: number, over: Parameters<typeof pose>[0] = {}, each?: (t: number, ball: THREE.Vector3) => void): THREE.Vector3 {
+  let ball = new THREE.Vector3()
+  for (let t = from; t <= to + 1e-9; t += 0.02) {
+    ball = model.apply(pose({ t, ...over }), t).ball
+    each?.(t, ball)
+  }
+  return ball
+}
 
 describe('the realistic coach', () => {
   it('stands on the floor at his height', () => {
@@ -65,19 +80,16 @@ describe('the realistic coach', () => {
 
   it('plays the recording: the right hand goes up and down', () => {
     const model = buildModel(skeleton(), [recording()])
-    model.apply(pose(), 0)
-    const high = at(model.root, 'RightHand').y
-    model.apply(pose(), 0.4)
-    const low = at(model.root, 'RightHand').y
-    expect(high - low).toBeGreaterThan(0.2)
+    const ys: number[] = []
+    run(model, 0, 1.6, {}, () => ys.push(at(model.root, 'RightHand').y))
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.2)
   })
 
   it('keeps the ball under the hand, lets it fall to the floor and brings it back, and never above the palm', () => {
     const model = buildModel(skeleton(), [recording()])
     let lowest = 9
     let held = 0
-    for (let t = 0; t <= 3.2; t += 0.02) {
-      const { ball } = model.apply(pose({ t }), t)
+    run(model, 0, 3.2, {}, (_t, ball) => {
       const wrist = at(model.root, 'RightHand')
       expect(Number.isFinite(ball.x + ball.y + ball.z)).toBe(true)
       expect(ball.y).toBeLessThanOrEqual(wrist.y - 0.2 + 1e-6)
@@ -85,27 +97,27 @@ describe('the realistic coach', () => {
       expect(ball.x).toBeCloseTo(wrist.x, 5)
       lowest = Math.min(lowest, ball.y)
       if (Math.abs(ball.y - (wrist.y - 0.2)) < 1e-6) held++
-    }
+    })
     expect(lowest).toBeCloseTo(BALL_R, 1)
     expect(held).toBeGreaterThan(10) // it rests in the hand for part of every bounce
   })
 
   it('jumps for a hype: all of him goes up', () => {
     const model = buildModel(skeleton(), [recording()])
-    model.apply(pose({ mood: 'idle' }), 0.1)
+    model.apply(pose(), 0.1)
     const rest = at(model.root, 'Hips').y
     model.apply({ ...pose(), rootY: 0.16 }, 0.1)
     expect(at(model.root, 'Hips').y - rest).toBeCloseTo(0.16, 3)
   })
 
-  it('poses the left arm from the mood (overhead for a hype, at rest otherwise), easing in', () => {
+  it('poses the left arm from the mood while he dribbles (overhead for a hype pose), easing in', () => {
     const model = buildModel(skeleton(), [recording()])
-    model.apply(pose(), 0)
+    run(model, 0, 0.2)
     const rest = at(model.root, 'LeftHand').y
-    const hype = (t: number) => pose({ t, mood: 'hype', moodAge: 0.6 })
-    model.apply(hype(0.05), 0.05)
+    const hype = { mood: 'hype' as const, moodAge: 0.6 }
+    model.apply(pose({ t: 0.22, ...hype }), 0.22)
     const early = at(model.root, 'LeftHand').y
-    for (let t = 0.1; t < 1.2; t += 0.05) model.apply(hype(t), t)
+    run(model, 0.24, 1.4, hype)
     const late = at(model.root, 'LeftHand').y
     expect(late).toBeGreaterThan(rest + 0.3)
     expect(early).toBeLessThan(late) // it did not snap there in one frame
@@ -122,11 +134,12 @@ describe('the realistic coach', () => {
   })
 
   it('moves nothing to NaN in any mood, talking or not, looking anywhere', () => {
-    const model = buildModel(skeleton(), [recording()])
+    const model = buildModel(skeleton(), [recording(), ...Object.values(REACTIONS).flat().map((o) => reaction(o.clip, 0.5))])
     let t = 0
     for (const mood of ['idle', 'happy', 'hype', 'hmm'] as const) {
       for (const talking of [false, true]) {
         t += 0.3
+        if (mood === 'hype' || mood === 'hmm') model.react(mood)
         const { ball } = model.apply(pose({ t, mood, talking, moodAge: 0.7, look: { x: 0.9, y: -0.9 } }), t)
         for (const name of ['LeftHand', 'RightHand', 'Head']) {
           const v = at(model.root, name)
@@ -135,5 +148,79 @@ describe('the realistic coach', () => {
         expect(Number.isFinite(ball.x + ball.y + ball.z)).toBe(true)
       }
     }
+  })
+})
+
+describe('reactions', () => {
+  const withReactions = () => buildModel(skeleton(), [recording(), reaction('Victory_Cheer', 1.0), reaction('Confused_Scratch', 0.4), reaction('Head_Hold_in_Pain', 0.8), reaction('Wave_One_Hand', 0.6)])
+  const hand = (m: ReturnType<typeof buildModel>) => at(m.root, 'LeftHand').y
+
+  it('plays the recording of the reaction over the dribble, fading it in', () => {
+    const model = withReactions()
+    run(model, 0, 0.5)
+    const rest = hand(model)
+    model.react('hype')
+    model.apply(pose({ t: 0.52 }), 0.52)
+    const early = hand(model)
+    run(model, 0.54, 1.5)
+    expect(early - rest).toBeLessThan(0.5) // not there in one frame
+    expect(hand(model) - rest).toBeGreaterThan(0.8) // and then fully there
+  })
+
+  it('goes back to dribbling when the reaction is over, and the left arm is the recording\'s again', () => {
+    const model = withReactions()
+    run(model, 0, 0.5)
+    const rest = hand(model)
+    model.react('hype')
+    run(model, 0.52, REACTIONS.hype[0]!.seconds + 1.5)
+    expect(Math.abs(hand(model) - rest)).toBeLessThan(0.05)
+  })
+
+  it('drops the ball while it plays and has it back in the hand after', () => {
+    const model = withReactions()
+    run(model, 0, 0.5)
+    model.react('hype')
+    const ball = run(model, 0.52, 3)
+    expect(ball.y).toBeCloseTo(BALL_R, 1) // on the floor
+    const back = run(model, 3.02, REACTIONS.hype[0]!.seconds + 2.5)
+    const wrist = at(model.root, 'RightHand')
+    expect(back.y).toBeGreaterThan(BALL_R + 0.05)
+    expect(back.y).toBeLessThanOrEqual(wrist.y - 0.2 + 1e-6)
+    expect(back.x).toBeCloseTo(wrist.x, 1)
+  })
+
+  it('takes the several recordings of a reaction in turn', () => {
+    const model = withReactions()
+    run(model, 0, 0.5)
+    const rest = hand(model)
+    model.react('hmm')
+    run(model, 0.52, 1.6)
+    const first = hand(model) - rest
+    run(model, 1.62, REACTIONS.hmm[0]!.seconds + 2)
+    model.react('hmm')
+    run(model, REACTIONS.hmm[0]!.seconds + 2.02, REACTIONS.hmm[0]!.seconds + 3.1)
+    const second = hand(model) - rest
+    expect(first).toBeGreaterThan(0.3)
+    expect(second).toBeGreaterThan(0.6)
+    expect(second).toBeGreaterThan(first + 0.2)
+  })
+
+  it('does nothing for a recording the file does not have', () => {
+    const model = buildModel(skeleton(), [recording()])
+    run(model, 0, 0.3)
+    expect(() => model.react('hype')).not.toThrow()
+    expect(() => run(model, 0.32, 1)).not.toThrow()
+  })
+
+  it('stands the reaction down when a new one starts', () => {
+    const model = withReactions()
+    run(model, 0, 0.5)
+    const rest = hand(model)
+    model.react('hype')
+    run(model, 0.52, 1.5)
+    model.react('greet')
+    run(model, 1.52, 2.6)
+    expect(hand(model) - rest).toBeGreaterThan(0.45)
+    expect(hand(model) - rest).toBeLessThan(0.75) // the wave (0.6), not the cheer (1.0)
   })
 })

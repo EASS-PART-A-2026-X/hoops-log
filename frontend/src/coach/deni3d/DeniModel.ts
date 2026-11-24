@@ -1,9 +1,11 @@
 /**
  * The realistic coach: a rigged character model (public/deni.glb, a Mixamo-style skeleton with no fingers and no
  * face rig) that dribbles with a recorded motion (the clip `basketball_dribble` in the same file). The ball is not in
- * the recording, so it is worked out from his right hand (dribbleBall.ts). What the recording cannot know is added on
- * top, in code: his left arm gestures while he talks, goes to his chin when he is thinking and overhead when he is
- * hyped (blended in and out smoothly), his head follows the pointer and nods while he talks, and he jumps for a hype.
+ * the recording, so it is worked out from his right hand (dribbleBall.ts). Other recorded motions play once on top of
+ * the dribble when something happens (a wave when the dialog opens, a cheer for a hype, a scratch of the head or a hold
+ * of it for a "hmm"): the dribble fades out, the ball drops to the floor, and it is picked up when the dribble returns.
+ * What the recordings cannot know is added in code: his left arm gestures while he talks (when no other motion is
+ * playing), his head follows the pointer and nods while he talks, and he jumps for a hype.
  *
  * Everything is worked out in the model's own frame (the `root` group), so turning him round changes nothing.
  * A fan-made character inspired by Deni Avdija, not the real Deni.
@@ -17,6 +19,24 @@ import { BALL_R, type Pose } from './pose'
 const HEIGHT = 2.04
 /** The recorded motion that plays all the time. */
 export const DRIBBLE_CLIP = 'basketball_dribble'
+/**
+ * The motions that play once on top of the dribble, by what happened: which recording, and how long of it is used
+ * (they are cut before their end, where he is already standing again). Each reaction may have several, taken in turn.
+ * A recording the file does not have is skipped.
+ */
+export type Reaction = 'greet' | 'hype' | 'hmm'
+export const REACTIONS: Record<Reaction, { clip: string; seconds: number }[]> = {
+  greet: [{ clip: 'Wave_One_Hand', seconds: 3.6 }],
+  hype: [{ clip: 'Victory_Cheer', seconds: 6.0 }],
+  hmm: [
+    { clip: 'Confused_Scratch', seconds: 4.2 },
+    { clip: 'Head_Hold_in_Pain', seconds: 3.4 },
+  ],
+}
+/** Seconds for the dribble to fade into a reaction and back. */
+const BLEND_S = 0.35
+const GRAVITY = 9.8
+
 /** How far the ball's centre is below his wrist while the palm is on it. */
 const BELOW_WRIST = 0.2
 /** The recording is looked at this many times a second to find the bounces. */
@@ -42,10 +62,12 @@ export interface DeniModel {
   /** Put this in the scene. Its origin is at his feet, he faces +Z. */
   root: THREE.Group
   /**
-   * Poses him for this moment (`t` = seconds into the recording, which repeats) and says where the ball is, in the
-   * frame of `root`.
+   * Poses him for this moment (`t` = seconds on the stage clock, which only goes forward) and says where the ball is,
+   * in the frame of `root`.
    */
   apply(pose: Pose, t: number): { ball: THREE.Vector3 }
+  /** Something happened: he plays the matching recording once, then goes back to dribbling. */
+  react(what: Reaction): void
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -127,9 +149,10 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     b.updateWorldMatrix(false, true)
   }
 
-  // ----- the recording, and where the dribbling hand goes in it -----
+  // ----- the recordings, and where the dribbling hand goes in the dribble -----
   const mixer = new THREE.AnimationMixer(scene)
-  mixer.clipAction(clip).play()
+  const base = mixer.clipAction(clip)
+  base.play()
   const height: number[] = []
   const steps = Math.max(2, Math.round(clip.duration * SAMPLE_FPS))
   for (let i = 0; i <= steps; i++) {
@@ -138,39 +161,84 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     frame()
     height.push(posOf(bone.rHand).y)
   }
+  mixer.setTime(0)
   const tops = findTops(height, steps / clip.duration)
   // The ball is let go from just under his hand at its highest.
   const ballTop = Math.max(...height) - BELOW_WRIST + 0.02
 
+  // A reaction (a wave, a cheer...) is mixed over the dribble: `blend` goes from 0 (only the dribble) to 1 (only the reaction).
+  const once = new Map<string, THREE.AnimationAction>()
+  const actionFor = (name: string): THREE.AnimationAction => {
+    let action = once.get(name)
+    if (!action) {
+      action = mixer.clipAction(clips.find((c) => c.name === name)!)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+      once.set(name, action)
+    }
+    return action
+  }
+  let shot: { action: THREE.AnimationAction; endAt: number } | null = null
+  let blend = 0
+  const turns: Record<Reaction, number> = { greet: 0, hype: 0, hmm: 0 }
+
   /** How much the left arm is posed by code instead of by the recording (0 to 1), eased so a gesture comes and goes smoothly. */
   let gesture = 0
   let lastT = 0
+  // The ball: where it is, how fast it falls while he is busy with a reaction, and whether he is still picking it up again.
+  const ball = new THREE.Vector3()
+  let fall = 0
+  let picking = false
+  let started = false
+
+  function react(what: Reaction): void {
+    const options = REACTIONS[what].filter((o) => clips.some((c) => c.name === o.clip))
+    if (options.length === 0) return
+    const choice = options[turns[what]++ % options.length]!
+    const action = actionFor(choice.clip)
+    if (shot && shot.action !== action) shot.action.stop()
+    action.reset().setEffectiveWeight(blend).play()
+    shot = { action, endAt: lastT + choice.seconds }
+  }
 
   function apply(p: Pose, t: number): { ball: THREE.Vector3 } {
-    mixer.setTime(t)
+    // Time only goes forward (with reduced motion it stays at 0, and he stands still).
+    const dt = Math.max(0, t - lastT)
+    lastT = t
+    const active = shot !== null && t < shot.endAt
+    const step = dt / BLEND_S
+    blend = active ? Math.min(1, blend + step) : Math.max(0, blend - step)
+    if (shot && !active && blend === 0) {
+      shot.action.stop()
+      shot = null
+    }
+    base.setEffectiveWeight(1 - blend)
+    shot?.action.setEffectiveWeight(blend)
+    mixer.update(dt)
     scene.updateMatrixWorld(true)
     frame()
-    const dt = Math.min(0.1, Math.max(0, t - lastT))
-    lastT = t
+    const free = 1 - blend
 
     // The hype jump: all of him goes up (the recording keeps his feet on the floor the rest of the time).
-    if (p.rootY > 0) moveBy(bone.hips, new THREE.Vector3(0, p.rootY, 0))
+    if (p.rootY > 0 && free > 0) moveBy(bone.hips, new THREE.Vector3(0, p.rootY * free, 0))
 
     // Head: it follows the pointer and nods a little while he talks (there is no face rig to move a mouth).
     const nod = 0.05 * p.mouth
-    for (const [b, share] of [
+    const share = 1 - 0.6 * blend
+    for (const [b, part] of [
       [bone.neck, 0.4],
       [bone.head, 0.6],
     ] as const) {
-      turnAbout(b, Y, p.headYaw * share)
-      turnAbout(b, X, (p.headPitch + nod) * share)
-      turnAbout(b, Z, p.headRoll * share)
+      turnAbout(b, Y, p.headYaw * part * share)
+      turnAbout(b, X, (p.headPitch + nod) * part * share)
+      turnAbout(b, Z, p.headRoll * part * share)
     }
 
     // Left arm: the recording's own while he only dribbles; from the angles of the pose (gesturing, at the chin, overhead) otherwise.
     const wanted = clamp01((p.lShoulder - 0.1) / 0.15)
     gesture = dt === 0 ? wanted : gesture + (wanted - gesture) * (1 - Math.exp(-dt * 10))
-    if (gesture > 0.002) {
+    const left = gesture * free
+    if (left > 0.002) {
       const recorded = [bone.lArm.quaternion.clone(), bone.lFore.quaternion.clone()] as const
       // His left is +x (he faces +Z).
       const out = Math.sin(p.lShoulderOut + 0.12)
@@ -179,16 +247,34 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
       const lower = new THREE.Vector3(out * 0.5, -Math.cos(total), Math.sin(total))
       aim(bone.lArm, bone.lFore, upper)
       aim(bone.lFore, bone.lHand, lower)
-      bone.lArm.quaternion.slerpQuaternions(recorded[0], bone.lArm.quaternion.clone(), gesture)
-      bone.lFore.quaternion.slerpQuaternions(recorded[1], bone.lFore.quaternion.clone(), gesture)
+      bone.lArm.quaternion.slerpQuaternions(recorded[0], bone.lArm.quaternion.clone(), left)
+      bone.lFore.quaternion.slerpQuaternions(recorded[1], bone.lFore.quaternion.clone(), left)
       bone.lArm.updateWorldMatrix(false, true)
     }
 
-    // The ball, from his right hand.
+    // The ball: in his right hand while he dribbles; dropped on the floor while a reaction plays; picked up again after.
     const wrist = posOf(bone.rHand)
-    const y = ballCentreY(freeBallY(t, tops, clip.duration, ballTop, BALL_R), wrist.y, BELOW_WRIST)
-    return { ball: new THREE.Vector3(wrist.x, y, wrist.z + 0.02) }
+    const held = new THREE.Vector3(wrist.x, ballCentreY(freeBallY(base.time, tops, clip.duration, ballTop, BALL_R), wrist.y, BELOW_WRIST), wrist.z + 0.02)
+    if (!started || dt === 0) {
+      started = true
+      ball.copy(held)
+    } else if (blend > 0.5) {
+      fall -= GRAVITY * dt
+      ball.y += fall * dt
+      if (ball.y < BALL_R) {
+        ball.y = BALL_R
+        fall = Math.abs(fall) * 0.55 > 0.4 ? Math.abs(fall) * 0.55 : 0
+      }
+      picking = true
+    } else if (picking) {
+      ball.lerp(held, 1 - Math.exp(-dt * 12))
+      fall = 0
+      if (ball.distanceTo(held) < 0.01) picking = false
+    } else {
+      ball.copy(held)
+    }
+    return { ball: ball.clone() }
   }
 
-  return { root, apply }
+  return { root, apply, react }
 }
