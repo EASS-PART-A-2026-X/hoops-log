@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CoachDialog from './CoachDialog'
-import DeniAvatar from './DeniAvatar'
 import { INTRO, KONAMI, KONAMI_CODE } from './lines'
 import type { AnswerContext } from './lines'
 import type { CoachApi } from './useCoach'
@@ -22,7 +21,7 @@ interface Props {
 }
 
 /**
- * The coach in the corner of the page: his face and what he just said as a caption (the voice is a bonus).
+ * The coach in the corner of the page: his portrait and what he just said as a caption (the voice is a bonus).
  * A click on his face opens the big view with the 3D figure and the questions.
  */
 export default function Coach({ coach, chat, aiAvailable, context, open: controlledOpen, onOpenChange }: Props) {
@@ -38,7 +37,6 @@ export default function Coach({ coach, chat, aiAvailable, context, open: control
     [onOpenChange],
   )
   const close = useCallback(() => change(false), [change])
-  const mood = talking || visible ? (said?.mood ?? 'idle') : 'idle'
 
   // The cheat code works anywhere, except while typing in a field.
   useEffect(() => {
@@ -87,7 +85,8 @@ export default function Coach({ coach, chat, aiAvailable, context, open: control
             change(true)
           }}
         >
-          <DeniAvatar mood={mood} talking={talking} />
+          {/* A portrait made from the same 3D model he has in his dialog (the button has its own label). */}
+          <img src={`${import.meta.env.BASE_URL}deni-face.webp`} alt="" width="76" height="76" draggable={false} />
         </button>
       </aside>
       {open && <CoachDialog coach={coach} chat={chat} aiAvailable={aiAvailable} context={context} onClose={close} returnTo={faceRef} />}

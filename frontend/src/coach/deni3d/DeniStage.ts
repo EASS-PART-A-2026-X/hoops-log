@@ -6,6 +6,11 @@
 import * as THREE from 'three'
 import type { Mood } from '../lines'
 import { buildDeni } from './buildDeni'
+import { loadDeniModel } from './DeniModel'
+
+/** How long the model file may take before the drawn figure stands in. */
+const MODEL_TIMEOUT_MS = 45_000
+import type { DeniModel } from './DeniModel'
 import type { DeniRig } from './buildDeni'
 import { BALL_R, poseAt } from './pose'
 import { KIT, drawFloor } from './textures'
@@ -15,7 +20,7 @@ const PALM_DOWN = Math.PI / 2
 
 const FOV = 27
 /** What the camera must keep in view: the figure with the jump and the raised arm, and his reach sideways. */
-const VIEW_H = 3.2
+const VIEW_H = 2.95
 const VIEW_W = 1.7
 /** He stands in the upper part of the picture: the subtitle sits over the floor under his feet. */
 const LOOK_Y = 0.86
@@ -25,6 +30,8 @@ export class DeniStage {
   private scene = new THREE.Scene()
   private camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 50)
   private rig: DeniRig
+  /** The realistic model, once its file has loaded. Until then (or if it cannot load) the drawn figure stands there. */
+  private model: DeniModel | null = null
   private raf = 0
   private disposed = false
   private start = performance.now()
@@ -38,6 +45,8 @@ export class DeniStage {
   private resizeObserver: ResizeObserver
   private container: HTMLElement
   private reduced: boolean
+  /** Told when the model has loaded (true), or could not (false: the drawn figure is shown instead). */
+  onLoad: ((loaded: boolean) => void) | null = null
   /** Called when the visitor taps him (a press and release without dragging). */
   onPoke: (() => void) | null = null
 
@@ -55,7 +64,10 @@ export class DeniStage {
     container.appendChild(canvas)
 
     this.rig = buildDeni(this.renderer.capabilities.getMaxAnisotropy())
+    // Nothing of him is drawn until the model has loaded; the drawn figure only stands in if it cannot.
+    this.rig.root.visible = false
     this.scene.add(this.rig.root)
+    void this.loadModel()
 
     const floorTex = new THREE.CanvasTexture(drawFloor())
     floorTex.colorSpace = THREE.SRGBColorSpace
@@ -87,6 +99,38 @@ export class DeniStage {
     this.loop()
   }
 
+  private async loadModel(): Promise<void> {
+    try {
+      // A stalled download must not keep the loading note up for ever: after a while the drawn figure stands in.
+      let giveUp: ReturnType<typeof setTimeout> | undefined
+      const stalled = new Promise<never>((_, reject) => {
+        giveUp = setTimeout(() => reject(new Error('The model took too long to load')), MODEL_TIMEOUT_MS)
+      })
+      let model: Awaited<ReturnType<typeof loadDeniModel>>
+      try {
+        model = await Promise.race([loadDeniModel(`${import.meta.env.BASE_URL}deni.glb`, this.renderer.capabilities.getMaxAnisotropy()), stalled])
+      } finally {
+        clearTimeout(giveUp)
+      }
+      if (this.disposed) return
+      // He replaces the drawn body; the ball and the shadows stay (they live in the same root).
+      this.rig.body.visible = false
+      this.rig.root.visible = true
+      this.rig.root.add(model.root)
+      this.model = model
+      this.onLoad?.(true)
+      // He greets you when the dialog opens (or reacts to what he is already feeling).
+      if (!this.reduced) model.react(this.mood === 'hype' || this.mood === 'hmm' ? this.mood : 'greet')
+      this.requestFrame()
+    } catch {
+      // No file, or a bad one: the drawn figure stands in.
+      if (this.disposed) return
+      this.rig.root.visible = true
+      this.onLoad?.(false)
+      this.requestFrame()
+    }
+  }
+
   setTalking(on: boolean): void {
     this.talking = on
     this.requestFrame()
@@ -95,6 +139,8 @@ export class DeniStage {
   setMood(mood: Mood): void {
     this.mood = mood
     this.moodAt = this.seconds()
+    // A recorded reaction for the moods that have one (with reduced motion he does not move).
+    if (!this.reduced && (mood === 'hype' || mood === 'hmm')) this.model?.react(mood)
     this.requestFrame()
   }
 
@@ -174,6 +220,9 @@ export class DeniStage {
     const p = poseAt({ t, talking: this.talking, mood: this.mood, moodAge: t - this.moodAt, look: this.lookNow, reduced: this.reduced })
     const r = this.rig
     r.root.rotation.y = this.yaw
+    // With the recorded model the ball follows his hand; the drawn figure's ball is the pose's.
+    const placed = this.model?.apply(p, this.reduced ? 0 : t)
+    const ball = placed ? { x: placed.ball.x, y: placed.ball.y, z: placed.ball.z, spin: p.ball.spin } : p.ball
     r.body.position.y = p.rootY
     r.body.rotation.z = p.lean
     r.body.scale.set(1 + 0.004 * p.breathe, 1, 1 + 0.012 * p.breathe)
@@ -187,12 +236,12 @@ export class DeniStage {
     r.rHand.rotation.set(-p.rWrist, PALM_DOWN, 0)
     r.lShoulder.rotation.set(-p.lShoulder, 0, p.lShoulderOut)
     r.lElbow.rotation.x = -p.lElbow
-    r.ball.position.set(p.ball.x, p.ball.y, p.ball.z)
-    r.ball.rotation.x = p.ball.spin
+    r.ball.position.set(ball.x, ball.y, ball.z)
+    r.ball.rotation.x = ball.spin
     // The ball's shadow tightens and darkens as the ball nears the floor.
-    const height = (p.ball.y - BALL_R) / 0.9
+    const height = Math.min(1, (ball.y - BALL_R) / 0.9)
     const size = 0.3 + 0.25 * height
-    r.ballShadow.position.set(p.ball.x, 0.005, p.ball.z)
+    r.ballShadow.position.set(ball.x, 0.005, ball.z)
     r.ballShadow.scale.set(size, 1, size)
     ;(r.ballShadow.material as THREE.MeshBasicMaterial).opacity = 0.85 - 0.5 * height
     this.renderer.render(this.scene, this.camera)

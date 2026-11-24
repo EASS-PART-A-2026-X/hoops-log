@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Coach from './Coach'
 import { useChat } from './useChat'
@@ -33,6 +36,16 @@ describe('Coach', () => {
     return face
   }
 
+  it('shows his portrait in the corner, not the drawn face, and the portrait file is really there', () => {
+    const { container } = render(<Harness />)
+    const face = screen.getByRole('button', { name: /Open Deni/ })
+    const picture = face.querySelector('img')
+    expect(picture?.getAttribute('src')).toMatch(/deni-face\.webp$/)
+    expect(picture?.getAttribute('alt')).toBe('') // the button has its own label
+    expect(container.querySelector('svg.deni')).toBeNull()
+    expect(existsSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/deni-face.webp'))).toBe(true)
+  })
+
   it('opens the big view with the chat, and says what he is', () => {
     render(<Harness />)
     const face = screen.getByRole('button', { name: /Open Deni/ })
@@ -51,7 +64,7 @@ describe('Coach', () => {
     expect(screen.getAllByText(/I am Deni/).length).toBeGreaterThan(0)
   })
 
-  it('says his chat reply as a subtitle and for screen readers, and stays open for the next message', async () => {
+  it('says his chat reply (once in the chat, once for screen readers), and stays open for the next message', async () => {
     vi.mocked(sendChat).mockResolvedValue({ reply: 'You made 6 of 6, that is 100%.', proposals: [], model: 'm' })
     render(<Harness />)
     openIt()
@@ -59,8 +72,9 @@ describe('Coach', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     })
-    // In the subtitle, in the live region and in the chat.
-    expect(screen.getAllByText(/made 6 of 6/)).toHaveLength(3)
+    // In the live region and in the chat. The subtitle on the stage stays quiet: it would only say the same thing twice.
+    expect(screen.getAllByText(/made 6 of 6/)).toHaveLength(2)
+    expect(document.querySelector('.coach-caption')).toBeNull()
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
