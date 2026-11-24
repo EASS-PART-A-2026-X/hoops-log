@@ -29,19 +29,19 @@ function skeleton(): THREE.Object3D {
   return scene
 }
 
-/** A made-up recording: the right hand goes up and down every 0.8 s for 3.2 s, highest at the start. */
+/** A made-up recording: the right hand goes up and down every 0.8 s for 6.4 s, highest at the start. */
 function recording(name = DRIBBLE_CLIP): THREE.AnimationClip {
   const times: number[] = []
   const values: number[] = []
-  for (let i = 0; i <= 8; i++) {
+  for (let i = 0; i <= 16; i++) {
     times.push(i * 0.4)
     values.push(-0.27, i % 2 === 0 ? 0.0 : -0.5, 0)
   }
-  return new THREE.AnimationClip(name, 3.2, [new THREE.VectorKeyframeTrack('mixamorigRightHand.position', times, values)])
+  return new THREE.AnimationClip(name, 6.4, [new THREE.VectorKeyframeTrack('mixamorigRightHand.position', times, values)])
 }
 
 /** Dribbling from the first moment and never resting: most of these tests are about what he does while he dribbles. */
-const BUSY: Partial<Schedule> = { firstWait: 0, dribbleFor: 9999 }
+const BUSY: Partial<Schedule> = { firstWait: 0, dribbleFor: Infinity }
 const build = (clips: THREE.AnimationClip[], plan: Partial<Schedule> = BUSY) => buildModel(skeleton(), clips, 1, plan)
 
 /** A made-up reaction: the left hand is held `lift` metres above where it is in the dribble, for `seconds`. */
@@ -156,6 +156,61 @@ describe('the realistic coach', () => {
   })
 })
 
+describe('edits do not pile up', () => {
+  /** The angle (degrees) between where his head points now and a frame ago. */
+  const turnSince = (model: ReturnType<typeof buildModel>, last: THREE.Quaternion) => {
+    const q = new THREE.Quaternion()
+    find(model.root, 'Head').getWorldQuaternion(q)
+    const deg = (2 * Math.acos(Math.min(1, Math.abs(last.dot(q)))) * 180) / Math.PI
+    last.copy(q)
+    return deg
+  }
+
+  it('keeps his head where the pointer puts it, standing or dribbling, instead of turning a bit more every frame', () => {
+    for (const plan of [BUSY, { firstWait: 999 }]) {
+      const model = build([recording()], plan)
+      const last = new THREE.Quaternion()
+      run(model, 0, 0.5, { look: { x: 1, y: -1 } })
+      model.root.updateMatrixWorld(true)
+      find(model.root, 'Head').getWorldQuaternion(last)
+      let biggest = 0
+      let t = 0.52
+      for (; t < 4; t += 0.02) {
+        model.apply(pose({ t, look: { x: 1, y: -1 } }), t)
+        model.root.updateMatrixWorld(true)
+        biggest = Math.max(biggest, turnSince(model, last))
+      }
+      expect(biggest).toBeLessThan(1) // degrees in one frame; it was about 13 when it piled up
+    }
+  })
+
+  it('keeps the jump at its height and the left arm where the pose puts it, while he stands', () => {
+    const model = build([recording()], { firstWait: 999 })
+    run(model, 0, 0.5)
+    const rest = at(model.root, 'Hips').y
+    const jump = { ...pose({ t: 0.6, mood: 'hype', moodAge: 0.6 }), rootY: 0.16 }
+    for (let t = 0.52; t < 3; t += 0.02) model.apply(jump, t)
+    expect(at(model.root, 'Hips').y - rest).toBeCloseTo(0.16, 2)
+    const arm = at(model.root, 'LeftHand').clone()
+    for (let t = 3.02; t < 6; t += 0.02) model.apply(jump, t)
+    expect(at(model.root, 'LeftHand').distanceTo(arm)).toBeLessThan(0.02)
+  })
+
+  it('does not jump when the dribble comes to its end, because it stops before the recording wraps round', () => {
+    const model = build([recording()], { firstWait: 0, dribbleFor: 99, waitFor: [30], routine: ['dribble'] })
+    run(model, 0, 0.02)
+    let last = at(model.root, 'RightHand')
+    let biggest = 0
+    run(model, 0.04, 8, {}, () => {
+      const hand = at(model.root, 'RightHand')
+      biggest = Math.max(biggest, hand.distanceTo(last))
+      last = hand
+    })
+    // The made-up hand moves 0.5 m in 0.4 s at most (1.25 m/s): 0.03 m a frame. A jump to the start would be much more.
+    expect(biggest).toBeLessThan(0.1)
+  })
+})
+
 describe('reactions', () => {
   const withReactions = () => build([recording(), reaction('Victory_Cheer', 1.0), reaction('Confused_Scratch', 0.4), reaction('Head_Hold_in_Pain', 0.8), reaction('Wave_One_Hand', 0.6)])
   const hand = (m: ReturnType<typeof buildModel>) => at(m.root, 'LeftHand').y
@@ -187,11 +242,16 @@ describe('reactions', () => {
     model.react('hype')
     const ball = run(model, 0.52, 3)
     expect(ball.y).toBeCloseTo(BALL_R, 1) // on the floor
-    const back = run(model, 3.02, REACTIONS.hype[0]!.seconds + 2.5)
-    const wrist = at(model.root, 'RightHand')
-    expect(back.y).toBeGreaterThan(BALL_R + 0.05)
-    expect(back.y).toBeLessThanOrEqual(wrist.y - 0.2 + 1e-6)
-    expect(back.x).toBeCloseTo(wrist.x, 1)
+    run(model, 3.02, REACTIONS.hype[0]!.seconds + 1.5)
+    // Two bounces later it is up in his hand again at the top of each, and never above the palm.
+    let highest = 0
+    run(model, REACTIONS.hype[0]!.seconds + 1.52, REACTIONS.hype[0]!.seconds + 3.3, {}, (_t, ball) => {
+      const wrist = at(model.root, 'RightHand')
+      highest = Math.max(highest, ball.y)
+      expect(ball.y).toBeLessThanOrEqual(wrist.y - 0.2 + 1e-6)
+      expect(ball.x).toBeCloseTo(wrist.x, 1)
+    })
+    expect(highest).toBeGreaterThan(BALL_R + 0.3)
   })
 
   it('takes the several recordings of a reaction in turn', () => {
@@ -251,6 +311,7 @@ describe('what he does when left alone', () => {
 
   it('is set up as asked: about a minute between routines, one dribble then the push-up, and nothing else', () => {
     const total = SCHEDULE.dribbleFor + 2.6 + SCHEDULE.waitFor[0]!
+    expect(SCHEDULE.dribbleFor).toBeLessThan(5)
     expect(total).toBeGreaterThanOrEqual(58)
     expect(total).toBeLessThanOrEqual(62)
     expect(SCHEDULE.routine).toEqual(['dribble', 'idle_to_push_up'])

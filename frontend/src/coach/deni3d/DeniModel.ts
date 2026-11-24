@@ -38,7 +38,8 @@ export const REACTIONS: Record<Reaction, { clip: string; seconds: number }[]> = 
 }
 /**
  * What he does when he is left alone, in seconds. `firstWait` is the pause after the greeting, `waitFor` the stand
- * between two routines (taken in turn), `dribbleFor` one go through the dribble, and `routine` what he does at each
+ * between two routines (taken in turn), `dribbleFor` one go through the dribble (never longer than the recording, which
+ * must not wrap round, or he would jump from its last pose to its first; Infinity = he never stops), and `routine` what he does at each
  * go, in order: "dribble", or the name of a recording that is played through once (one the file does not have is skipped).
  * Everything else of the time he stands and does nothing.
  */
@@ -50,8 +51,8 @@ export interface Schedule {
 }
 export const SCHEDULE: Schedule = {
   firstWait: 5,
-  waitFor: [52],
-  dribbleFor: 5,
+  waitFor: [53],
+  dribbleFor: 4.2,
   routine: ['dribble', 'idle_to_push_up'],
 }
 /** Seconds for him to ease from the dribble to standing, and back. */
@@ -217,6 +218,13 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
   let routineAt = 0
   const turns: Record<Reaction, number> = { greet: 0, hype: 0, hmm: 0 }
 
+  // The bones this edits, as the recording left them. three.js only writes a bone when the recording's value for it
+  // CHANGED since the last frame, so while he stands (a pose that does not change) it does not write them at all, and
+  // an edit made every frame (the head turning toward the pointer, the jump) would pile up on itself. So every frame
+  // starts by putting these back as they were, and the edits are made on top of that clean pose.
+  const edited = [bone.hips, bone.neck, bone.head, bone.lArm, bone.lFore]
+  const clean = edited.map((b) => ({ q: b.quaternion.clone(), p: b.position.clone() }))
+
   /** How much the left arm is posed by code instead of by the recording (0 to 1), eased so a gesture comes and goes smoothly. */
   let gesture = 0
   let lastT = 0
@@ -232,7 +240,8 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
       const name = S.routine[routineAt++]!
       if (name === 'dribble') {
         phase = 'dribble'
-        phaseEnd = t + S.dribbleFor
+        // It ends (and he eases to standing) before the recording does, so it never wraps round.
+        phaseEnd = Number.isFinite(S.dribbleFor) ? t + Math.min(S.dribbleFor, clip.duration - REST_BLEND_S - 0.05) : Infinity
         // He starts from the beginning of the recording, standing up (it is not seen: its weight is 0 while he stands).
         base.reset().play()
         return
@@ -283,7 +292,15 @@ export function buildModel(scene: THREE.Object3D, clips: readonly THREE.Animatio
     base.setEffectiveWeight((1 - blend) * (1 - rest))
     stand.setEffectiveWeight((1 - blend) * rest)
     shot?.action.setEffectiveWeight(blend)
+    edited.forEach((b, i) => {
+      b.quaternion.copy(clean[i]!.q)
+      b.position.copy(clean[i]!.p)
+    })
     mixer.update(dt)
+    edited.forEach((b, i) => {
+      clean[i]!.q.copy(b.quaternion)
+      clean[i]!.p.copy(b.position)
+    })
     scene.updateMatrixWorld(true)
     frame()
     const free = 1 - blend
