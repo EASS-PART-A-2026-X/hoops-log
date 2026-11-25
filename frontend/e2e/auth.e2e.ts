@@ -147,8 +147,8 @@ test.describe('the login screen', () => {
 
   test('the first shot of a new account is its own, and it is still there after a reload', async ({ page }) => {
     await signUp(page)
-    await addShotViaForm(page, { player: 'Newcomer', x: 25, y: 10, made: true })
-    await expect(notice(page)).toContainText(/Saved shot #\d+ for Newcomer/)
+    await addShotViaForm(page, { x: 25, y: 10, made: true, note: 'my first one' })
+    await expect(notice(page)).toContainText(/Saved shot #\d+\./)
     await page.reload()
     await expect(nav(page)).toBeVisible()
     await expect(page.locator('button.drawer-toggle .drawer-count')).toHaveText('1')
@@ -250,7 +250,7 @@ test.describe('the login screen', () => {
   test('the next person on the same computer gets an empty app, not the last one’s shots', async ({ page, anonRequest }) => {
     const first = await makeAccount(anonRequest, uniqueName('first'))
     for (let i = 0; i < 3; i++) {
-      const r = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(first.token), data: { player: 'First Player', x: 20 + i, y: 10, made: true } })
+      const r = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(first.token), data: { note: 'First Player shot', x: 20 + i, y: 10, made: true } })
       expect(r.status()).toBe(201)
     }
     const second = await makeAccount(anonRequest, uniqueName('second'))
@@ -262,8 +262,8 @@ test.describe('the login screen', () => {
     await logIn(page, second.username)
     await expect(nav(page)).toBeVisible()
     await openDrawer(page, 'list')
-    await expect(drawer(page).getByText('No shots yet. Open "Add a shot" to log your first one.')).toBeVisible()
-    await expect(page.getByText('First Player')).toHaveCount(0)
+    await expect(drawer(page).getByText('No shots yet. Open "Add a shot" to log your first one, or try the demo to see a full court.')).toBeVisible()
+    await expect(page.getByText('First Player shot')).toHaveCount(0)
   })
 
   test('when the login ends while you are typing a shot, the login screen opens on top and the half-typed shot is still there afterwards', async ({ page, anonRequest, guard }) => {
@@ -271,7 +271,7 @@ test.describe('the login screen', () => {
     const who = await signUp(page)
     const token = (await storedToken(page)) ?? ''
     await openDrawer(page, 'add')
-    await fillShotForm(drawer(page), { player: 'Half Typed', x: 31, y: 12 })
+    await fillShotForm(drawer(page), { x: 31, y: 12, note: 'Half Typed' })
     // Somewhere else (another device, say) this login is ended.
     expect((await anonRequest.post(`${BACKEND_URL}/auth/logout`, { headers: auth(token) })).status()).toBe(204)
     await drawer(page).getByRole('button', { name: 'Add shot' }).click()
@@ -280,11 +280,11 @@ test.describe('the login screen', () => {
     expect(await storedToken(page)).toBeNull()
     await logIn(page, who)
     await expect(loginDialog(page)).toHaveCount(0)
-    await expect(drawer(page).getByLabel('Player')).toHaveValue('Half Typed')
+    await expect(drawer(page).getByLabel('Note (optional)')).toHaveValue('Half Typed')
     await expect(drawer(page).getByLabel(/^X \(/)).toHaveValue('31')
     // And it saves now.
     await drawer(page).getByRole('button', { name: 'Add shot' }).click()
-    await expect(notice(page)).toContainText(/Saved shot #\d+ for Half Typed/)
+    await expect(notice(page)).toContainText(/Saved shot #\d+\./)
   })
 
   test('a login that is no longer good at page load goes to the login screen with a sentence about it', async ({ page, anonRequest, guard }) => {
@@ -320,14 +320,14 @@ test.describe('the login screen', () => {
 
 test.describe('someone who is logged in', () => {
   test('goes straight to the app and sees only their own shots', async ({ page, api, anonRequest }) => {
-    await api.add({ player: 'Mine', x: 25, y: 10, made: true })
+    await api.add({ x: 25, y: 10, made: true, note: 'Mine only' })
     const other = await makeAccount(anonRequest, uniqueName('other'))
-    await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(other.token), data: { player: 'Theirs', x: 30, y: 12, made: false } })
+    await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(other.token), data: { note: 'Theirs only', x: 30, y: 12, made: false } })
     await openApp(page)
     await expect(page.locator('button.drawer-toggle .drawer-count')).toHaveText('1')
     await openDrawer(page, 'list')
-    await expect(page.getByText('Mine').first()).toBeVisible()
-    await expect(page.getByText('Theirs')).toHaveCount(0)
+    await expect(page.getByText('Mine only').first()).toBeVisible()
+    await expect(page.getByText('Theirs only')).toHaveCount(0)
   })
 })
 
@@ -338,11 +338,12 @@ test.describe('someone who is logged in', () => {
 test.describe('the API is locked', () => {
   const LOCKED: [string, string, Record<string, unknown> | undefined][] = [
     ['GET', '/shots', undefined],
-    ['POST', '/shots', { player: 'x', x: 1, y: 1, made: true }],
+    ['POST', '/shots', { x: 1, y: 1, made: true }],
     ['GET', '/shots/1', undefined],
     ['PATCH', '/shots/1', { made: false }],
     ['DELETE', '/shots/1', undefined],
     ['GET', '/chart.svg', undefined],
+    ['GET', '/demo/shots', undefined],
     ['GET', '/auth/me', undefined],
     ['POST', '/auth/logout', undefined],
   ]
@@ -397,7 +398,7 @@ test.describe('the API is locked', () => {
   test('two accounts never see, change, delete or draw each other’s shots', async ({ anonRequest }) => {
     const a = await makeAccount(anonRequest, uniqueName('alice'))
     const b = await makeAccount(anonRequest, uniqueName('bob'))
-    const made = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(a.token), data: { player: 'Alice Only', x: 25, y: 10, made: true } })
+    const made = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(a.token), data: { note: 'Alice Only', x: 25, y: 10, made: true } })
     const shot = (await made.json()) as { id: number }
     expect((await anonRequest.get(`${BACKEND_URL}/shots`, { headers: auth(b.token) })).status()).toBe(200)
     expect(await (await anonRequest.get(`${BACKEND_URL}/shots`, { headers: auth(b.token) })).json()).toEqual([])
@@ -407,18 +408,22 @@ test.describe('the API is locked', () => {
       expect(res.status(), method).toBe(404)
       expect(await res.json(), method).toEqual(await missing.json()) // the same words as a shot that does not exist
     }
-    expect(await (await anonRequest.get(`${BACKEND_URL}/chart.svg`, { headers: auth(b.token) })).text()).not.toContain('Alice Only')
-    expect(await (await anonRequest.get(`${BACKEND_URL}/chart.svg`, { headers: auth(a.token) })).text()).toContain('Alice Only')
+    // The chart is drawn from the caller's own shots and titles each mark with the account's name.
+    expect(await (await anonRequest.get(`${BACKEND_URL}/chart.svg`, { headers: auth(b.token) })).text()).not.toContain(`${a.username}:`)
+    expect(await (await anonRequest.get(`${BACKEND_URL}/chart.svg`, { headers: auth(a.token) })).text()).toContain(`${a.username}:`)
     const still = await anonRequest.get(`${BACKEND_URL}/shots/${shot.id}`, { headers: auth(a.token) })
-    expect(await still.json()).toMatchObject({ id: shot.id, player: 'Alice Only', made: true })
+    expect(await still.json()).toMatchObject({ id: shot.id, player: a.username, note: 'Alice Only', made: true })
   })
 
   test('nobody can say whose a shot is: the owner is not a field, in or out', async ({ anonRequest }) => {
     const a = await makeAccount(anonRequest, uniqueName('owner'))
-    const post = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(a.token), data: { player: 'x', x: 1, y: 1, made: true, owner_id: 1 } })
+    const post = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(a.token), data: { x: 1, y: 1, made: true, owner_id: 1 } })
     expect(post.status()).toBe(422)
-    const ok = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(a.token), data: { player: 'x', x: 1, y: 1, made: true } })
+    const ok = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(a.token), data: { x: 1, y: 1, made: true } })
     expect(await ok.json()).not.toHaveProperty('owner_id')
+    expect(await ok.json()).toMatchObject({ player: a.username }) // the server puts the account's name on the shot
+    const named = await anonRequest.post(`${BACKEND_URL}/shots`, { headers: auth(a.token), data: { player: 'Someone Else', x: 1, y: 1, made: true } })
+    expect(named.status()).toBe(422) // the name cannot be chosen
     const { id } = (await ok.json()) as { id: number }
     expect((await anonRequest.patch(`${BACKEND_URL}/shots/${id}`, { headers: auth(a.token), data: { owner_id: 1 } })).status()).toBe(422)
   })

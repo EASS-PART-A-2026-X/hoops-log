@@ -7,7 +7,6 @@ import { BACKEND_URL, BASE_URL, assertSafeBackend, assertSafeFrontend } from './
 // ---------------------------------------------------------------------------------------------
 
 export interface ShotInput {
-  player: string
   x: number
   y: number
   made: boolean
@@ -16,6 +15,8 @@ export interface ShotInput {
 }
 export interface ShotRow extends ShotInput {
   id: number
+  /** The account's username: the server fills it in. */
+  player: string
   game_date: string
   zone: string
   shot_type: '2PT' | '3PT'
@@ -97,15 +98,14 @@ export function dayString(daysAgo = 0): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-/** `count` repeatable shots for one player over the last weeks, spread over every area of the court. */
-export function makeShots(player: string, count: number, opts: { seed?: number; makeRate?: number } = {}): ShotInput[] {
+/** `count` repeatable shots over the last weeks, spread over every area of the court. */
+export function makeShots(count: number, opts: { seed?: number; makeRate?: number } = {}): ShotInput[] {
   const next = rng(opts.seed ?? 1)
   const rate = opts.makeRate ?? 0.5
   return Array.from({ length: count }, (_, i) => {
     const [x, y] = SPOTS[Math.floor(next() * SPOTS.length)]!
     const jitter = () => Math.round((next() - 0.5) * 20) / 10 // up to a foot either way, one decimal
     return {
-      player,
       x: Math.min(50, Math.max(0, Math.round((x + jitter()) * 10) / 10)),
       y: Math.min(47, Math.max(0, Math.round((y + jitter()) * 10) / 10)),
       made: next() < rate,
@@ -390,9 +390,8 @@ export async function closeDrawer(page: Page): Promise<void> {
 /** Fill in the add-a-shot form (the drawer must be showing it) and press the button. */
 export async function fillShotForm(
   scope: Locator,
-  shot: { player?: string; date?: string; x: number | string; y: number | string; made?: boolean; note?: string },
+  shot: { date?: string; x: number | string; y: number | string; made?: boolean; note?: string },
 ): Promise<void> {
-  if (shot.player !== undefined) await scope.getByLabel('Player').fill(shot.player)
   if (shot.date !== undefined) await scope.getByLabel('Game date').fill(shot.date)
   await scope.getByLabel(/^X \(/).fill(String(shot.x))
   await scope.getByLabel(/^Y \(/).fill(String(shot.y))
@@ -411,7 +410,7 @@ export async function addShotViaForm(page: Page, shot: Parameters<typeof fillSho
 export const kpi = (page: Page, label: 'FIELD GOAL' | 'THREE POINT' | 'SHOTS' | 'HOTTEST ZONE'): Locator =>
   page.locator('.kpi').filter({ hasText: label }).locator('.kpi-value')
 
-/** The notice under the top bar ("Saved shot #3 for Yuly."). */
+/** The notice under the top bar ("Saved shot #3."). */
 export const notice = (page: Page): Locator => page.locator('.notice-slot')
 
 /** One row of the shot list, found by something it says (a note, "#12"). */

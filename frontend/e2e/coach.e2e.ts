@@ -47,6 +47,7 @@ test.describe('Deni in the corner', () => {
   test('greets an empty log by telling you to add a shot, and the caption can be dismissed from the keyboard', async ({ page }) => {
     await openApp(page)
     await expect(caption(page)).toContainText('Your log is empty')
+    await expect(caption(page)).toContainText('press Demo')
     const bubble = page.locator('.coach-bubble')
     await expect(bubble).toBeVisible()
     await bubble.getByRole('button', { name: 'Dismiss' }).focus()
@@ -55,22 +56,22 @@ test.describe('Deni in the corner', () => {
   })
 
   test('greets a log with the real number of shots and the rank', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 14, { seed: 51 }))
+    await api.seed(makeShots(14, { seed: 51 }))
     await openApp(page)
-    await expect(caption(page)).toContainText(/Welcome back, Yuly\. 14 shots logged/)
+    await expect(caption(page)).toContainText(/Welcome back, e2e-runner\. 14 shots logged/)
   })
 
   test('reacts to a saved shot, and to the 25th shot with a milestone', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 24, { seed: 52 }))
+    await api.seed(makeShots(24, { seed: 52 }))
     await openApp(page)
     await expect(caption(page)).toContainText('24 shots logged')
-    await addShotViaForm(page, { player: 'Yuly', x: 25, y: 6, made: true })
+    await addShotViaForm(page, { x: 25, y: 6, made: true })
     await expect(notice(page)).toContainText('Saved shot')
     await expect(caption(page)).toContainText(/Shot number 25/, { timeout: 15_000 })
   })
 
   test('says something about the page the first time you open it', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 10, { seed: 53 }))
+    await api.seed(makeShots(10, { seed: 53 }))
     await openApp(page)
     const before = await caption(page).innerText()
     await page.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'vs NBA' }).click()
@@ -120,7 +121,7 @@ test.describe('Deni’s big view', () => {
   })
 
   test('answers with the real numbers from your log', async ({ page, api }) => {
-    const rows = await api.seed(makeShots('Yuly', 30, { seed: 54, makeRate: 0.6 }))
+    const rows = await api.seed(makeShots(30, { seed: 54, makeRate: 0.6 }))
     const made = rows.filter((r) => r.made).length
     const fg = Math.round((made / rows.length) * 100)
     await openApp(page)
@@ -143,7 +144,7 @@ test.describe('Deni’s big view', () => {
   })
 
   test('with too few shots in an area he says the sample is too small', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 4, { seed: 55 }))
+    await api.seed(makeShots(4, { seed: 55 }))
     await openApp(page)
     await face(page).click()
     await ask(page, 'Where am I best?')
@@ -151,7 +152,7 @@ test.describe('Deni’s big view', () => {
   })
 
   test('the same question twice in a row gets a "same question" answer', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 20, { seed: 56 }))
+    await api.seed(makeShots(20, { seed: 56 }))
     await openApp(page)
     await face(page).click()
     await ask(page, 'How am I shooting?')
@@ -253,7 +254,7 @@ test.describe('Deni’s voice', () => {
 
   test('speaks the caption through the browser voice once you have clicked, and the switch turns it off for good', async ({ page, api }) => {
     await stubSpeech(page)
-    await api.seed(makeShots('Yuly', 20, { seed: 61 }))
+    await api.seed(makeShots(20, { seed: 61 }))
     await openApp(page)
     await face(page).click()
     await ask(page, 'How do XP and levels work?')

@@ -5,17 +5,18 @@ Repository: https://github.com/EASS-PART-A-2026-X/hoops-log
 A shot-chart tracker for basketball players and coaches: log shots on a court, see where you score, and turn a messy game recap into structured shots.
 
 **Purpose:** shots recorded in notes apps and chat messages cannot be mapped or compared, so players never see where they are actually efficient.
-**Operational principle:** after a player logs shots (by clicking the court, or by pasting a recap and confirming the proposed shots), the shots are saved and the chart shows made/missed by court position and zone; after a restart the same chart is still there.
+**Operational principle:** after a player logs shots (with the add-shot form, or from EX3 by pasting a recap and confirming the proposed shots), the shots are saved and the chart shows made/missed by court position and zone; after a restart the same chart is still there.
 
 ## User stories
-1. As a player, I can click a spot on the court to log a shot so that my chart builds up over time.
+1. As a player, I can log a shot (where, made or missed) so that my chart builds up over time.
 2. As a player, I can paste a messy recap ("missed a corner three, then hit a pull-up from the left elbow"), review the proposed shots and save them, so that I don't have to enter each shot by hand.
-3. As a coach, I can filter the chart by player, zone, shot type and date range so that I can see who is efficient from where.
-4. As a player, I log in with my own account so that nobody else can see, change or delete my shots.
+3. As a player, I can see my shots by zone and compare myself with NBA players so that I can see where I am efficient.
+4. As a player, I log in with my own account so that nobody else can see, change or delete my shots. The shots I log are always under my username.
+4b. As a new player with no shots, I can open a demo with made-up shots to see what a full court looks like, and I am told the demo is not mine and my own shots never go into it.
 5. As a player, I can ask "where should I shoot more?" so that I get recommendations backed by my own numbers.
 
 ## Data sketch
-Shot: player (text, 1-50), x (float, 0-50 ft), y (float, 0-47 ft), made (bool), game_date (date, at most one day ahead of the server's date to allow for time zones), note (text, max 200)
+Shot: x (float, 0-50 ft), y (float, 0-47 ft), made (bool), game_date (date, at most one day ahead of the server's date to allow for time zones), note (text, max 200). The player is the account's username: the server fills it in, and a client can never send it.
 
 Computed by backend code, never stored or sent by a client:
 - **zone**: named area from x, y (left_corner_3, left_wing_3, top_3, right_wing_3, right_corner_3, left_elbow, right_elbow, mid_range, paint, restricted_area)
@@ -48,11 +49,11 @@ cd backend
 uv run fastapi dev
 ```
 
-On first start the app creates `data/app.db` (git-ignored) and adds three demo shots if the table is empty (if you delete every shot and restart, the three demo shots are added again, with new ids). In a second terminal:
+On first start the app creates `data/app.db` (git-ignored). Every account starts with no shots; the app's DEMO button shows made-up ones to look at. In a second terminal:
 
 ```bash
 curl http://localhost:8000/health   # prints {"status":"ok"}
-curl http://localhost:8000/shots    # the three demo shots
+curl http://localhost:8000/shots    # 401: log in first (see Accounts and security)
 ```
 
 Interactive API docs: http://localhost:8000/docs
@@ -66,7 +67,7 @@ docker run -d --name backend -p 127.0.0.1:8000:8000 -v backend-data:/app/data ho
 curl -sS --retry 10 --retry-all-errors --retry-delay 1 localhost:8000/health   # {"status":"ok"}
 ```
 
-The named volume `backend-data` holds the database, so shots survive `docker rm -f backend` followed by the same `docker run` again. Without `-v backend-data:/app/data`, a new container starts with an empty database (only the demo shots). `docker volume rm backend-data` deletes the data.
+The named volume `backend-data` holds the database, so shots survive `docker rm -f backend` followed by the same `docker run` again. Without `-v backend-data:/app/data`, a new container starts with an empty database. `docker volume rm backend-data` deletes the data.
 
 ### Settings
 | Variable | Default | Meaning |
@@ -85,7 +86,7 @@ Every route needs `Authorization: Bearer <token>` (a missing or bad token is a 4
 | Request | What it does | Success |
 |---|---|---|
 | `GET /shots?offset=0&limit=50` | List a page (limit at most 100, offset at most 2147483647) | 200, or 422 if `limit` or `offset` is invalid or out of range |
-| `POST /shots` | Create a shot | 201 |
+| `POST /shots` | Create a shot (`x`, `y`, `made`, optional `game_date` and `note`). The player is your username, so sending a `player` is a 422 | 201 |
 | `GET /shots/{id}` | Read one (ids start at 1) | 200, 404, or 422 if the id is below 1 or above 2147483647 |
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, 404, or 422 (bad body, or an id below 1 or above 2147483647) |
 | `DELETE /shots/{id}` | Delete one | 204, 404, or 422 if the id is below 1 or above 2147483647 |
@@ -94,11 +95,12 @@ Every route needs `Authorization: Bearer <token>` (a missing or bad token is a 4
 | `POST /auth/login` | Log in with a username or an email and a password; returns `{token, user}` | 200, 401, 429 |
 | `GET /auth/me` | Who the token belongs to | 200 |
 | `POST /auth/logout` | End this login at once | 204 |
+| `GET /demo/shots` | The built-in demo: 150 made-up shots (negative ids, the same every time, never stored and never mixed with your own) | 200 |
 | `GET /health` | Liveness check, returns `{"status":"ok"}` | 200 |
 
 ```bash
-curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/shots
-# 201: zone "left_corner_3" and shot_type "3PT" are computed from x, y
+curl -i --json '{"x":1.5,"y":4,"made":false}' -H "Authorization: Bearer $TOKEN" localhost:8000/shots
+# 201: zone "left_corner_3" and shot_type "3PT" are computed from x, y, and player is your username
 ```
 
 ## Accounts and security
@@ -109,7 +111,7 @@ Every shot belongs to an account. You sign up with an email, a username and a pa
 | A stranger calls the API with `curl` | Every route except `/health`, `/auth/register` and `/auth/login` answers 401 without a valid token. A test fails if a route is added without the lock. |
 | Someone steals the database file | Passwords are stored only as salted scrypt hashes (a new random salt each, 16 MB of memory per guess), tokens only as SHA-256 hashes. Nothing in the file logs anyone in. |
 | Someone guesses passwords | Rate limits per address (all attempts, and failed attempts per account). An unknown user and a wrong password get the same answer and take the same time. Passwords are 10 to 128 characters and not a common one. |
-| One user reads or edits another's shots | A shot has an owner. Someone else's shot is a 404, the same as a missing one, so ids cannot be probed. The client can never send an `owner_id`. |
+| One user reads or edits another's shots, or logs a shot as someone else | A shot has an owner and the server puts the account's username on it; a `player` in the request is refused. Someone else's shot is a 404, the same as a missing one, so ids cannot be probed. The client can never send an `owner_id`. |
 | A token is stolen or forgotten | Tokens are 32 random bytes, last 7 days, at most 10 per user, and `POST /auth/logout` ends one at once. |
 | A token leaks through an address | It is only accepted in the `Authorization` header, never in the URL. Login answers are marked `no-store`. |
 | Another website tries to use your login | CORS names the exact frontend addresses. The token is not a cookie, so there is no CSRF. |
@@ -122,7 +124,7 @@ Every shot belongs to an account. You sign up with an email, a username and a pa
 - The email is not verified and there is no password reset (both need an email service).
 - A token in `localStorage` can be read by a script injected into the page. React escapes everything it draws, and the browser tests try HTML in names.
 - The rate limits live in memory, per process, and a restart clears them.
-- The first account to sign up takes over any shots made before accounts existed, so that existing data is not lost.
+- Shots saved before accounts existed stay in the database file but belong to nobody: no account sees them and nothing deletes them. (An earlier version let the first account to sign up take them over; that was removed, because the first person to register should not get everything.)
 
 ## Test
 From `backend/`:
@@ -133,7 +135,7 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-`tests/test_shots.py` starts with a testing-strategy comment listing every input partition; each test fixes one of them. `tests/test_court.py` checks the zone and 2PT/3PT rules. `tests/test_seed.py` checks the demo data is added once, and `tests/test_restart.py` checks a shot is still there after the server restarts on the same database file. The other tests use a fresh in-memory database each.
+`tests/test_shots.py` starts with a testing-strategy comment listing every input partition; each test fixes one of them. `tests/test_court.py` checks the zone and 2PT/3PT rules. `tests/test_demo.py` checks the built-in demo (150 made-up shots, never stored), and `tests/test_restart.py` checks a shot is still there after the server restarts on the same database file. The other tests use a fresh in-memory database each.
 
 ## How I know the tests are good
 Passing tests only show that the cases I thought of work. Three tools, all in this repo, check the rest. Everything below runs from a fresh clone with only `uv` (and Docker for the last step).
@@ -156,6 +158,8 @@ uv run python ../scripts/mutation_score.py app/court.py # one file
 | `player` containing a lone surrogate | 500 | 422 |
 | `player` containing a control character, then `GET /chart.svg` | 201, then a chart that is not valid XML for everyone | 422 |
 
+(The `player` rows were found when a client could still send a player. It is now the account's username, which is limited to letters, digits and `_ . -`, so those inputs cannot happen.)
+
 Plus one cosmetic bug: a missed shot at `x=0, y=0` was drawn partly outside the image. The breaker's 19 failing tests became permanent tests in `backend/tests/adversarial/`, and I added edge-value tests to the normal suite so the mutation score covers the fixes. It also reported what it tried that was fine (escaping, boundaries, unknown fields), and what is a decision rather than a bug: the API still accepts `x: "1.5"` and `made: "yes"` (Pydantic's default coercion); `test_lax_coercion_is_accepted_for_now` records that on purpose.
 
 **3. One command that says whether a change is safe to merge.** `scripts/ci.sh` runs ruff, the formatter check, pytest and the mutation score (must be at least 95%). With `--docker` it also builds the image and checks that a shot survives `docker rm -f` plus a new `docker run` on the same volume, that it is gone without the volume, and a **kill test**: shots are posted in a loop, the container is `SIGKILL`ed at a random moment, and every shot the API acknowledged with 201 must still be there after the restart. `.githooks/pre-push` runs the quick version before every push (turn it on with `git config core.hooksPath .githooks`), and `.github/workflows/ci.yml` runs the full one on pull requests.
@@ -168,13 +172,13 @@ scripts/ci.sh --docker   # plus the Docker and kill tests, needs Docker
 The checks found problems in their own tooling too: the first kill test reported 22 lost writes, which was my checker reading only the first 100 of 118 shots (the API returns at most 100 per page), not a lost write; and CI rejected my own lint error on the way in.
 
 ## API requests and results
-Six requests, with the status code and the stage of FastAPI's pipeline that answers (1 route match, 2 JSON parse, 3 input validation, 4 my handler, 5 response).
+Six requests (each one logged in, with a token), with the status code and the stage of FastAPI's pipeline that answers (1 route match, 2 JSON parse, 3 input validation, 4 my handler, 5 response).
 
 | # | Request | Result | Stage | Why |
 |---|---|---|---|---|
-| 1 | `POST /shots` `{"player":"Yuly","x":15,"y":19,"made":true}` | 201 | 5 | Valid; the body has an `id`, `zone` "left_elbow", `shot_type` "2PT" |
+| 1 | `POST /shots` `{"x":15,"y":19,"made":true}` (logged in) | 201 | 5 | Valid; the body has an `id`, your username as `player`, `zone` "left_elbow", `shot_type` "2PT" |
 | 2 | `GET /shots/999` | 404 `{"detail":"Shot not found"}` | 4 | The route matched and my handler ran; the id does not exist |
-| 3 | `POST /shots` `{"player":"","x":51}` | 422, 4 errors | 3 | `player` too short, `x` over 50, `y` and `made` missing; all reported at once, handler never ran |
+| 3 | `POST /shots` `{"x":51}` (logged in) | 422, 3 errors | 3 | `x` over 50, `y` and `made` missing; all reported at once, handler never ran |
 | 4 | `PATCH /shots/999` `{"x":51}` | 422, 1 error | 3 | `x` over 50; validation runs before the handler, so the missing id is never checked |
 | 5 | `GET /shot/1` (typo) | 404 `{"detail":"Not Found"}` | 1 | No route matched; none of my code ran |
 | 6 | `DELETE /shots/1` twice | 204, then 404 | 5, then 4 | The first call deletes; the second finds nothing |

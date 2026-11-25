@@ -23,9 +23,9 @@ You need two programs running at once: the backend (API on port 8000) and this f
    npm run dev               # http://localhost:5173
    ```
 
-3. **Open http://localhost:5173** (use `localhost` or `127.0.0.1`, other addresses are blocked by the backend's CORS list). The first time in a tab you see a PRESS START screen; press it, then log in or sign up (email, username, password, password again). The app only opens once you are logged in, and every account sees only its own shots. The first account on an existing database takes over the shots that were already there. Add `?title` to the address to see it again.
+3. **Open http://localhost:5173** (use `localhost` or `127.0.0.1`, other addresses are blocked by the backend's CORS list). The first time in a tab you see a PRESS START screen; press it, then log in or sign up (email, username, password, password again). The app only opens once you are logged in, and every account sees only its own shots. Every account starts with no shots (and sees only its own). Add `?title` to the address to see it again.
 
-On a fresh backend database the app starts with three demo shots. The backend stores shots in SQLite, so they are still there after a restart.
+A new account starts with an empty court and two choices: add a first shot, or press **DEMO** to see made-up shots on a full court. The demo is read only, clearly marked, never saved, and never mixed with your own shots. The backend stores shots in SQLite, so they are still there after a restart.
 
 ### Where the backend is
 
@@ -39,7 +39,7 @@ The backend's CORS list names the address of the page (the frontend, :5173), not
 
 ## What is in it
 
-- **My log**: the 3D court (heat map, 3D beams or flight paths), the shot list and the add-shot form in a drawer opened by the **Shots** button, "Watch shot" / "Watch session" replays, and a player dropdown in the top bar ("Shots of").
+- **My log**: the 3D court (heat map, 3D beams or flight paths), the shot list and the add-shot form in a drawer opened by the **Shots** button, "Watch shot" / "Watch session" replays, and a **DEMO** button (made-up shots, read only) with a welcome for an empty log. There is no player to choose: the shots are your account's own, under your username.
 - **vs NBA**: you against the league average or a chosen player, with a verdict and a face-off intro.
 - **Players**: a ranking of NBA players closest to your style, your shot card (downloadable as a PNG), and the "Compare my shots" baseline.
 - **XP, levels and trophies**: shown in the top bar; click the level badge for the trophy drawer.
@@ -94,6 +94,7 @@ What is in `frontend/e2e/`:
 | `log-journey` | add, edit and delete shots through the form; zone and type come from the backend; the numbers on screen match the backend; XP |
 | `validation` | the browser's checks, the backend's 422 messages, Hebrew, emoji, HTML and SQL in names, trimming, dates |
 | `map` | the 3D court draws, the filters and styles, replay and the shot film, the flat chart without WebGL |
+| `demo` | the empty-account welcome (also without WebGL and on a phone), the demo (150 made-up shots, read only, never stored, never mixed with your own, no XP or toasts), and the demo over plain HTTP |
 | `compare` | vs NBA, the face-off, the Players ranking and team filter, the shot card as a real PNG, trophies |
 | `coach` | Deni's greetings, answers with your real numbers, the 3D figure, voice, HD voice failing gracefully, the cheat code |
 | `layout` | a desktop window and a short one (680 high) with no page scroll, a very short one (600 high) that scrolls, a phone, keyboard-only use |
@@ -110,7 +111,7 @@ E2E_MONKEY_VERBOSE=1 E2E_MONKEY_SEEDS=7 npx playwright test --project=full monke
 
 **Every test fails on any browser error**: a script error, a `console.error`, a failed request, an HTTP error (4xx or 5xx) from the throwaway servers, an alert or confirm dialog, or a request to anything but the two throwaway servers. A test that causes one on purpose allows exactly that one line with `guard.allow(...)` (for example only `POST /shots` answering 422), so anything else still fails.
 
-**A test named `KNOWN GAP`** pins what the app does today for something that should change (the player picker lists names that differ only in capitals as two people). It is written to fail on purpose the day the gap is fixed, so whoever fixes it updates it.
+**A test named `KNOWN GAP`** would pin what the app does today for something that should change, and fail on purpose the day it is fixed. There are none at the moment.
 
 Settings (environment variables): `E2E_CHANNEL=msedge` (or `chrome`) uses an installed browser instead of Playwright's Chromium; `E2E_EXTERNAL=1` skips starting the servers (start the backend on 8011, with `LOGIN_ATTEMPTS`, `LOGIN_FAILURES` and `REGISTER_ATTEMPTS` set to 1000, and the frontend on 5199, with `VITE_BACKEND_URL` pointing at the backend); `E2E_BACKEND_PORT`, `E2E_FRONTEND_PORT`, `E2E_BASE_URL` and `E2E_BACKEND_URL` change where they live. `npm run e2e:types` type-checks the test files. On GitHub the tests run in their own workflow, `e2e` (see its header for when each size runs).
 
@@ -129,4 +130,4 @@ The backend's zone names are unchanged: `left_*` zones have x < 25 and `right_*`
 
 ## Without WebGL
 
-If the browser cannot start WebGL, the map shows the backend's flat `/chart.svg` instead (flipped so the basket is at the top, like the 3D court). That chart can only be filtered by player, so the area and result filters are disabled, and its colours (green made, red missed) come from the backend.
+If the browser cannot start WebGL, the map shows the backend's flat `/chart.svg` instead (flipped so the basket is at the top, like the 3D court). The area and result filters are disabled, and its colours (green made, red missed) come from the backend.

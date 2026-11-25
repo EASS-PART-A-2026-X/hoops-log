@@ -6,7 +6,7 @@ const noPageScroll = (page: Page) => page.evaluate(() => document.documentElemen
 
 test.describe('a desktop window', () => {
   test('the My log page fits the window: no page scroll, the court and the tiles are in view', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 30, { seed: 71 }))
+    await api.seed(makeShots(30, { seed: 71 }))
     await page.setViewportSize({ width: 1366, height: 800 })
     await openApp(page)
     await expect(kpi(page, 'SHOTS')).toBeVisible()
@@ -18,7 +18,7 @@ test.describe('a desktop window', () => {
   })
 
   test('a short window (680 high) still fits with no page scroll: compact mode', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 30, { seed: 72 }))
+    await api.seed(makeShots(30, { seed: 72 }))
     await page.setViewportSize({ width: 1280, height: 680 })
     await openApp(page)
     await expect(kpi(page, 'SHOTS')).toBeVisible()
@@ -27,7 +27,7 @@ test.describe('a desktop window', () => {
   })
 
   test('a very short window (600 high) falls back to a normal scrolling page, never sideways', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 30, { seed: 78 }))
+    await api.seed(makeShots(30, { seed: 78 }))
     await page.setViewportSize({ width: 1280, height: 600 })
     await openApp(page)
     await expect(kpi(page, 'SHOTS')).toBeVisible()
@@ -37,7 +37,7 @@ test.describe('a desktop window', () => {
   })
 
   test('the shot list drawer slides over the page and closes with Escape and with its button', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 10, { seed: 73 }))
+    await api.seed(makeShots(10, { seed: 73 }))
     await openApp(page)
     await drawerToggle(page).click()
     await expect(drawer(page)).toBeVisible()
@@ -48,7 +48,7 @@ test.describe('a desktop window', () => {
   })
 
   test('the drawer lists 20 shots at a time and "Show 20 more" adds the next page', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 55, { seed: 74 }))
+    await api.seed(makeShots(55, { seed: 74 }))
     await openApp(page)
     await openDrawer(page, 'list')
     await expect(drawer(page).locator('ul.shots > li')).toHaveCount(20)
@@ -64,14 +64,14 @@ test.describe('a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
   test('every page fits the width with no sideways scroll', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 30, { seed: 75 }))
+    await api.seed(makeShots(30, { seed: 75 }))
     await openApp(page)
     expect(await noSideScroll(page)).toBe(true)
     await page.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'vs NBA' }).click()
-    await expect(page.getByText('Yuly vs NBA average')).toBeVisible()
+    await expect(page.getByText('e2e-runner vs NBA average')).toBeVisible()
     expect(await noSideScroll(page)).toBe(true)
     await page.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Players' }).click()
-    await expect(page.getByText(/Yuly shoots most like/)).toBeVisible()
+    await expect(page.getByText(/e2e-runner shoots most like/)).toBeVisible()
     expect(await noSideScroll(page)).toBe(true)
   })
 
@@ -80,7 +80,6 @@ test.describe('a phone', () => {
     await drawerToggle(page).tap()
     await expect(page.getByRole('dialog', { name: 'Shots' })).toBeVisible()
     await page.getByRole('button', { name: /Add a shot/ }).tap()
-    await drawer(page).getByLabel('Player').fill('Yuly')
     await drawer(page).getByLabel(/^X \(/).fill('25')
     await drawer(page).getByLabel(/^Y \(/).fill('20')
     await drawer(page).getByRole('button', { name: 'Add shot' }).tap()
@@ -113,34 +112,15 @@ test.describe('the keyboard alone', () => {
     await page.getByRole('button', { name: /Add a shot/ }).focus()
     await page.keyboard.press('Enter')
     // (The date field is three segments to Tab through, so jump to the fields with typing in them.)
-    await drawer(page).getByLabel('Player').focus()
-    await page.keyboard.type('Yuly')
     await drawer(page).getByLabel(/^X \(/).focus()
     await page.keyboard.type('30')
     await page.keyboard.press('Tab')
     await page.keyboard.type('12')
     await page.keyboard.press('Enter') // submits the form
     await expect(notice(page)).toContainText('Saved shot')
-    expect(await api.list()).toMatchObject([{ player: 'Yuly', x: 30, y: 12 }])
+    expect(await api.list()).toMatchObject([{ player: 'e2e-runner', x: 30, y: 12 }])
     await page.keyboard.press('Escape')
     await expect(drawerToggle(page)).toHaveAttribute('aria-expanded', 'false')
     await expect(drawerToggle(page)).toBeFocused()
-  })
-
-  test('the player picker is a listbox: arrows move, Enter chooses, Escape closes', async ({ page, api }) => {
-    await api.seed([...makeShots('Yuly', 8, { seed: 76 }), ...makeShots('Noam', 6, { seed: 77 })])
-    await openApp(page)
-    const picker = page.getByRole('combobox', { name: /^Shots of:/ })
-    await picker.focus()
-    await page.keyboard.press('Enter')
-    await expect(page.getByRole('listbox')).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(page.getByRole('listbox')).toHaveCount(0)
-    await picker.press('Enter')
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('Enter')
-    await expect(page.getByRole('listbox')).toHaveCount(0)
-    await expect(picker).toHaveAttribute('aria-label', /^Shots of: /)
   })
 })
