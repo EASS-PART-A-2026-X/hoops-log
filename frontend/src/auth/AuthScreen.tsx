@@ -51,6 +51,37 @@ function Field({ id, label, error, hint, children }: FieldProps) {
   )
 }
 
+interface PasswordBoxProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  /** What the eye is called for a screen reader: "password" or "repeated password". */
+  what: string
+}
+
+/** A password box with an eye on its right: hidden by default, and a click shows what is typed (and hides it again). */
+function PasswordBox({ what, ...input }: PasswordBoxProps) {
+  const [shown, setShown] = useState(false)
+  return (
+    <div className="au-pw">
+      <input {...input} type={shown ? 'text' : 'password'} />
+      <button
+        type="button"
+        className="au-eye"
+        aria-pressed={shown}
+        aria-label={`${shown ? 'Hide' : 'Show'} ${what}`}
+        title={`${shown ? 'Hide' : 'Show'} ${what}`}
+        // Pressing the eye must not take the cursor out of the box (that would count as leaving it).
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setShown((on) => !on)}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+          <circle cx="12" cy="12" r="3" />
+          {shown && <path d="M4 4l16 16" />}
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 /**
  * The player-select screen: log in, or create an account. It sits on the same moving court as the title screen
  * and wipes away the same way once you are in.
@@ -284,10 +315,11 @@ export default function AuthScreen({ mode: startMode = 'login', notice = null, a
               }
             >
               {(d) => (
-                <input
+                <PasswordBox
+                  key={mode} // a switch between the forms hides it again
+                  what="password"
                   id={id('password')}
                   name="password"
-                  type="password"
                   autoComplete={register ? 'new-password' : 'current-password'}
                   maxLength={MAX_PASSWORD}
                   required
@@ -304,10 +336,10 @@ export default function AuthScreen({ mode: startMode = 'login', notice = null, a
             {register && (
               <Field id={id('confirm')} label="Repeat password" error={shown('confirm')}>
                 {(d) => (
-                  <input
+                  <PasswordBox
+                    what="repeated password"
                     id={id('confirm')}
                     name="password_confirm"
-                    type="password"
                     autoComplete="new-password"
                     maxLength={MAX_PASSWORD}
                     required

@@ -285,6 +285,74 @@ describe('the sign up form', () => {
   })
 })
 
+describe('the eye on the password boxes', () => {
+  const eye = (name: string) => screen.getByRole('button', { name })
+
+  it('starts hidden, shows what is typed on a click, and hides it again on the next', async () => {
+    const { user } = open()
+    await user.type(field('Password'), 'my secret pass')
+    expect(field('Password').type).toBe('password')
+    expect(eye('Show password').getAttribute('aria-pressed')).toBe('false')
+    await user.click(eye('Show password'))
+    expect(field('Password').type).toBe('text')
+    expect(field('Password').value).toBe('my secret pass')
+    expect(eye('Hide password').getAttribute('aria-pressed')).toBe('true')
+    await user.click(eye('Hide password'))
+    expect(field('Password').type).toBe('password')
+  })
+
+  it('works from the keyboard (Tab to the eye, Enter or Space)', async () => {
+    const { user } = open()
+    await user.click(field('Password'))
+    await user.tab()
+    expect(document.activeElement).toBe(eye('Show password'))
+    await user.keyboard('{Enter}')
+    expect(field('Password').type).toBe('text')
+    await user.keyboard(' ')
+    expect(field('Password').type).toBe('password')
+  })
+
+  it('pressing it does not count as leaving the box (no error appears)', async () => {
+    const { user } = open()
+    await user.click(field('Password'))
+    await user.click(eye('Show password'))
+    expect(screen.queryByText('Enter your password.')).toBeNull()
+    expect(document.activeElement).toBe(field('Password'))
+  })
+
+  it('each box on the sign up form has its own eye', async () => {
+    const { user } = open()
+    await user.click(screen.getByRole('button', { name: 'SIGN UP' }))
+    await user.type(field('Password'), 'first password')
+    await user.type(field('Repeat password'), 'first password')
+    await user.click(eye('Show password'))
+    expect(field('Password').type).toBe('text')
+    expect(field('Repeat password').type).toBe('password') // the other box stays hidden
+    await user.click(eye('Show repeated password'))
+    expect(field('Repeat password').type).toBe('text')
+  })
+
+  it('switching between the forms hides it again', async () => {
+    const { user } = open()
+    await user.click(eye('Show password'))
+    expect(field('Password').type).toBe('text')
+    await user.click(screen.getByRole('button', { name: 'SIGN UP' }))
+    expect(field('Password').type).toBe('password')
+    expect(eye('Show password')).toBeTruthy()
+  })
+
+  it('what is typed still goes to the backend when it is shown', async () => {
+    loginAccount.mockResolvedValue(USER)
+    const { user, onAuthenticated } = open()
+    await user.type(field('Username or email'), 'yuly')
+    await user.type(field('Password'), 'visible-pass')
+    await user.click(eye('Show password'))
+    await user.click(screen.getByRole('button', { name: "LET'S PLAY" }))
+    expect(loginAccount).toHaveBeenCalledWith('yuly', 'visible-pass')
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalled())
+  })
+})
+
 describe('after it works', () => {
   it('wipes away like the title screen and then says it is done', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })

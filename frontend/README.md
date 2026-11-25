@@ -90,7 +90,7 @@ What is in `frontend/e2e/`:
 | File | What it checks |
 |---|---|
 | `smoke` | the app opens, the PRESS START screen, three main screens really render (court, vs NBA, Deni), and the error guard itself (it sees a script error, console error, 500, failed request, 404, alert and a request to the real backend) |
-| `auth` | PRESS START, then the login and sign-up screens: every mistake named before anything is sent, password fields hidden, a taken name, a wrong password, logging out, a login that ends while you type (the half-typed shot survives), two accounts kept apart; and the API over plain HTTP without a token, with a bad one, and across accounts |
+| `auth` | PRESS START, then the login and sign-up screens: every mistake named before anything is sent, password fields hidden until you press their eye, a taken name, a wrong password, logging out, a login that ends while you type (the half-typed shot survives), two accounts kept apart; and the API over plain HTTP without a token, with a bad one, and across accounts |
 | `log-journey` | add, edit and delete shots through the form; zone and type come from the backend; the numbers on screen match the backend; XP |
 | `validation` | the browser's checks, the backend's 422 messages, Hebrew, emoji, HTML and SQL in names, trimming, dates |
 | `map` | the 3D court draws, the filters and styles, replay and the shot film, the flat chart without WebGL |

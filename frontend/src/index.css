@@ -4855,3 +4855,42 @@ h3 {
   }
 }
 
+/* The eye on a password box */
+.au-pw {
+  position: relative;
+}
+
+.au-pw input {
+  padding-right: 52px;
+}
+
+/* Edge draws its own eye in a focused password box: ours replaces it, so there are not two. */
+.au-pw input::-ms-reveal,
+.au-pw input::-ms-clear {
+  display: none;
+}
+
+.au-eye {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.au-eye:hover {
+  color: #fff;
+}
+
+.au-eye[aria-pressed='true'] {
+  color: var(--orange-soft);
+}
+

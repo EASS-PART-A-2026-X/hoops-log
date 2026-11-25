@@ -18,7 +18,7 @@ async function fillSignUp(page: Page, who: { email: string; username: string; pa
   await page.getByLabel('Email').fill(who.email)
   await page.getByLabel('Username').fill(who.username)
   await page.getByLabel('Password', { exact: true }).fill(password)
-  await page.getByLabel('Repeat password').fill(who.confirm ?? password)
+  await page.getByLabel('Repeat password', { exact: true }).fill(who.confirm ?? password)
 }
 
 async function signUp(page: Page, username = uniqueName()) {
@@ -32,7 +32,7 @@ async function signUp(page: Page, username = uniqueName()) {
 
 async function logIn(page: Page, who: string, password = PASSWORD) {
   await page.getByLabel('Username or email').fill(who)
-  await page.getByLabel('Password').fill(password)
+  await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: "LET'S PLAY" }).click()
 }
 
@@ -79,7 +79,7 @@ test.describe('the login screen', () => {
     await expect(page.getByLabel('Email')).toHaveAttribute('type', 'email')
     await expect(page.getByLabel('Email')).toBeFocused()
     await expect(page.getByLabel('Username')).toHaveAttribute('autocomplete', 'username')
-    for (const label of [page.getByLabel('Password', { exact: true }), page.getByLabel('Repeat password')]) {
+    for (const label of [page.getByLabel('Password', { exact: true }), page.getByLabel('Repeat password', { exact: true })]) {
       await expect(label).toHaveAttribute('type', 'password')
       await expect(label).toHaveAttribute('autocomplete', 'new-password')
     }
@@ -90,8 +90,30 @@ test.describe('the login screen', () => {
       'password',
     ])
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click()
-    await expect(page.getByLabel('Password')).toHaveAttribute('type', 'password')
-    await expect(page.getByLabel('Password')).toHaveAttribute('autocomplete', 'current-password')
+    await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password')
+    await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('autocomplete', 'current-password')
+  })
+
+  test('the eye on a password box shows what is typed, and hides it again', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'SIGN UP' }).click()
+    const password = page.getByLabel('Password', { exact: true })
+    const repeat = page.getByLabel('Repeat password', { exact: true })
+    await password.fill('look at me 123')
+    await repeat.fill('look at me 123')
+    await expect(password).toHaveAttribute('type', 'password') // hidden until you ask
+    await page.getByRole('button', { name: 'Show password', exact: true }).click()
+    await expect(password).toHaveAttribute('type', 'text')
+    await expect(password).toHaveValue('look at me 123')
+    await expect(repeat).toHaveAttribute('type', 'password') // the other box has its own eye
+    await expect(page.getByText('Enter a password.')).toHaveCount(0) // pressing it is not "leaving" the box
+    await page.getByRole('button', { name: 'Hide password', exact: true }).click()
+    await expect(password).toHaveAttribute('type', 'password')
+    await page.getByRole('button', { name: 'Show repeated password' }).click()
+    await expect(repeat).toHaveAttribute('type', 'text')
+    // Back on the log in form everything is hidden again.
+    await page.getByRole('button', { name: 'LOG IN', exact: true }).click()
+    await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password')
   })
 
   test('every mistake is named before anything is sent', async ({ page }) => {
@@ -183,8 +205,8 @@ test.describe('the login screen', () => {
     await page.goto('/')
     await logIn(page, who.username, 'definitely not it')
     await expect(page.getByRole('alert')).toHaveText('Wrong username, email or password.')
-    await expect(page.getByLabel('Password')).toHaveValue('')
-    await expect(page.getByLabel('Password')).toBeFocused()
+    await expect(page.getByLabel('Password', { exact: true })).toHaveValue('')
+    await expect(page.getByLabel('Password', { exact: true })).toBeFocused()
     await expect(page.getByText('Enter your password.')).toHaveCount(0)
     expect(await storedToken(page)).toBeNull()
     await logIn(page, who.username)
@@ -212,7 +234,7 @@ test.describe('the login screen', () => {
     const who = await makeAccount(anonRequest, uniqueName('wipe'))
     await page.goto('/')
     await page.getByLabel('Username or email').fill(who.username)
-    await page.getByLabel('Password').fill(PASSWORD)
+    await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
     const watching = watchForErrors(page)
     await page.getByRole('button', { name: "LET'S PLAY" }).click()
     await expect(nav(page)).toBeVisible()
@@ -248,8 +270,8 @@ test.describe('the login screen', () => {
     const who = await makeAccount(anonRequest, uniqueName('enter'))
     await page.goto('/')
     await page.getByLabel('Username or email').fill(who.username)
-    await page.getByLabel('Password').fill(PASSWORD)
-    await page.getByLabel('Password').press('Enter')
+    await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
+    await page.getByLabel('Password', { exact: true }).press('Enter')
     await expect(nav(page)).toBeVisible()
   })
 
@@ -264,6 +286,8 @@ test.describe('the login screen', () => {
     await page.keyboard.press('Tab')
     await page.keyboard.type(PASSWORD)
     await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Show password', exact: true })).toBeFocused() // the eye is reachable by keyboard
+    await page.keyboard.press('Tab')
     await page.keyboard.type(PASSWORD)
     await page.keyboard.press('Enter')
     await expect(nav(page)).toBeVisible()
@@ -274,7 +298,7 @@ test.describe('the login screen', () => {
     const token = (await storedToken(page)) ?? ''
     await logoutButton(page).click()
     await expect(loginDialog(page)).toBeVisible()
-    await expect(page.getByLabel('Password')).toHaveValue('')
+    await expect(page.getByLabel('Password', { exact: true })).toHaveValue('')
     await expect(nav(page)).toHaveCount(0)
     expect(await storedToken(page)).toBeNull()
     await page.reload()
