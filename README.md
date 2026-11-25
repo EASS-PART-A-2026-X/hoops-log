@@ -7,9 +7,12 @@ A shot chart for basketball players and coaches: log your shots, see where you s
 
 ![Hoops Log: the heat map of a player's shots on a 3D court, with the shooting percentage of each zone](docs/images/hoops-log.png)
 
-[Run it](#run-it) · [Endpoints](#endpoints) · [Tests](#test) · [How I know the tests are good](#how-i-know-the-tests-are-good) · [AI use](#ai-use) · [Open-source contributions](#open-source-contributions)
+[Run it](#run-it) · [The app](#the-app) · [Endpoints](#endpoints) · [Tests](#test) · [How I know the tests are good](#how-i-know-the-tests-are-good) · [AI use](#ai-use) · [Open-source contributions](#open-source-contributions)
 
-**Status: EX2** (backend + browser frontend). The AI service is planned for EX3. The screenshot shows generated demo shots, not real games.
+**Course checklist**
+- [x] **EX1, backend:** CRUD API with validation, SQLite that survives restarts, Docker, and tests with a mutation score ([how I know the tests are good](#how-i-know-the-tests-are-good))
+- [x] **EX2, frontend:** React app on the same API with loading, empty and error states, unit tests and a real-browser suite that also runs every night ([frontend/README.md](frontend/README.md))
+- [ ] **EX3, AI service and operations:** planned (recap to shots, Compose, failure tests, release)
 
 ## Run it
 Two programs run at once, each in its own terminal. You need [uv](https://docs.astral.sh/uv/) (0.12 or newer; it installs Python 3.14 for you) and Node 24 or newer.
@@ -33,6 +36,14 @@ curl -sS --retry 10 --retry-all-errors --retry-delay 1 localhost:8000/health   #
 ```
 
 The named volume holds the database, so shots survive `docker rm -f backend` and a new `docker run` with the same `-v`. Without it a new container starts empty (only the demo shots). `docker volume rm backend-data` deletes the data. The only setting is `DATABASE_URL` (default `sqlite:///./data/app.db`, see `backend/.env.example`); set it in the environment, or with `docker run -e`.
+
+## The app
+Screenshots use generated demo shots, not real games.
+
+| | |
+|---|---|
+| ![vs NBA: the player's numbers against Kevin Durant, with areas led and a verdict](docs/images/vs-nba.jpg)<br>**vs NBA**: you against the league average or a chosen player. | ![Players: a ranking of NBA players closest to your style, with your own shot card first](docs/images/players.jpg)<br>**Players**: who shoots most like you, and your own shot card. |
+| ![The shots drawer beside the 3D beams view of the court](docs/images/drawer.jpg)<br>**Shots**: the list and add form in a drawer, next to the 3D beams view. | ![Deni, the fan-made coach, answering questions about your shots](docs/images/deni.jpg)<br>**Deni**: a scripted coach who answers from your own shots (no AI yet). |
 
 ## What it is
 **Purpose:** shots recorded in notes apps and chat messages cannot be mapped or compared, so players never see where they are actually efficient.
