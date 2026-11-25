@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
-import type { ShotInput } from './api'
+import type { ShotInput, User } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
@@ -21,6 +21,7 @@ import { shouldShowTitle } from './game/titleSeen'
 import { TROPHIES } from './game/achievements'
 import { trophiesOf, xpOf } from './game/profile'
 import ScoreBug, { MuteButton } from './ScoreBug'
+import LogoutButton from './auth/LogoutButton'
 import { play, unlockAudio } from './game/audio'
 import { useCelebrations } from './game/useCelebrations'
 import { levelInfo } from './game/xp'
@@ -37,7 +38,17 @@ interface Notice {
   text: string
 }
 
-export default function App() {
+interface AppProps {
+  /** Who is logged in (null when it is not known yet), shown on the log out button. */
+  user?: User | null
+  onLogout?: () => void
+  /** The title screen was already shown (by the login flow), so do not show it again. */
+  skipTitle?: boolean
+  /** Keep the court covered until this turns false: it then makes its entrance. */
+  hold?: boolean
+}
+
+export default function App({ user = null, onLogout, skipTitle = false, hold = false }: AppProps = {}) {
   const { shots, truncated, loading, loadError, refresh } = useShots()
   const [notice, setNotice] = useState<Notice | null>(null)
   const [tab, setTab] = useState<'log' | 'nba' | 'players'>('log')
@@ -255,10 +266,10 @@ export default function App() {
   const trophyList = useMemo(() => trophiesOf(shooterShots ?? []), [shooterShots])
   const trophyCount = trophyList.filter((t) => t.unlocked).length
   // The title screen: shown once per tab. The app is already loading behind it.
-  const [title, setTitle] = useState(shouldShowTitle)
+  const [title, setTitle] = useState(() => !skipTitle && shouldShowTitle())
   // True from the moment the player presses start, while the wipe is still running.
   const [started, setStarted] = useState(false)
-  const covered = title && !started
+  const covered = (title && !started) || hold
   const coachContext = useMemo(() => ({ shots: shooterShots ?? [], shooter }), [shooterShots, shooter])
   const coach = useCoach()
   useCoachChatter({
@@ -345,7 +356,10 @@ export default function App() {
             {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
           </button>
         )}
-        <MuteButton />
+        <div className="bar-tools">
+          <MuteButton />
+          {onLogout && <LogoutButton name={user?.username ?? null} onLogout={onLogout} />}
+        </div>
         <nav className="tabs" aria-label="Pages">
           <button type="button" aria-current={tab === 'log' ? 'page' : undefined} onClick={() => setTab('log')}>
             My log

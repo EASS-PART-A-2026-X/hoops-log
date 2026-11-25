@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BACKEND_URL } from './api'
+import { ApiError, fetchChartSvg } from './api'
 import type { Shot } from './api'
 import type { CourtScene, FilmState, MapMode } from './court/CourtScene'
 import { latestIndices, summarizeFilm } from './court/film'
@@ -333,13 +333,14 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [filmOpen, visible, film, closeFilm])
+  // The flat chart comes from a login-protected route, and an <img> cannot send the token: fetch it, show it from memory.
+  const chart = useChartImage(failed !== null, activePlayer)
   const loading = shots === null
   const label = loading
     ? loadError
       ? 'Shot map. The shots could not be loaded.'
       : 'Shot map, loading'
     : `Shot map. ${summary.attempts} shots, ${summary.made} made${hottest ? `, hottest zone ${hottest.label}` : ''}. The shot list and zone breakdown give the same data as text.`
-  const chartUrl = `${BACKEND_URL}/chart.svg${activePlayer ? `?player=${encodeURIComponent(activePlayer)}` : ''}`
 
   return (
     <section className="map card" aria-labelledby="map-title">
@@ -393,7 +394,15 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                   Reload to try 3D again
                 </button>
               )}
-              <img src={chartUrl} alt={`Shot chart: green circles are made shots, red crosses are misses.`} />
+              {chart.src ? (
+                <img src={chart.src} alt="Shot chart: green circles are made shots, red crosses are misses." />
+              ) : chart.error ? (
+                <p className="state error" role="alert">
+                  {chart.error}
+                </p>
+              ) : (
+                <p className="state">Loading the chart…</p>
+              )}
             </div>
           ) : (
             <div className={`stage-frame${cellHover && mode === 'heat' ? ' cell-hover' : ''}${film ? ' film-on' : ''}`}>
@@ -577,4 +586,30 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
       </div>
     </section>
   )
+}
+
+/** The backend's flat chart as an image address, fetched with the login token. Only runs while the fallback is shown. */
+function useChartImage(wanted: boolean, player: string): { src: string | null; error: string | null } {
+  const [state, setState] = useState<{ key: string; src: string | null; error: string | null }>({ key: '', src: null, error: null })
+  const key = `${wanted}|${player}`
+  useEffect(() => {
+    if (!wanted) return
+    let cancelled = false
+    let url: string | null = null
+    fetchChartSvg(player)
+      .then((svg) => {
+        if (cancelled) return
+        url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+        setState({ key, src: url, error: null })
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) setState({ key, src: null, error: caught instanceof ApiError ? caught.message : 'Could not load the chart.' })
+      })
+    return () => {
+      cancelled = true
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [wanted, player, key])
+  // An answer for another player (or from before) is not shown while the new one loads.
+  return state.key === key ? { src: state.src, error: state.error } : { src: null, error: null }
 }
