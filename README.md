@@ -122,6 +122,7 @@ Every shot belongs to an account. You sign up with an email, a username and a pa
 **Not covered yet.**
 - **HTTPS.** Run locally, the token travels as plain HTTP. A deployed app must sit behind HTTPS, and a section on that comes with the deployment.
 - The email is not verified and there is no password reset (both need an email service).
+- Sign-up says when an email or username is already used, so someone can find out whether an address has an account (log in never says which part was wrong). Sign-up is rate-limited per address to slow that down; a vaguer message would hurt everyone who just mistyped.
 - A token in `localStorage` can be read by a script injected into the page. React escapes everything it draws, and the browser tests try HTML in names.
 - The rate limits live in memory, per process, and a restart clears them. With several worker processes each one counts on its own, so the real limit is multiplied by the number of workers.
 - Behind a reverse proxy the server has to be started with `--proxy-headers` and `--forwarded-allow-ips` set to the proxy's address (by default only a proxy on the same machine is trusted). Otherwise every visitor looks like the proxy and shares one set of rate limits.
