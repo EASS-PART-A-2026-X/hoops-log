@@ -197,6 +197,17 @@ describe('logoutAccount', () => {
     expect(currentToken()).toBeNull()
   })
 
+  it('a 401 on logout means it had already ended: nobody is told "your login ended"', async () => {
+    setToken('mine')
+    const ended = vi.fn()
+    const stop = onSessionEnded(ended)
+    fetchMock.mockResolvedValue(reply(401, { detail: 'Not logged in' }))
+    await expect(logoutAccount()).resolves.toBeUndefined()
+    stop()
+    expect(ended).not.toHaveBeenCalled()
+    expect(currentToken()).toBeNull()
+  })
+
   it('still logs out here when the server cannot be reached', async () => {
     setToken('mine')
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))

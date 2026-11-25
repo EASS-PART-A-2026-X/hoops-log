@@ -103,6 +103,8 @@ function waitFrom(response: Response): number | null {
 interface Options {
   /** A login or register call: it carries no token, and a 401 there means "wrong password", not "session over". */
   anonymous?: boolean
+  /** Logging out: a 401 only means the login was already over, which is what was asked for, so nobody is told. */
+  quiet401?: boolean
 }
 
 async function request<T>(path: string, init: RequestInit = {}, options: Options = {}): Promise<T> {
@@ -126,6 +128,7 @@ async function request<T>(path: string, init: RequestInit = {}, options: Options
     }
     if (response.status === 401) {
       if (options.anonymous) throw new ApiError('invalid', 'Wrong username, email or password.')
+      if (options.quiet401) throw new ApiError('unauthorized', 'Your login had already ended.')
       // The token is no good any more (expired, or ended on another device): forget it and tell the app.
       clearToken()
       notifySessionEnded()
@@ -228,12 +231,16 @@ export async function fetchMe(): Promise<User | null> {
   }
 }
 
-/** End this login on the server, then forget the token here. A server that cannot be reached still logs you out here. */
+/**
+ * End this login on the server, then forget the token here. A server that cannot be reached still logs you out here
+ * (an unreachable server must not trap you in the app), but then the token stays valid on the server until it expires
+ * (7 days): it was only forgotten on this device. A 401 means it had already ended, so that is not an error either.
+ */
 export async function logoutAccount(): Promise<void> {
   try {
-    await request<void>('/auth/logout', { method: 'POST' })
+    await request<void>('/auth/logout', { method: 'POST' }, { quiet401: true })
   } catch {
-    /* the token is dropped below either way; an unreachable server must not trap you in the app */
+    /* the token is dropped below either way */
   } finally {
     clearToken()
   }

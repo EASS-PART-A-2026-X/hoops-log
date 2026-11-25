@@ -81,7 +81,7 @@ The named volume `backend-data` holds the database, so shots survive `docker rm 
 The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run fastapi dev`, or `docker run -e DATABASE_URL=...`.
 
 ### Endpoints
-Every route needs `Authorization: Bearer <token>` (a missing or bad token is a 401), except `/health`, `/auth/register` and `/auth/login`. You only ever see your own shots: someone else's id is a 404, the same as a missing one.
+Every route needs `Authorization: Bearer <token>` (a missing or bad token is a 401), except `/health`, `/auth/register` and `/auth/login`. (The documentation pages `/docs`, `/redoc` and `/openapi.json` are open too: they show the shape of the API, and no data.) You only ever see your own shots: someone else's id is a 404, the same as a missing one.
 
 | Request | What it does | Success |
 |---|---|---|
@@ -108,7 +108,7 @@ Every shot belongs to an account. You sign up with an email, a username and a pa
 
 | What could go wrong | What stops it |
 |---|---|
-| A stranger calls the API with `curl` | Every route except `/health`, `/auth/register` and `/auth/login` answers 401 without a valid token. A test fails if a route is added without the lock. |
+| A stranger calls the API with `curl` | Every route except `/health`, `/auth/register` and `/auth/login` answers 401 without a valid token (the `/docs`, `/redoc` and `/openapi.json` pages show the API's shape and hold no data). A test fails if a route is added without the lock. |
 | Someone steals the database file | Passwords are stored only as salted scrypt hashes (a new random salt each, 16 MB of memory per guess), tokens only as SHA-256 hashes. Nothing in the file logs anyone in. |
 | Someone guesses passwords | Rate limits per address (all attempts, and failed attempts per account). An unknown user and a wrong password get the same answer and take the same time. Passwords are 10 to 128 characters and not a common one. |
 | One user reads or edits another's shots, or logs a shot as someone else | A shot has an owner and the server puts the account's username on it; a `player` in the request is refused. Someone else's shot is a 404, the same as a missing one, so ids cannot be probed. The client can never send an `owner_id`. |
@@ -123,7 +123,9 @@ Every shot belongs to an account. You sign up with an email, a username and a pa
 - **HTTPS.** Run locally, the token travels as plain HTTP. A deployed app must sit behind HTTPS, and a section on that comes with the deployment.
 - The email is not verified and there is no password reset (both need an email service).
 - A token in `localStorage` can be read by a script injected into the page. React escapes everything it draws, and the browser tests try HTML in names.
-- The rate limits live in memory, per process, and a restart clears them.
+- The rate limits live in memory, per process, and a restart clears them. With several worker processes each one counts on its own, so the real limit is multiplied by the number of workers.
+- Behind a reverse proxy the server has to be started with `--proxy-headers` and `--forwarded-allow-ips` set to the proxy's address (by default only a proxy on the same machine is trusted). Otherwise every visitor looks like the proxy and shares one set of rate limits.
+- Logging out when the server cannot be reached forgets the token on this device only: it stays valid on the server until it expires (7 days). Logging out again once the server is back ends it at once.
 - Shots saved before accounts existed stay in the database file but belong to nobody: no account sees them and nothing deletes them. (An earlier version let the first account to sign up take them over; that was removed, because the first person to register should not get everything.)
 
 ## Test

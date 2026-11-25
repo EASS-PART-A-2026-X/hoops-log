@@ -70,8 +70,8 @@ class Shot(ShotBase, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
 
     id: int | None = Field(default=None, primary_key=True)
-    # Whose shot it is. Null only for shots made before accounts existed; the first
-    # account that registers takes those over.
+    # Whose shot it is. Null only for shots made before accounts existed: those stay in
+    # the file and belong to nobody (no account sees them, nothing deletes them).
     owner_id: int | None = Field(default=None, foreign_key="account.id", index=True)
 
 

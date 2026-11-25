@@ -309,6 +309,17 @@ test.describe('the login screen', () => {
     expect((await anonRequest.get(`${BACKEND_URL}/shots`, { headers: auth(token) })).status()).toBe(401)
   })
 
+  test('logging out with a login that had already ended just shows the login screen, with no "login ended" notice', async ({ page, anonRequest, guard }) => {
+    guard.allow(/http 401 POST .*\/auth\/logout/)
+    await signUp(page)
+    const token = (await storedToken(page)) ?? ''
+    expect((await anonRequest.post(`${BACKEND_URL}/auth/logout`, { headers: auth(token) })).status()).toBe(204) // ended elsewhere
+    await logoutButton(page).click()
+    await expect(loginDialog(page)).toBeVisible()
+    await expect(page.getByText('Your login ended')).toHaveCount(0) // you asked to log out: nothing "ended" on you
+    expect(await storedToken(page)).toBeNull()
+  })
+
   test('the next person on the same computer gets an empty app, not the last one’s shots', async ({ page, anonRequest }) => {
     const first = await makeAccount(anonRequest, uniqueName('first'))
     for (let i = 0; i < 3; i++) {

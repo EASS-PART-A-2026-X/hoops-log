@@ -86,8 +86,13 @@ def register(
     session.add(user)
     try:
         session.commit()
-    except IntegrityError:  # two requests with the same name at the same moment
+    except (
+        IntegrityError
+    ):  # two sign-ups with the same email or name at the same moment
         session.rollback()
+        # The checks above passed, so another sign-up won the race: say which it took.
+        if session.exec(select(User).where(User.email == email)).first() is not None:
+            raise taken("email") from None
         raise taken("username") from None
     session.refresh(user)
     return token_response(session, user)

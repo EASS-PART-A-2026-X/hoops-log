@@ -207,8 +207,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   loggedIn: [true, { option: true }],
   seenTitle: [true, { option: true }],
 
-  // One account for the whole run. The first account on a fresh database also takes over the three demo shots, which
-  // every test then clears like any others.
+  // One account for the whole run. A new account starts with no shots, and every test clears its own anyway.
   runAccount: [
     // oxlint-disable-next-line no-empty-pattern
     async ({ playwright }, provide) => {

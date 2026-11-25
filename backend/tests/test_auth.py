@@ -269,6 +269,40 @@ def test_a_new_database_has_no_shots_for_anyone(anon):
     assert anon.get("/shots", headers=bearer(token)).json() == []
 
 
+@pytest.mark.parametrize("taken_field", ["email", "username"])
+def test_a_sign_up_that_loses_a_race_names_the_field_that_was_taken(
+    anon, session, monkeypatch, taken_field
+):
+    # Both checks pass, then another sign-up saves first (simulated while the password
+    # is hashed, which happens between the checks and the save).
+    from app.users import User
+
+    real = auth_routes.hash_password
+    other = {
+        "email": ("yuly@example.com", "winner"),  # same email, another username
+        "username": ("winner@example.com", "Yuly"),  # same username, another email
+    }[taken_field]
+
+    def rival_wins_first(password):
+        session.add(
+            User(
+                email=other[0],
+                username=other[1],
+                username_key=other[1].lower(),
+                password_hash="x",
+                created_at=security.utcnow(),
+            )
+        )
+        session.commit()
+        return real(password)
+
+    monkeypatch.setattr(auth_routes, "hash_password", rival_wins_first)
+    r = register(anon)
+    assert r.status_code == status.HTTP_409_CONFLICT
+    assert r.json()["detail"]["field"] == taken_field
+    assert len(session.exec(select(User)).all()) == 1  # only the rival exists
+
+
 def test_register_is_rate_limited_per_address(anon, monkeypatch):
     monkeypatch.setattr(security.register_attempts, "limit", 2)
     assert register(anon).status_code == 201
