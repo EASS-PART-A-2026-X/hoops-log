@@ -732,6 +732,7 @@ h3 {
 }
 
 .stage {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -4649,3 +4650,208 @@ h3 {
     flex: none;
   }
 }
+
+/* ---------- The player's name in the top bar, the demo, and the welcome for an empty log ---------- */
+.bug-pick .bug-name {
+  display: block;
+  max-width: 190px;
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.demo-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--bench);
+  background: transparent;
+  border: 1px dashed var(--bench);
+  border-radius: 22px;
+  cursor: pointer;
+}
+
+.demo-btn:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+.demo-btn[aria-pressed='true'] {
+  color: #05080c;
+  background: var(--bench);
+  border-style: solid;
+}
+
+.demo-banner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 8px clamp(16px, 3vw, 56px);
+  background: repeating-linear-gradient(135deg, rgba(127, 176, 255, 0.16) 0 14px, rgba(127, 176, 255, 0.08) 14px 28px);
+  border-bottom: 1px solid var(--bench);
+}
+
+.demo-tag {
+  flex: none;
+  padding: 2px 10px;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: #05080c;
+  background: var(--bench);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.demo-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: #dbe8ff;
+}
+
+.demo-exit {
+  flex: none;
+  padding: 6px 16px;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #fff;
+  background: transparent;
+  border: 1px solid #fff;
+  cursor: pointer;
+}
+
+.demo-exit:hover {
+  color: #05080c;
+  background: #fff;
+}
+
+.add-note {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* An empty court: a game-style panel in the middle of it. */
+.welcome {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(480px, calc(100% - 32px));
+  padding: 18px 24px 16px;
+  text-align: center;
+  transform: translate(-50%, -54%);
+  background: rgba(10, 16, 24, 0.9);
+  border: 1px solid var(--line-strong);
+  border-top: 4px solid var(--orange);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+}
+
+.welcome-kicker {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: var(--orange);
+}
+
+.welcome h3 {
+  font-size: clamp(30px, 5vmin, 40px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.welcome-text {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.welcome-go,
+.welcome-demo {
+  padding: 9px 22px;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+.welcome-go {
+  color: #fff;
+  background: var(--orange);
+  border: 0;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+
+.welcome-go:hover,
+.welcome-go:focus-visible {
+  background: var(--orange-soft);
+}
+
+.welcome-demo {
+  color: var(--bench);
+  background: transparent;
+  border: 1px dashed var(--bench);
+}
+
+.welcome-demo:hover,
+.welcome-demo:focus-visible {
+  color: #fff;
+  border-color: #fff;
+}
+
+.welcome-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding-top: 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.welcome-note svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--orange-soft);
+}
+
+@media (max-width: 640px) {
+  .demo-banner {
+    flex-wrap: wrap;
+  }
+
+  .demo-text {
+    flex-basis: 100%;
+    order: 3;
+  }
+}
+

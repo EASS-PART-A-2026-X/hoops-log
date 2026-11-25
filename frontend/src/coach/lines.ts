@@ -32,7 +32,7 @@ function shotsOf(n: number): string {
 
 export function greet(name: string, shots: number, rank: string, n = 0): Line {
   if (shots === 0) {
-    return { text: 'Welcome. Your log is empty, so open the Shots button and add your first shot. I will be here.', mood: 'happy' }
+    return { text: 'Welcome. Your log is empty, so add your first shot, or press Demo to see a full court. I will be here.', mood: 'happy' }
   }
   const who = name || 'there'
   return {

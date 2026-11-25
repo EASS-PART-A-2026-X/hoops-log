@@ -54,7 +54,7 @@ describe('the token on requests', () => {
   it('goes with the content type on a write', async () => {
     setToken('abc')
     fetchMock.mockResolvedValue(reply(201, { id: 1 }))
-    await createShot({ player: 'A', x: 1, y: 1, made: true, game_date: '2026-11-01', note: '' })
+    await createShot({ x: 1, y: 1, made: true, game_date: '2026-11-01', note: '' })
     expect(lastCall().headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer abc' })
   })
 })

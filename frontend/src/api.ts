@@ -5,8 +5,8 @@ import { clearToken, currentToken, notifySessionEnded, setToken } from './auth/s
 
 export type ShotType = '2PT' | '3PT'
 
+/** What you send about a shot. There is no player: a shot is always your account's own. */
 export interface ShotInput {
-  player: string
   x: number
   y: number
   made: boolean
@@ -16,6 +16,8 @@ export interface ShotInput {
 
 export interface Shot extends ShotInput {
   id: number
+  /** The account's username (or "Demo Player" in the demo): the server fills it in. */
+  player: string
   zone: string
   shot_type: ShotType
 }
@@ -258,4 +260,12 @@ export async function fetchChartSvg(player: string): Promise<string> {
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** The built-in demo: made-up shots (negative ids, never stored) to see what a full court looks like. */
+export function listDemoShots(): Promise<Shot[]> {
+  return request<Shot[]>('/demo/shots').then((shots) => {
+    if (!Array.isArray(shots)) throw new ApiError('server', 'The server sent a reply this app could not read. Try again.')
+    return shots
+  })
 }
