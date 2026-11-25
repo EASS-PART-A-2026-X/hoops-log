@@ -17,7 +17,8 @@ const STEPS = Number(process.env.E2E_MONKEY_STEPS ?? 70)
 /** The fast project (every pull request) runs one seed, and a shorter one. */
 const FAST_STEPS = 25
 
-const CLICKABLE = 'button, [role=option], [role=combobox], [role=radio], input[type=radio], input[type=checkbox], summary, a[href^="/"], .player-you, li.player-you'
+// The Log out button is left alone: it would end the very session the monkey is checking afterwards (auth.e2e.ts covers it).
+const CLICKABLE = 'button:not(.account-btn), [role=option], [role=combobox], [role=radio], input[type=radio], input[type=checkbox], summary, a[href^="/"], .player-you, li.player-you'
 const TYPEABLE = 'input:not([type=radio]):not([type=checkbox]):not([type=hidden]), textarea'
 const KEYS = ['Escape', 'Tab', 'Shift+Tab', 'Enter', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'b', 'a', 'x', 'Home', 'End', 'PageDown']
 const SIZES: [number, number][] = [

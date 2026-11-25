@@ -3,8 +3,10 @@ import { addShotViaForm, closeDrawer, drawer, expect, kpi, makeShots, notice, op
 
 test.describe('when the backend is not there', () => {
   test('the court says the shots could not load, the list names the address, and Try again recovers', async ({ page, api, guard }) => {
-    // Only the shot list's own request is refused on purpose; any other failed request still fails the test.
+    // Only the shot list's own request, and the check of the stored login that runs first, are refused on purpose;
+    // any other failed request still fails the test.
     guard.allow(/^request failed: GET \S+\/shots\?\S* net::ERR_CONNECTION_REFUSED$/)
+    guard.allow(/^request failed: GET \S+\/auth\/me net::ERR_CONNECTION_REFUSED$/)
     await api.seed(makeShots('Yuly', 6, { seed: 81 }))
     let down = true
     await page.route(`${BACKEND_URL}/**`, (route) => (down ? route.abort('connectionrefused') : route.fallback()))

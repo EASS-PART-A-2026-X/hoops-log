@@ -78,7 +78,7 @@ test.describe('the safety net itself', () => {
       'dialog: alert "deliberate alert"',
       `http 500 GET ${origin}/__boom__`,
       `request failed: GET ${origin}/__fail__`,
-      `http 404 GET ${BACKEND_URL}/shots/999999`,
+      `http 401 GET ${BACKEND_URL}/shots/999999`, // the page's own fetch carries no token
     ]) {
       expect(seen(), line).toContain(line)
     }

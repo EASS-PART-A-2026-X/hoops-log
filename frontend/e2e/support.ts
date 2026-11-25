@@ -162,8 +162,36 @@ export class Guard {
   }
 }
 
+/** The one account every test is logged in as (made once per run). Tests about accounts make their own. */
+export const E2E_PASSWORD = 'e2e runner password 1'
+
+export interface Account {
+  token: string
+  id: number
+  username: string
+}
+
+/** Make an account over HTTP, or log in to it when it already exists (a backend that was not started fresh). */
+export async function makeAccount(request: APIRequestContext, username: string, password = E2E_PASSWORD): Promise<Account & { email: string; password: string }> {
+  const email = `${username.toLowerCase()}@example.com`
+  const made = await request.post(`${BACKEND_URL}/auth/register`, { data: { email, username, password, password_confirm: password } })
+  const res = made.status() === 409 ? await request.post(`${BACKEND_URL}/auth/login`, { data: { login: username, password } }) : made
+  expect(res.ok(), `making the account ${username}: ${await res.text()}`).toBe(true)
+  const body = (await res.json()) as { token: string; user: { id: number; username: string } }
+  return { token: body.token, id: body.user.id, username: body.user.username, email, password }
+}
+
+/** A name nobody used before (usernames are 3 to 30 letters, digits, _ . -). */
+export const uniqueName = (prefix = 'u'): string => `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`
+
 interface Fixtures {
   api: Api
+  /** Every request to the backend that is not the browser's (the api helper and `request`) carries this account's token. */
+  account: Account
+  /** A request context with no token at all: what a stranger can do. */
+  anonRequest: APIRequestContext
+  /** The browser starts logged in as `account`, unless a test turns this off (to see the login screen). */
+  loggedIn: boolean
   guard: Guard
   /** The title screen is skipped unless a test turns this off. */
   seenTitle: boolean
@@ -171,8 +199,41 @@ interface Fixtures {
   quiet: boolean
 }
 
-export const test = base.extend<Fixtures>({
+interface WorkerFixtures {
+  runAccount: Account
+}
+
+export const test = base.extend<Fixtures, WorkerFixtures>({
+  loggedIn: [true, { option: true }],
   seenTitle: [true, { option: true }],
+
+  // One account for the whole run. The first account on a fresh database also takes over the three demo shots, which
+  // every test then clears like any others.
+  runAccount: [
+    // oxlint-disable-next-line no-empty-pattern
+    async ({ playwright }, provide) => {
+      assertSafeBackend()
+      const context = await playwright.request.newContext()
+      const made = await makeAccount(context, 'e2e-runner')
+      await context.dispose()
+      await provide({ token: made.token, id: made.id, username: made.username })
+    },
+    { scope: 'worker' },
+  ],
+  account: async ({ runAccount }, provide) => {
+    await provide(runAccount)
+  },
+  // The built-in `request` is replaced: same thing, but logged in as the account.
+  request: async ({ playwright, account }, provide) => {
+    const context = await playwright.request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${account.token}` } })
+    await provide(context)
+    await context.dispose()
+  },
+  anonRequest: async ({ playwright }, provide) => {
+    const context = await playwright.request.newContext()
+    await provide(context)
+    await context.dispose()
+  },
   quiet: [true, { option: true }],
 
   // Playwright wants the first argument written as a destructuring pattern, even when it is empty.
@@ -193,12 +254,17 @@ export const test = base.extend<Fixtures>({
     { auto: true },
   ],
 
-  page: async ({ page, guard, seenTitle, quiet }, provide) => {
+  page: async ({ page, guard, seenTitle, quiet, loggedIn, account }, provide) => {
     assertSafeBackend()
     assertSafeFrontend()
     await page.addInitScript(
-      ({ seenTitle, quiet }) => {
+      ({ seenTitle, quiet, token }) => {
         try {
+          if (token && !window.sessionStorage.getItem('e2e-token-set')) {
+            // Only the first load of a tab: a test that logs out (or whose login ends) must not be logged in again by a reload.
+            window.localStorage.setItem('hoops-token', token)
+            window.sessionStorage.setItem('e2e-token-set', '1')
+          }
           if (seenTitle) window.sessionStorage.setItem('hoops-title-seen', '1')
           if (quiet) {
             window.localStorage.setItem('coach-chatter', '0')
@@ -209,7 +275,7 @@ export const test = base.extend<Fixtures>({
           /* storage blocked: the app copes with that too */
         }
       },
-      { seenTitle, quiet },
+      { seenTitle, quiet, token: loggedIn ? account.token : '' },
     )
 
     let lastNavigation = 0
@@ -280,7 +346,7 @@ export const test = base.extend<Fixtures>({
       const cors = {
         'access-control-allow-origin': '*',
         'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-        'access-control-allow-headers': '*',
+        'access-control-allow-headers': 'content-type, authorization',
       }
       if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
       const response = await route.fetch()

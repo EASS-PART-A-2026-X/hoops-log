@@ -29,6 +29,16 @@ test.describe('the API contract the frontend relies on', () => {
     expect(odd.status()).toBe(400)
   })
 
+  test('the browser may send the login token, and no other custom header', async ({ request }) => {
+    const ask = (headers: string) =>
+      request.fetch(`${BACKEND_URL}/shots`, {
+        method: 'OPTIONS',
+        headers: { Origin: 'http://localhost:5173', 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': headers },
+      })
+    expect((await ask('authorization, content-type')).status()).toBe(200)
+    for (const header of ['x-custom', 'cookie']) expect((await ask(header)).status(), header).toBe(400)
+  })
+
   test('create, read, change and delete one shot; ids are never reused', async ({ api, request }) => {
     const a = await api.add({ player: 'Yuly', x: 25, y: 6, made: true })
     expect(a).toMatchObject({ zone: 'restricted_area', shot_type: '2PT' })

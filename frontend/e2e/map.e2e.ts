@@ -143,7 +143,8 @@ test.describe('without WebGL', () => {
     })
     await openApp(page)
     await expect(page.getByText(/flat chart instead/i)).toBeVisible({ timeout: 20_000 })
-    await expect(page.locator('img[src*="/chart.svg"]')).toBeVisible()
+    // The chart is fetched with the login token and shown from memory (an <img> cannot send the token).
+    await expect(page.locator('img[alt^="Shot chart"][src^="blob:"]')).toBeVisible()
     await expect(chip(page, 'Result', 'Made')).toBeDisabled()
   })
 })
