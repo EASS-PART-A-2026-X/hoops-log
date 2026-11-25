@@ -416,7 +416,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                   </button>
                 </div>
               ) : (
-                (loading || !ready) && <p className="stage-msg">Loading the court…</p>
+                (loading || !ready) && !welcome && <p className="stage-msg">Loading the court…</p>
               )}
               {selectedId !== null && !hiddenSelected && (
                 <button type="button" className="btn stage-clear" onClick={() => onSelect(null)}>

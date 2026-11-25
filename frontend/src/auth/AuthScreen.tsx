@@ -102,7 +102,8 @@ export default function AuthScreen({ mode: startMode = 'login', notice = null, a
         password: password === '' ? 'Enter your password.' : null,
       }
   // A field shows its own problem once it was left, and the backend's answer (a taken name) until it is edited.
-  const shown = (name: string) => serverErrors[name] ?? (touched[name] ? errors[name] : null) ?? null
+  // Once you are in, nothing is a mistake any more: the boxes were emptied on purpose, so no error shows while the screen wipes away.
+  const shown = (name: string) => (leaving ? null : (serverErrors[name] ?? (touched[name] ? errors[name] : null) ?? null))
   const touch = (name: string) => setTouched((t) => ({ ...t, [name]: true }))
   const edit = (name: string, set: (v: string) => void) => (e: { target: { value: string } }) => {
     set(e.target.value)

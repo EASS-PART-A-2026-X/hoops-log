@@ -311,6 +311,34 @@ describe('after it works', () => {
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1), { timeout: 400 }) // not after the 900 ms wipe
   })
 
+  it('shows no error while it wipes away (the emptied password is not a mistake)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    loginAccount.mockResolvedValue(USER)
+    const { user } = openWithClock()
+    await user.type(field('Username or email'), 'yuly')
+    await user.type(field('Password'), 'secret-secret')
+    await user.click(screen.getByRole('button', { name: "LET'S PLAY" }))
+    await waitFor(() => expect(screen.getByRole('dialog').className).toContain('leaving'))
+    expect(document.querySelector('.au-error')).toBeNull()
+    expect(screen.queryByText('Enter your password.')).toBeNull()
+    expect(document.querySelector('.au-field.bad')).toBeNull()
+  })
+
+  it('the same for the sign up form (no "type the password again" while leaving)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    registerAccount.mockResolvedValue(USER)
+    const { user } = openWithClock()
+    await user.click(screen.getByRole('button', { name: 'SIGN UP' }))
+    await user.type(field('Email'), 'yuly@example.com')
+    await user.type(field('Username'), 'Yuly')
+    await user.type(field('Password'), 'a long enough password')
+    await user.type(field('Repeat password'), 'a long enough password')
+    await user.click(screen.getByRole('button', { name: 'CREATE PLAYER' }))
+    await waitFor(() => expect(screen.getByRole('dialog').className).toContain('leaving'))
+    expect(document.querySelector('.au-error')).toBeNull()
+    expect(document.querySelector('.au-field.bad')).toBeNull()
+  })
+
   it('forgets the password it was holding', async () => {
     loginAccount.mockResolvedValue(USER)
     const { user, onAuthenticated } = open()

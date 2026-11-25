@@ -192,6 +192,44 @@ test.describe('the login screen', () => {
     await expect(logoutButton(page)).toHaveAccessibleName(`Log out ${who.username}`)
   })
 
+  // Samples the screen every 20 ms from the moment it is called until the login screen is gone.
+  const watchForErrors = (page: Page) =>
+    page.evaluate(
+      () =>
+        new Promise<string[]>((resolve) => {
+          const seen = new Set<string>()
+          const timer = setInterval(() => {
+            document.querySelectorAll('.au-error, .au-form-error').forEach((e) => seen.add(e.textContent ?? ''))
+            if (!document.querySelector('.title.auth')) {
+              clearInterval(timer)
+              resolve([...seen])
+            }
+          }, 20)
+        }),
+    )
+
+  test('no error shows while the login screen wipes away after logging in', async ({ page, anonRequest }) => {
+    const who = await makeAccount(anonRequest, uniqueName('wipe'))
+    await page.goto('/')
+    await page.getByLabel('Username or email').fill(who.username)
+    await page.getByLabel('Password').fill(PASSWORD)
+    const watching = watchForErrors(page)
+    await page.getByRole('button', { name: "LET'S PLAY" }).click()
+    await expect(nav(page)).toBeVisible()
+    expect(await watching).toEqual([]) // the emptied password box is not "Enter your password"
+  })
+
+  test('no error shows while the sign up screen wipes away either', async ({ page }) => {
+    const name = uniqueName('wipe')
+    await page.goto('/')
+    await page.getByRole('button', { name: 'SIGN UP' }).click()
+    await fillSignUp(page, { email: `${name}@example.com`, username: name })
+    const watching = watchForErrors(page)
+    await page.getByRole('button', { name: 'CREATE PLAYER' }).click()
+    await expect(nav(page)).toBeVisible()
+    expect(await watching).toEqual([])
+  })
+
   test('an unknown user gets exactly the same answer as a wrong password', async ({ page, guard }) => {
     guard.allow(/http 401 POST .*\/auth\/login/)
     await page.goto('/')
