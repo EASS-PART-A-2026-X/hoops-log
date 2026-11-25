@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +10,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from app import security
 from app.db import get_session
 from app.main import app
+from app.models import Shot
 from app.users import User, username_key
 
 # Hashing is slow on purpose, so the test accounts are made once and reused.
@@ -87,5 +89,29 @@ def anon(engine: Engine) -> Iterator[TestClient]:
 @pytest.fixture
 def client(anon: TestClient, session: Session) -> TestClient:
     """A client logged in as the account "tester": the shots tests use this one."""
-    anon.headers.update(login_header(session, make_user(session)))
+    user = make_user(session)
+    anon.headers.update(login_header(session, user))
+    # For add_shot below: whose shots these are, and a way to reach the database.
+    anon.user_id, anon.db = user.id, session  # type: ignore[attr-defined]
     return anon
+
+
+def add_shot(client: TestClient, **fields) -> Shot:
+    """A shot put straight into the database for the account `client` is logged in
+    as, under any player name. A client cannot choose the name (the server uses the
+    account's username), so tests that need other names, such as the chart's
+    player filter, do it this way."""
+    values = {
+        "player": "Ann",
+        "x": 25.0,
+        "y": 10.0,
+        "made": True,
+        "game_date": date.today(),
+        "note": "",
+        **fields,
+    }
+    shot = Shot(owner_id=client.user_id, **values)  # type: ignore[attr-defined]
+    client.db.add(shot)  # type: ignore[attr-defined]
+    client.db.commit()  # type: ignore[attr-defined]
+    client.db.refresh(shot)  # type: ignore[attr-defined]
+    return shot

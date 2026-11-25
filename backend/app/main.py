@@ -9,18 +9,14 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlmodel import Session
 
 from app import db
-from app.routers import auth, chart, health, shots
-from app.seed import seed_if_empty
+from app.routers import auth, chart, demo, health, shots
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     db.create_db_and_tables()
-    with Session(db.engine) as session:
-        seed_if_empty(session)
     yield
     db.engine.dispose()
 
@@ -54,6 +50,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(shots.router)
+app.include_router(demo.router)
 app.include_router(chart.router)
 
 

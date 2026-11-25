@@ -59,7 +59,13 @@ def list_shots(
     summary="Record a shot",
 )
 def create_shot(body: ShotCreate, session: SessionDep, user: CurrentUser) -> Shot:
-    return save(session, Shot.model_validate(body, update={"owner_id": user.id}))
+    # The shot is its account's own, and carries the account's name.
+    return save(
+        session,
+        Shot.model_validate(
+            body, update={"owner_id": user.id, "player": user.username}
+        ),
+    )
 
 
 @router.get(

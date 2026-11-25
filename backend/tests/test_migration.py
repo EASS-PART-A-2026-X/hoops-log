@@ -71,7 +71,7 @@ def test_a_new_database_needs_no_migration(
     engine.dispose()
 
 
-def test_the_first_account_adopts_the_migrated_shots(old_database):
+def test_nobody_takes_the_migrated_shots_and_they_are_kept(old_database):
     from fastapi.testclient import TestClient
 
     from app.main import app
@@ -87,4 +87,9 @@ def test_the_first_account_adopts_the_migrated_shots(old_database):
         shots = client.get(
             "/shots", headers={"Authorization": f"Bearer {token}"}
         ).json()
-    assert [s["player"] for s in shots] == ["Yuly", "Noam"]
+    assert shots == []  # a new account starts empty
+    with old_database.connect() as connection:
+        rows = connection.execute(
+            text("SELECT player, owner_id FROM shot ORDER BY id")
+        ).all()
+    assert [tuple(r) for r in rows] == [("Yuly", None), ("Noam", None)]  # nothing lost

@@ -251,28 +251,22 @@ def test_a_refused_registration_creates_nothing(anon, session):
     assert session.exec(select(AuthToken)).all() == []
 
 
-def test_first_account_takes_the_old_shots_and_the_second_does_not(anon, session):
+def test_nobody_takes_over_the_old_shots(anon, session):
     from app.models import Shot
 
     session.add_all([Shot(player="Old", x=1, y=1, made=True) for _ in range(3)])
     session.commit()
     first = register(anon).json()
     second = register(anon, email="b@example.com", username="second").json()
-    assert len(anon.get("/shots", headers=bearer(first["token"])).json()) == 3
-    assert anon.get("/shots", headers=bearer(second["token"])).json() == []
-    assert {s.owner_id for s in session.exec(select(Shot)).all()} == {
-        first["user"]["id"]
-    }
+    for account in (first, second):
+        assert anon.get("/shots", headers=bearer(account["token"])).json() == []
+    # They are still in the file, untouched and not anyone's.
+    assert [s.owner_id for s in session.exec(select(Shot)).all()] == [None] * 3
 
 
-def test_old_shots_stay_hidden_until_someone_signs_up(client, session):
-    from app.models import Shot
-
-    session.add(Shot(player="Old", x=1, y=1, made=True))
-    session.commit()
-    assert (
-        client.get("/shots").json() == []
-    )  # `client` is logged in, but is not the first account
+def test_a_new_database_has_no_shots_for_anyone(anon):
+    token = register(anon).json()["token"]
+    assert anon.get("/shots", headers=bearer(token)).json() == []
 
 
 def test_register_is_rate_limited_per_address(anon, monkeypatch):

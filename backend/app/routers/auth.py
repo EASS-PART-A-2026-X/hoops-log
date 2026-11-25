@@ -1,11 +1,9 @@
 from fastapi import APIRouter, HTTPException, Request, status
-from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, func, select
+from sqlmodel import Session, select
 
 from app.db import SessionDep
 from app.deps import CurrentLogin, CurrentUser
-from app.models import Shot
 from app.security import (
     DUMMY_HASH,
     hash_password,
@@ -78,7 +76,6 @@ def register(
         raise taken("email")
     if session.exec(select(User).where(User.username_key == key)).first() is not None:
         raise taken("username")
-    first_account = session.exec(select(func.count()).select_from(User)).one() == 0
     user = User(
         email=email,
         username=body.username,
@@ -93,12 +90,6 @@ def register(
         session.rollback()
         raise taken("username") from None
     session.refresh(user)
-    if first_account:
-        # Shots from before accounts existed belong to the first person to sign up.
-        session.exec(
-            update(Shot).where(Shot.owner_id.is_(None)).values(owner_id=user.id)
-        )
-        session.commit()
     return token_response(session, user)
 
 

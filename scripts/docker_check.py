@@ -83,18 +83,20 @@ def request(method: str, path: str, body: dict | None = None) -> tuple[int, obje
         return err.code, None
 
 
-def players() -> list[str]:
-    """Every player name, reading all pages (the API returns at most 100 a page)."""
+def notes() -> list[str]:
+    """Every shot's note (the name each check gives its shots), reading all pages
+    (the API returns at most 100 a page)."""
     names: list[str] = []
     while True:
         page = request("GET", f"/shots?limit=100&offset={len(names)}")[1]
         if not page:
             return names
-        names += [s["player"] for s in page]  # type: ignore[union-attr]
+        names += [s["note"] for s in page]  # type: ignore[union-attr]
 
 
-def shot(player: str) -> dict:
-    return {"player": player, "x": 25, "y": 10, "made": True}
+def shot(note: str) -> dict:
+    # The player is always the account's username, so the note tells the shots apart.
+    return {"note": note, "x": 25, "y": 10, "made": True}
 
 
 def cleanup() -> None:
@@ -106,7 +108,7 @@ MIN_WRITES = 10  # a kill test that killed nothing in flight proves nothing
 
 
 def chaos() -> tuple[int, list[str], str]:
-    """Return (acknowledged count, acknowledged players missing after the kill, problem).
+    """Return (acknowledged count, acknowledged shots missing after the kill, problem).
 
     `problem` is empty when the test ran properly: at least MIN_WRITES writes were
     acknowledged before the kill, and none failed for any reason other than the kill.
@@ -150,7 +152,7 @@ def chaos() -> tuple[int, list[str], str]:
     elif count_at_kill < MIN_WRITES:
         problem = f"only {count_at_kill} writes acknowledged before the kill"
     start(volume=True)
-    present = set(players())
+    present = set(notes())
     return len(acknowledged), [p for p in acknowledged if p not in present], problem
 
 
@@ -164,13 +166,13 @@ def main() -> int:
         start(volume=True)
         request("POST", "/shots", shot("persist"))
         start(volume=True)  # rm -f + run again, same volume
-        ok = "persist" in players()
+        ok = "persist" in notes()
         results.append(("shot survives rm + run on the same volume", ok, ""))
 
         start(volume=False)
         request("POST", "/shots", shot("ephemeral"))
         start(volume=False)
-        ok = "ephemeral" not in players()
+        ok = "ephemeral" not in notes()
         results.append(("without the volume the shot is gone", ok, ""))
 
         start(volume=True)

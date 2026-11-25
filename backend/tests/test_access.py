@@ -19,7 +19,7 @@ from app.models import Shot
 from app.users import AuthToken
 from tests.conftest import login_header, make_user
 
-SHOT = {"player": "Yuly", "x": 15, "y": 19, "made": True}
+SHOT = {"x": 15, "y": 19, "made": True}
 
 # (method, path, json body). Ids need not exist: a locked route answers 401 first.
 PROTECTED = [
@@ -29,6 +29,7 @@ PROTECTED = [
     ("PATCH", "/shots/1", {"made": False}),
     ("DELETE", "/shots/1", None),
     ("GET", "/chart.svg", None),
+    ("GET", "/demo/shots", None),
     ("GET", "/auth/me", None),
     ("POST", "/auth/logout", None),
 ]
@@ -100,8 +101,8 @@ def make_shot(client, **changes):
 
 
 def test_each_account_sees_only_its_own_shots(client, other):
-    mine = make_shot(client, player="Mine")
-    theirs = make_shot(other, player="Theirs")
+    mine = make_shot(client)
+    theirs = make_shot(other)
     assert [s["id"] for s in client.get("/shots").json()] == [mine["id"]]
     assert [s["id"] for s in other.get("/shots").json()] == [theirs["id"]]
     assert client.get("/shots", params={"offset": 1}).json() == []
@@ -137,13 +138,13 @@ def test_the_owner_can_still_do_everything(client):
 
 
 def test_the_chart_shows_only_your_shots(client, other):
-    make_shot(client, player="Mine")
-    make_shot(other, player="Theirs")
+    make_shot(client)
+    make_shot(other)
     mine = client.get("/chart.svg")
-    assert "Mine" in mine.text
-    assert "Theirs" not in mine.text
-    assert "Mine" not in other.get("/chart.svg").text
-    assert "Theirs" not in client.get("/chart.svg", params={"player": "Theirs"}).text
+    assert "tester:" in mine.text
+    assert "other:" not in mine.text
+    assert "tester:" not in other.get("/chart.svg").text
+    assert "other:" not in client.get("/chart.svg", params={"player": "other"}).text
 
 
 def test_the_client_cannot_choose_the_owner(client, other, session):
