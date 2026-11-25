@@ -39,8 +39,16 @@ def test_other_methods_are_refused(client: TestClient, method: str) -> None:
     assert response.status_code == 400
 
 
-def test_other_headers_are_refused(client: TestClient) -> None:
-    response = preflight(client, "http://localhost:5173", headers="authorization")
+def test_login_token_header_is_allowed(client: TestClient) -> None:
+    response = preflight(
+        client, "http://localhost:5173", headers="authorization, content-type"
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("header", ["x-custom", "cookie", "x-forwarded-for"])
+def test_other_headers_are_refused(client: TestClient, header: str) -> None:
+    response = preflight(client, "http://localhost:5173", headers=header)
     assert response.status_code == 400
 
 
@@ -57,3 +65,27 @@ def test_simple_request_from_frontend_gets_the_header(client: TestClient) -> Non
     response = client.get("/shots", headers={"Origin": "http://localhost:5173"})
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_the_browser_may_read_how_long_to_wait(anon: TestClient, monkeypatch) -> None:
+    from app import security
+
+    monkeypatch.setattr(security.login_attempts, "limit", 1)
+    origin = {"Origin": "http://localhost:5173"}
+    body = {"login": "nobody", "password": "whatever"}
+    anon.post("/auth/login", json=body, headers=origin)
+    blocked = anon.post("/auth/login", json=body, headers=origin)
+    assert blocked.status_code == 429
+    assert int(blocked.headers["retry-after"]) >= 1
+    assert blocked.headers["access-control-expose-headers"] == "Retry-After"
+
+
+def test_every_answer_from_auth_is_marked_not_to_be_cached(anon: TestClient) -> None:
+    for response in (
+        anon.post(
+            "/auth/login", json={"login": "nobody", "password": "whatever"}
+        ),  # 401
+        anon.post("/auth/login", json={}),  # 422
+        anon.get("/auth/me"),  # 401
+    ):
+        assert response.headers["cache-control"] == "no-store", response.status_code

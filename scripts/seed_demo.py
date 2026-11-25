@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Add realistic demo shots through the API, or remove them again.
 
-    python3 scripts/seed_demo.py                 # add 150 shots to http://localhost:8000
-    python3 scripts/seed_demo.py --count 400
-    python3 scripts/seed_demo.py --remove        # delete the demo shots
-    python3 scripts/seed_demo.py --url http://localhost:8002
+    python3 scripts/seed_demo.py --username yuly # add 150 shots to http://localhost:8000
+    python3 scripts/seed_demo.py --username yuly --count 400
+    python3 scripts/seed_demo.py --username yuly --remove    # delete the demo shots
+    python3 scripts/seed_demo.py --username yuly --url http://localhost:8002
+
+The shots go into the account you log in as (sign up in the app first). The password
+is asked for, or read from the HOOPS_PASSWORD environment variable; it is never put on
+the command line.
 
 Only the standard library is used. The shots go through POST /shots, so the backend
 checks and classifies them like any other. The demo players are exactly "Demo Yuly" and
@@ -14,8 +18,10 @@ real player with a similar name is never touched.
 
 import argparse
 import datetime
+import getpass
 import json
 import math
+import os
 import random
 import urllib.error
 import urllib.request
@@ -75,9 +81,14 @@ REGIONS = [
 NOTES = ["", "", "", "off the dribble", "catch and shoot", "fast break", "contested"]
 
 
+TOKEN = ""
+
+
 def call(url: str, method: str, body: dict | None = None):
     data = json.dumps(body).encode() if body is not None else None
     headers = {"Content-Type": "application/json"} if body is not None else {}
+    if TOKEN:
+        headers["Authorization"] = f"Bearer {TOKEN}"
     request = urllib.request.Request(url, data, headers, method=method)
     with urllib.request.urlopen(request, timeout=10) as response:
         raw = response.read()
@@ -142,6 +153,21 @@ def remove(base: str) -> None:
     print(f"Removed {len(demo)} demo shots from {base}")
 
 
+def log_in(base: str, username: str, password: str) -> None:
+    global TOKEN
+    try:
+        answer = call(
+            f"{base}/auth/login", "POST", {"login": username, "password": password}
+        )
+    except urllib.error.HTTPError as error:
+        if error.code == 401:
+            raise SystemExit(
+                "Wrong username or password (sign up in the app first)."
+            ) from None
+        raise
+    TOKEN = answer["token"]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -149,13 +175,20 @@ def main() -> None:
     parser.add_argument(
         "--url", default="http://localhost:8000", help="backend address"
     )
+    parser.add_argument(
+        "--username", required=True, help="the account to add the shots to"
+    )
     parser.add_argument("--count", type=int, default=150, help="how many shots to add")
     parser.add_argument(
         "--remove", action="store_true", help="delete the demo shots instead"
     )
     args = parser.parse_args()
     base = args.url.rstrip("/")
+    password = os.environ.get("HOOPS_PASSWORD") or getpass.getpass(
+        f"Password for {args.username}: "
+    )
     try:
+        log_in(base, args.username, password)
         remove(base) if args.remove else add(base, args.count)
     except urllib.error.HTTPError as error:
         raise SystemExit(

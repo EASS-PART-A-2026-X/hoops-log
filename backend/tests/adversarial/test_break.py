@@ -13,7 +13,9 @@ GOOD = {"player": "Ann", "x": 25, "y": 10, "made": True}
 
 @pytest.fixture
 def c(client, engine):
-    return TestClient(app, raise_server_exceptions=False)
+    # Same login as `client`, but a 500 comes back as a response instead of raising.
+    login = {"Authorization": client.headers["Authorization"]}
+    return TestClient(app, raise_server_exceptions=False, headers=login)
 
 
 def post(c, **kw):

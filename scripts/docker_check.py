@@ -26,6 +26,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE, NAME, VOLUME, PORT = "hoops-log-ci", "hoops-log-ci", "hoops-log-ci-data", 18000
 URL = f"http://127.0.0.1:{PORT}"
+# The API needs a login: the check signs up (or logs in, when the volume already has
+# the account) and sends the token with every request.
+ACCOUNT = {
+    "email": "docker-check@example.com",
+    "username": "docker-check",
+    "password": "a long throwaway password",
+}
+token = ""
 
 
 def docker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -41,20 +49,33 @@ def start(volume: bool) -> None:
     for _ in range(60):
         try:
             if request("GET", "/health")[0] == 200:
+                sign_in()
                 return
         except OSError:
             time.sleep(0.5)
     raise SystemExit("container did not become healthy")
 
 
+def sign_in() -> None:
+    """Get a token: register the account, or log in when it already exists."""
+    global token
+    token = ""
+    body = {**ACCOUNT, "password_confirm": ACCOUNT["password"]}
+    status, answer = request("POST", "/auth/register", body)
+    if status == 409:
+        login = {"login": ACCOUNT["username"], "password": ACCOUNT["password"]}
+        status, answer = request("POST", "/auth/login", login)
+    if status not in (200, 201):
+        raise SystemExit(f"could not sign in to the container: HTTP {status}")
+    token = answer["token"]  # type: ignore[index]
+
+
 def request(method: str, path: str, body: dict | None = None) -> tuple[int, object]:
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(
-        URL + path,
-        data=data,
-        method=method,
-        headers={"Content-Type": "application/json"},
-    )
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(URL + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             return resp.status, json.loads(resp.read() or "null")

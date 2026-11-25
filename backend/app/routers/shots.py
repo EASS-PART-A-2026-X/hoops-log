@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from sqlmodel import Session, select
 
 from app.db import SessionDep
+from app.deps import CurrentUser
 from app.models import Shot, ShotCreate, ShotPublic, ShotUpdate
+from app.users import User
 
 router = APIRouter(prefix="/shots", tags=["shots"])
 
@@ -25,9 +27,10 @@ def save(session: Session, shot: Shot) -> Shot:
     return shot
 
 
-def get_or_404(session: Session, shot_id: ShotId) -> Shot:
+def get_or_404(session: Session, shot_id: ShotId, user: User) -> Shot:
     shot = session.get(Shot, shot_id)
-    if shot is None:
+    # Someone else's shot answers exactly like a missing one, so ids cannot be probed.
+    if shot is None or shot.owner_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Shot not found")
     return shot
 
@@ -35,10 +38,17 @@ def get_or_404(session: Session, shot_id: ShotId) -> Shot:
 @router.get("", response_model=list[ShotPublic], summary="List shots, oldest id first")
 def list_shots(
     session: SessionDep,
+    user: CurrentUser,
     offset: Annotated[int, Query(ge=0, le=MAX_ID)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[Shot]:
-    query = select(Shot).order_by(Shot.id).offset(offset).limit(limit)
+    query = (
+        select(Shot)
+        .where(Shot.owner_id == user.id)
+        .order_by(Shot.id)
+        .offset(offset)
+        .limit(limit)
+    )
     return list(session.exec(query).all())
 
 
@@ -48,8 +58,8 @@ def list_shots(
     status_code=status.HTTP_201_CREATED,
     summary="Record a shot",
 )
-def create_shot(body: ShotCreate, session: SessionDep) -> Shot:
-    return save(session, Shot.model_validate(body))
+def create_shot(body: ShotCreate, session: SessionDep, user: CurrentUser) -> Shot:
+    return save(session, Shot.model_validate(body, update={"owner_id": user.id}))
 
 
 @router.get(
@@ -58,8 +68,8 @@ def create_shot(body: ShotCreate, session: SessionDep) -> Shot:
     responses=NOT_FOUND,
     summary="Read one shot",
 )
-def get_shot(shot_id: ShotId, session: SessionDep) -> Shot:
-    return get_or_404(session, shot_id)
+def get_shot(shot_id: ShotId, session: SessionDep, user: CurrentUser) -> Shot:
+    return get_or_404(session, shot_id, user)
 
 
 @router.patch(
@@ -68,8 +78,10 @@ def get_shot(shot_id: ShotId, session: SessionDep) -> Shot:
     responses=NOT_FOUND,
     summary="Change only the fields sent",
 )
-def update_shot(shot_id: ShotId, body: ShotUpdate, session: SessionDep) -> Shot:
-    shot = get_or_404(session, shot_id)
+def update_shot(
+    shot_id: ShotId, body: ShotUpdate, session: SessionDep, user: CurrentUser
+) -> Shot:
+    shot = get_or_404(session, shot_id, user)
     # Only fields the client sent; null means "leave unchanged".
     # equivalent-mutant: exclude_none already drops every unset field (all default None)
     shot.sqlmodel_update(body.model_dump(exclude_unset=True, exclude_none=True))
@@ -82,6 +94,6 @@ def update_shot(shot_id: ShotId, body: ShotUpdate, session: SessionDep) -> Shot:
     responses=NOT_FOUND,
     summary="Delete a shot",
 )
-def delete_shot(shot_id: ShotId, session: SessionDep) -> None:
-    session.delete(get_or_404(session, shot_id))
+def delete_shot(shot_id: ShotId, session: SessionDep, user: CurrentUser) -> None:
+    session.delete(get_or_404(session, shot_id, user))
     session.commit()

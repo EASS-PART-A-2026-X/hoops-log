@@ -5,6 +5,7 @@ from sqlmodel import select
 
 from app.chart import render_chart
 from app.db import SessionDep
+from app.deps import CurrentUser
 from app.models import Shot
 
 router = APIRouter(tags=["chart"])
@@ -18,6 +19,7 @@ router = APIRouter(tags=["chart"])
 )
 def chart(
     session: SessionDep,
+    user: CurrentUser,
     player: Annotated[str | None, Query(min_length=1, max_length=50)] = None,
 ) -> Response:
     # Trade-off, on purpose: this loads every shot and filters in Python, not in SQL.
@@ -25,7 +27,9 @@ def chart(
     # names like "Élodie". The chart reads every shot when unfiltered anyway, so this
     # costs nothing extra at this app's size. Do not "optimise" it back to SQL
     # without keeping the non-ASCII test.
-    shots = session.exec(select(Shot).order_by(Shot.id)).all()
+    shots = session.exec(
+        select(Shot).where(Shot.owner_id == user.id).order_by(Shot.id)
+    ).all()
     if player is not None:
         # "yuly" and "Yuly" are the same player. casefold is Unicode case folding,
         # so it is a little broader than upper/lower case: "Straße" matches "STRASSE".
