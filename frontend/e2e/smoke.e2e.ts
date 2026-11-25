@@ -46,6 +46,8 @@ test.describe('the PRESS START title screen', () => {
 
   test('comes back with ?title even after it was seen', async ({ page }) => {
     await page.goto('/')
+    // The stored login is checked first, so the title appears a moment after the page loads: wait for it before the key.
+    await expect(page.getByRole('dialog', { name: 'Hoops Log, press start' })).toBeVisible()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog', { name: 'Hoops Log, press start' })).toBeHidden({ timeout: 25_000 })
     await page.goto('/?title')
