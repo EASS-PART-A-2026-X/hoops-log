@@ -11,7 +11,8 @@ A shot-chart tracker for basketball players and coaches: log shots on a court, s
 1. As a player, I can click a spot on the court to log a shot so that my chart builds up over time.
 2. As a player, I can paste a messy recap ("missed a corner three, then hit a pull-up from the left elbow"), review the proposed shots and save them, so that I don't have to enter each shot by hand.
 3. As a coach, I can filter the chart by player, zone, shot type and date range so that I can see who is efficient from where.
-4. As a player, I can ask "where should I shoot more?" so that I get recommendations backed by my own numbers.
+4. As a player, I log in with my own account so that nobody else can see, change or delete my shots.
+5. As a player, I can ask "where should I shoot more?" so that I get recommendations backed by my own numbers.
 
 ## Data sketch
 Shot: player (text, 1-50), x (float, 0-50 ft), y (float, 0-47 ft), made (bool), game_date (date, at most one day ahead of the server's date to allow for time zones), note (text, max 200)
@@ -71,10 +72,16 @@ The named volume `backend-data` holds the database, so shots survive `docker rm 
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./data/app.db` | Where the SQLite database file lives. See `backend/.env.example`. |
+| `FRONTEND_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | The page addresses (comma separated) that may call the API from a browser. Set it to the real address when deployed. |
+| `LOGIN_ATTEMPTS` | `30` | Login tries per address in 5 minutes. |
+| `LOGIN_FAILURES` | `8` | Failed logins per address and account in 5 minutes. |
+| `REGISTER_ATTEMPTS` | `10` | Sign-ups per address per hour. |
 
 The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run fastapi dev`, or `docker run -e DATABASE_URL=...`.
 
 ### Endpoints
+Every route needs `Authorization: Bearer <token>` (a missing or bad token is a 401), except `/health`, `/auth/register` and `/auth/login`. You only ever see your own shots: someone else's id is a 404, the same as a missing one.
+
 | Request | What it does | Success |
 |---|---|---|
 | `GET /shots?offset=0&limit=50` | List a page (limit at most 100, offset at most 2147483647) | 200, or 422 if `limit` or `offset` is invalid or out of range |
@@ -83,12 +90,39 @@ The app reads it from the environment: `DATABASE_URL=sqlite:///./other.db uv run
 | `PATCH /shots/{id}` | Change only the fields sent (`null` means unchanged) | 200, 404, or 422 (bad body, or an id below 1 or above 2147483647) |
 | `DELETE /shots/{id}` | Delete one | 204, 404, or 422 if the id is below 1 or above 2147483647 |
 | `GET /chart.svg?player=Name` | Shot chart as an SVG image (green circle = made, red cross = missed); `player` is optional. It ignores letter case and spaces around the name, so `yuly` and `Yuly` are the same player; it uses Unicode case folding, so `Straße` and `STRASSE` also match | 200, or 422 if `player` is empty or longer than 50 characters |
+| `POST /auth/register` | Make an account (`email`, `username`, `password`, `password_confirm`) and log in; returns `{token, user}` | 201, 409 if the email or username is taken, 422, 429 |
+| `POST /auth/login` | Log in with a username or an email and a password; returns `{token, user}` | 200, 401, 429 |
+| `GET /auth/me` | Who the token belongs to | 200 |
+| `POST /auth/logout` | End this login at once | 204 |
 | `GET /health` | Liveness check, returns `{"status":"ok"}` | 200 |
 
 ```bash
 curl -i --json '{"player":"Yuly","x":1.5,"y":4,"made":false}' localhost:8000/shots
 # 201: zone "left_corner_3" and shot_type "3PT" are computed from x, y
 ```
+
+## Accounts and security
+Every shot belongs to an account. You sign up with an email, a username and a password (typed twice), the backend gives you a login token, and the browser sends it with every request. Nobody can see, change, delete or draw another account's shots.
+
+| What could go wrong | What stops it |
+|---|---|
+| A stranger calls the API with `curl` | Every route except `/health`, `/auth/register` and `/auth/login` answers 401 without a valid token. A test fails if a route is added without the lock. |
+| Someone steals the database file | Passwords are stored only as salted scrypt hashes (a new random salt each, 16 MB of memory per guess), tokens only as SHA-256 hashes. Nothing in the file logs anyone in. |
+| Someone guesses passwords | Rate limits per address (all attempts, and failed attempts per account). An unknown user and a wrong password get the same answer and take the same time. Passwords are 10 to 128 characters and not a common one. |
+| One user reads or edits another's shots | A shot has an owner. Someone else's shot is a 404, the same as a missing one, so ids cannot be probed. The client can never send an `owner_id`. |
+| A token is stolen or forgotten | Tokens are 32 random bytes, last 7 days, at most 10 per user, and `POST /auth/logout` ends one at once. |
+| A token leaks through an address | It is only accepted in the `Authorization` header, never in the URL. Login answers are marked `no-store`. |
+| Another website tries to use your login | CORS names the exact frontend addresses. The token is not a cookie, so there is no CSRF. |
+| Strange input | Every field has a length and character check. Tests send SQL, scripts, emoji and Hebrew to every field. |
+
+**How it works.** `POST /auth/register` and `POST /auth/login` return `{token, user}`. The frontend keeps the token in `localStorage`, sends it as `Authorization: Bearer <token>`, and asks `/auth/me` on load to check it still works. When a request gets a 401, the login screen opens over the app, so a half-typed shot is not lost. The code is in `backend/app/` (`security.py` for passwords, tokens and limits, `deps.py` for the lock, `routers/auth.py` for the routes) and `frontend/src/auth/`.
+
+**Not covered yet.**
+- **HTTPS.** Run locally, the token travels as plain HTTP. A deployed app must sit behind HTTPS, and a section on that comes with the deployment.
+- The email is not verified and there is no password reset (both need an email service).
+- A token in `localStorage` can be read by a script injected into the page. React escapes everything it draws, and the browser tests try HTML in names.
+- The rate limits live in memory, per process, and a restart clears them.
+- The first account to sign up takes over any shots made before accounts existed, so that existing data is not lost.
 
 ## Test
 From `backend/`:
