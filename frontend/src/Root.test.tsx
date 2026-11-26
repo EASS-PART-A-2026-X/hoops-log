@@ -2,7 +2,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './api'
 import type { User } from './api'
 import { clearToken, notifySessionEnded, setToken } from './auth/session'
@@ -64,6 +64,12 @@ function setup({ titleSeen = true }: { titleSeen?: boolean } = {}) {
   Object.defineProperty(window, 'localStorage', { value: memoryStorage(), configurable: true })
   window.history.replaceState(null, '', '/')
 }
+
+// The first test would otherwise pay for loading the whole app (Three.js and all) inside its own 5 seconds, and
+// fail on a slow or busy machine. Load it once here, with a limit that fits.
+beforeAll(async () => {
+  await import('./Root')
+}, 60_000)
 
 beforeEach(() => {
   fetchMe.mockReset()
