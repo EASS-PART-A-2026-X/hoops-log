@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Shot, ShotInput } from './api'
 
 const make = (id: number, player: string): Shot => ({
@@ -50,6 +50,12 @@ function memoryStorage(seed: Record<string, string> = {}) {
     clear: () => data.clear(),
   }
 }
+
+// The first test would otherwise pay for loading the whole app (Three.js and all) inside its own 5 seconds, and
+// fail on a slow or busy machine. Load it once here, with a limit that fits.
+beforeAll(async () => {
+  await import('./App')
+}, 60_000)
 
 beforeEach(() => {
   mine = []
