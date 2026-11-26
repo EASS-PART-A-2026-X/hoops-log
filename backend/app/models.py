@@ -42,15 +42,24 @@ GameDate = Annotated[date, AfterValidator(_not_too_far_ahead)]
 Note = Annotated[str, Field(max_length=200), AfterValidator(_printable_text)]
 
 
-class ShotBase(SQLModel):
-    """Fields shared by every shot schema. Text is stored as typed (Hebrew is fine)."""
+class ShotFields(SQLModel):
+    """What a client sends about a shot. Text is stored as typed (Hebrew is fine).
 
-    player: Player
+    There is no player here: a shot is always its account's own, and the server fills
+    in the account's username.
+    """
+
     x: CourtX
     y: CourtY
     made: bool
     game_date: GameDate = Field(default_factory=date.today)
     note: Note = ""
+
+
+class ShotBase(ShotFields):
+    """A stored shot: the fields above plus whose it is (the account's username)."""
+
+    player: Player
 
 
 class Shot(ShotBase, table=True):
@@ -61,10 +70,13 @@ class Shot(ShotBase, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
 
     id: int | None = Field(default=None, primary_key=True)
+    # Whose shot it is. Null only for shots made before accounts existed: those stay in
+    # the file and belong to nobody (no account sees them, nothing deletes them).
+    owner_id: int | None = Field(default=None, foreign_key="account.id", index=True)
 
 
-class ShotCreate(ShotBase):
-    """POST body. Unknown fields (including zone and shot_type) -> 422."""
+class ShotCreate(ShotFields):
+    """POST body. Unknown fields (player, owner_id, zone, shot_type...) -> 422."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -74,7 +86,6 @@ class ShotUpdate(SQLModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    player: Player | None = None
     x: CourtX | None = None
     y: CourtY | None = None
     made: bool | None = None

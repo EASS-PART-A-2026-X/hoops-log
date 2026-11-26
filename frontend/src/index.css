@@ -732,6 +732,7 @@ h3 {
 }
 
 .stage {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -4357,3 +4358,539 @@ h3 {
     animation: none;
   }
 }
+
+/* ---------- Login and sign-up: the player-select screen ---------- */
+.boot {
+  position: fixed;
+  inset: 0;
+  background: #05080c;
+}
+
+.title.auth {
+  display: flex;
+  overflow-x: hidden;
+  overflow-y: auto;
+  cursor: default;
+  user-select: text;
+}
+
+/* The court stays put while the form scrolls on a short window. */
+.title.auth .t-bg {
+  position: fixed;
+}
+
+.au-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(460px, 100%);
+  margin: auto;
+  padding: 20px 16px 28px;
+  animation: au-rise 0.65s var(--ease-slam) both;
+}
+
+@keyframes au-rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.96);
+  }
+}
+
+.title.auth.leaving .au-stage {
+  animation: t-zoom 0.9s ease-in forwards;
+}
+
+.au-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.au-brand svg {
+  flex: none;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6));
+}
+
+.au-kicker {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.42em;
+  color: var(--orange);
+}
+
+.au-brand h1 {
+  margin: 0;
+  font-size: clamp(34px, 7vmin, 46px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0.05em;
+}
+
+.au-card {
+  padding: 18px 24px 20px;
+  font-family: var(--body);
+  background: rgba(10, 16, 24, 0.86);
+  border: 1px solid var(--line-strong);
+  border-left: 6px solid var(--orange);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+}
+
+.au-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 16px;
+  border: 1px solid var(--line-strong);
+}
+
+.au-switch button {
+  padding: 9px 0;
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.au-switch button:hover {
+  color: #fff;
+}
+
+.au-switch button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--orange);
+}
+
+.au-notice {
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: #cfe0ff;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(127, 176, 255, 0.5);
+}
+
+.au-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.au-field label {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bench);
+}
+
+.au-field input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  font: 500 17px var(--body);
+  color: #fff;
+  background: rgba(5, 8, 12, 0.75);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+}
+
+.au-field input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(255, 122, 47, 0.28);
+}
+
+.au-field.bad input {
+  border-color: var(--red);
+}
+
+.au-error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--red);
+}
+
+.au-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.au-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+.au-bars {
+  display: grid;
+  grid-template-columns: repeat(4, 22px);
+  gap: 4px;
+}
+
+.au-bars i {
+  height: 7px;
+  background: var(--line-strong);
+  transform: skewX(-20deg);
+  transition: background 0.2s;
+}
+
+.au-meter[data-bars='1'] i:nth-child(-n + 1) {
+  background: var(--red);
+}
+.au-meter[data-bars='2'] i:nth-child(-n + 2) {
+  background: var(--orange);
+}
+.au-meter[data-bars='3'] i:nth-child(-n + 3) {
+  background: var(--bench);
+}
+.au-meter[data-bars='4'] i {
+  background: var(--green);
+}
+
+.au-form-error-slot {
+  min-height: 0;
+}
+
+.au-form-error {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 107, 107, 0.26);
+  border: 1px solid var(--red);
+  border-left-width: 4px;
+}
+
+.au-go {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: #fff;
+  background: var(--orange);
+  border: 0;
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  cursor: pointer;
+}
+
+.au-go:hover:not(:disabled),
+.au-go:focus-visible {
+  background: var(--orange-soft);
+  outline: none;
+}
+
+.au-go:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.au-foot {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.au-link {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--orange-soft);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.au-privacy {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+@media (max-height: 640px) {
+  .au-brand svg {
+    display: none;
+  }
+}
+
+/* The top bar wraps instead of letting the score bug run over the Shots button (it did between about 800 and 1100 px,
+   and the logout button makes the bar longer). The sound and logout buttons stay together. */
+.bar-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+@media (min-width: 641px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .scorebug-wrap {
+    flex: none;
+  }
+}
+
+/* ---------- The player's name in the top bar, the demo, and the welcome for an empty log ---------- */
+.bug-pick .bug-name {
+  display: block;
+  max-width: 190px;
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.demo-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--bench);
+  background: transparent;
+  border: 1px dashed var(--bench);
+  border-radius: 22px;
+  cursor: pointer;
+}
+
+.demo-btn:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+.demo-btn[aria-pressed='true'] {
+  color: #05080c;
+  background: var(--bench);
+  border-style: solid;
+}
+
+.demo-banner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 8px clamp(16px, 3vw, 56px);
+  background: repeating-linear-gradient(135deg, rgba(127, 176, 255, 0.16) 0 14px, rgba(127, 176, 255, 0.08) 14px 28px);
+  border-bottom: 1px solid var(--bench);
+}
+
+.demo-tag {
+  flex: none;
+  padding: 2px 10px;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: #05080c;
+  background: var(--bench);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.demo-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: #dbe8ff;
+}
+
+.demo-exit {
+  flex: none;
+  padding: 6px 16px;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #fff;
+  background: transparent;
+  border: 1px solid #fff;
+  cursor: pointer;
+}
+
+.demo-exit:hover {
+  color: #05080c;
+  background: #fff;
+}
+
+.add-note {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* An empty court: a game-style panel in the middle of it. */
+.welcome {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(480px, calc(100% - 32px));
+  padding: 18px 24px 16px;
+  text-align: center;
+  transform: translate(-50%, -54%);
+  background: rgba(10, 16, 24, 0.9);
+  border: 1px solid var(--line-strong);
+  border-top: 4px solid var(--orange);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+}
+
+.welcome-kicker {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: var(--orange);
+}
+
+.welcome h3 {
+  font-size: clamp(30px, 5vmin, 40px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.welcome-text {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.welcome-go,
+.welcome-demo {
+  padding: 9px 22px;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+.welcome-go {
+  color: #fff;
+  background: var(--orange);
+  border: 0;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+
+.welcome-go:hover,
+.welcome-go:focus-visible {
+  background: var(--orange-soft);
+}
+
+.welcome-demo {
+  color: var(--bench);
+  background: transparent;
+  border: 1px dashed var(--bench);
+}
+
+.welcome-demo:hover,
+.welcome-demo:focus-visible {
+  color: #fff;
+  border-color: #fff;
+}
+
+.welcome-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding-top: 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.welcome-note svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--orange-soft);
+}
+
+@media (max-width: 640px) {
+  .demo-banner {
+    flex-wrap: wrap;
+  }
+
+  .demo-text {
+    flex-basis: 100%;
+    order: 3;
+  }
+}
+
+/* The eye on a password box */
+.au-pw {
+  position: relative;
+}
+
+.au-pw input {
+  padding-right: 52px;
+}
+
+/* Edge draws its own eye in a focused password box: ours replaces it, so there are not two. */
+.au-pw input::-ms-reveal,
+.au-pw input::-ms-clear {
+  display: none;
+}
+
+.au-eye {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.au-eye:hover {
+  color: #fff;
+}
+
+.au-eye[aria-pressed='true'] {
+  color: var(--orange-soft);
+}
+

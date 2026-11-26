@@ -24,6 +24,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["error"]
+markers = ["real_cost: runs with the real (slow) password hashing settings"]
 
 [tool.ruff.lint]
 extend-select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PT", "RUF", "FAST"]

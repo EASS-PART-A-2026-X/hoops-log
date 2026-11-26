@@ -5,7 +5,7 @@ import json
 # when the rule it protects is broken (break the rule on purpose to check).
 #
 # Shot fields
-#   player:    missing | "" | whitespace only | 1 char | 50 chars | 51 chars | Hebrew
+#   player:    never sent: the server uses the account's username (sending it is a 422)
 #   x:         -0.1 | 0 | 50 | 50.1 | missing | not a number
 #   y:         -0.1 | 0 | 47 | 47.1
 #   made:      true | false | missing | not a bool ("maybe")
@@ -41,7 +41,7 @@ from datetime import date, timedelta
 import pytest
 from fastapi import status
 
-SHOT = {"player": "Yuly", "x": 15, "y": 19, "made": True}  # a left-elbow 2PT
+SHOT = {"x": 15, "y": 19, "made": True}  # a left-elbow 2PT
 
 
 def test_health(client):
@@ -56,7 +56,7 @@ def test_create_returns_201_with_defaults_and_computed_fields(client):
     body = r.json()
     assert body["id"] >= 1
     assert (body["player"], body["x"], body["y"], body["made"]) == (
-        "Yuly",
+        "tester",  # the account's username
         15,
         19,
         True,
@@ -72,15 +72,39 @@ def test_get_returns_what_was_created(client):
 
 
 def test_hebrew_text_is_stored_as_typed(client):
-    shot = {**SHOT, "player": "יולי", "note": "זריקה מהמרפק"}
+    shot = {**SHOT, "note": "זריקה מהמרפק"}
     created = client.post("/shots", json=shot).json()
-    assert (created["player"], created["note"]) == ("יולי", "זריקה מהמרפק")
+    assert created["note"] == "זריקה מהמרפק"
     assert client.get(f"/shots/{created['id']}").json() == created
 
 
 def test_text_is_trimmed(client):
-    created = client.post("/shots", json={**SHOT, "player": "  Yuly  "}).json()
-    assert created["player"] == "Yuly"
+    created = client.post("/shots", json={**SHOT, "note": "  keep  "}).json()
+    assert created["note"] == "keep"
+
+
+def test_the_shot_carries_the_username_as_it_was_typed(anon, session):
+    from tests.conftest import login_header, make_user
+
+    account = make_user(session, "CoachNoam")
+    shot = anon.post("/shots", json=SHOT, headers=login_header(session, account)).json()
+    assert shot["player"] == "CoachNoam"
+
+
+@pytest.mark.parametrize("player", ["Someone Else", "tester", "", None])
+def test_the_player_cannot_be_sent_at_all(client, player):
+    # Not even the account's own name: the field does not exist for a client.
+    r = client.post("/shots", json={**SHOT, "player": player})
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert r.json()["detail"][0]["type"] == "extra_forbidden"
+    assert client.get("/shots").json() == []
+
+
+def test_the_player_cannot_be_changed_either(client):
+    sid = client.post("/shots", json=SHOT).json()["id"]
+    r = client.patch(f"/shots/{sid}", json={"player": "Someone Else"})
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert client.get(f"/shots/{sid}").json()["player"] == "tester"
 
 
 @pytest.mark.parametrize("field", ["chef", "zone", "shot_type"])
@@ -92,10 +116,6 @@ def test_unknown_and_computed_fields_are_rejected(client, field):
 
 # One field at a time: POST sends it on top of a valid shot, PATCH sends it alone.
 INVALID_VALUES = {
-    "player empty": {"player": ""},
-    "player whitespace only": {"player": "   "},
-    "player 51 chars": {"player": "x" * 51},
-    "player 51 Hebrew chars": {"player": "א" * 51},
     "x below 0": {"x": -0.1},
     "x above 50": {"x": 50.1},
     "x not a number": {"x": "abc"},
@@ -108,10 +128,9 @@ INVALID_VALUES = {
 }
 # A missing field is invalid for POST only; PATCH may leave any field out.
 MISSING_FIELDS = {
-    "player missing": {"x": 1, "y": 1, "made": True},
-    "x missing": {"player": "a", "y": 1, "made": True},
-    "y missing": {"player": "a", "x": 1, "made": True},
-    "made missing": {"player": "a", "x": 1, "y": 1},
+    "x missing": {"y": 1, "made": True},
+    "y missing": {"x": 1, "made": True},
+    "made missing": {"x": 1, "y": 1},
 }
 INVALID_BODIES = {
     **{name: {**SHOT, **change} for name, change in INVALID_VALUES.items()},
@@ -127,9 +146,8 @@ def test_invalid_bodies_are_422(client, body):
 
 
 VALID_EDGES = {
-    "player 1 char": {"player": "x"},
-    "player 50 chars": {"player": "x" * 50},
-    "player 50 Hebrew chars": {"player": "א" * 50},
+    "note 1 char": {"note": "n"},
+    "note Hebrew": {"note": "א" * 200},
     "x is 0": {"x": 0},
     "x is 50": {"x": 50},
     "y is 0": {"y": 0},
@@ -180,10 +198,10 @@ def test_non_integer_id_is_422(client):
 def test_list_is_paginated(client):
     assert client.get("/shots").json() == []
     for n in range(3):
-        client.post("/shots", json={**SHOT, "player": f"P{n}"})
-    assert [s["player"] for s in client.get("/shots").json()] == ["P0", "P1", "P2"]
+        client.post("/shots", json={**SHOT, "note": f"N{n}"})
+    assert [s["note"] for s in client.get("/shots").json()] == ["N0", "N1", "N2"]
     page = client.get("/shots", params={"offset": 1, "limit": 1}).json()
-    assert [s["player"] for s in page] == ["P1"]
+    assert [s["note"] for s in page] == ["N1"]
     assert client.get("/shots", params={"offset": 3}).json() == []
 
 
@@ -222,7 +240,7 @@ def test_patch_changes_only_sent_fields(client):
     body = r.json()
     assert body["made"] is False
     assert (body["player"], body["x"], body["y"], body["note"]) == (
-        "Yuly",
+        "tester",
         15,
         19,
         "keep",
@@ -231,9 +249,9 @@ def test_patch_changes_only_sent_fields(client):
 
 def test_patch_null_means_leave_unchanged(client):
     sid = client.post("/shots", json=SHOT).json()["id"]
-    r = client.patch(f"/shots/{sid}", json={"player": None, "x": None})
+    r = client.patch(f"/shots/{sid}", json={"note": None, "x": None})
     assert r.status_code == status.HTTP_200_OK
-    assert (r.json()["player"], r.json()["x"]) == ("Yuly", 15)
+    assert (r.json()["note"], r.json()["x"]) == ("", 15)
 
 
 def test_patch_moving_the_shot_updates_zone_and_type(client):
@@ -329,7 +347,7 @@ def test_offset_range(client):
 )
 def test_text_that_cannot_be_stored_or_drawn_is_422(client, text):
     # Each of these used to be a 500 or a chart that was no longer valid XML.
-    for field in ("player", "note"):
+    for field in ("note",):
         # json.dumps escapes a lone surrogate as \\ud800, which is how a client would
         # send it; httpx's json= would refuse to encode it at all.
         body = json.dumps({**SHOT, field: text})
@@ -347,8 +365,30 @@ def test_tab_and_newline_are_allowed_in_a_note(client):
 def test_surrogate_inside_a_rejected_object_is_422(client):
     # The 422 echoes the rejected input back; a surrogate in an object KEY used to
     # make that echo impossible to send (500).
-    body = '{"player": {"\\ud800": 1}, "x": 1, "y": 1, "made": true}'
+    body = '{"note": {"\\ud800": 1}, "x": 1, "y": 1, "made": true}'
     r = client.post(
         "/shots", content=body, headers={"content-type": "application/json"}
     )
     assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+def test_patch_trims_the_note_like_create_does(client):
+    sid = client.post("/shots", json=SHOT).json()["id"]
+    r = client.patch(f"/shots/{sid}", json={"note": "  padded  "})
+    assert r.json()["note"] == "padded"
+    assert client.get(f"/shots/{sid}").json()["note"] == "padded"
+
+
+def test_a_stored_player_name_is_limited_to_1_to_50_characters():
+    # The name comes from the account (letters, digits and _ . - only, at most 30),
+    # but the response type still guards what it reads back from the database.
+    from pydantic import ValidationError
+
+    from app.models import ShotPublic
+
+    base = {"id": 1, "x": 25, "y": 10, "made": True}
+    assert ShotPublic(player="x", **base).player == "x"
+    assert ShotPublic(player="x" * 50, **base).player == "x" * 50
+    for bad in ("", "x" * 51):
+        with pytest.raises(ValidationError):
+            ShotPublic(player=bad, **base)

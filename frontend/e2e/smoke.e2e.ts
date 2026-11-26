@@ -46,6 +46,8 @@ test.describe('the PRESS START title screen', () => {
 
   test('comes back with ?title even after it was seen', async ({ page }) => {
     await page.goto('/')
+    // The stored login is checked first, so the title appears a moment after the page loads: wait for it before the key.
+    await expect(page.getByRole('dialog', { name: 'Hoops Log, press start' })).toBeVisible()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('dialog', { name: 'Hoops Log, press start' })).toBeHidden({ timeout: 25_000 })
     await page.goto('/?title')
@@ -78,7 +80,7 @@ test.describe('the safety net itself', () => {
       'dialog: alert "deliberate alert"',
       `http 500 GET ${origin}/__boom__`,
       `request failed: GET ${origin}/__fail__`,
-      `http 404 GET ${BACKEND_URL}/shots/999999`,
+      `http 401 GET ${BACKEND_URL}/shots/999999`, // the page's own fetch carries no token
     ]) {
       expect(seen(), line).toContain(line)
     }
@@ -100,7 +102,7 @@ test.describe('the safety net itself', () => {
 
 test.describe('the main screens really render (kept here so the fast run catches a broken screen)', () => {
   test('the 3D court draws a court with the shots on it, not a blank canvas', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 40, { seed: 11 }))
+    await api.seed(makeShots(40, { seed: 11 }))
     await openApp(page)
     await expect(page.locator('.stage-canvas canvas')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('Loading the court…')).toHaveCount(0)
@@ -115,10 +117,10 @@ test.describe('the main screens really render (kept here so the fast run catches
   })
 
   test('vs NBA says who leads, from your real shots', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 40, { seed: 21, makeRate: 0.6 }))
+    await api.seed(makeShots(40, { seed: 21, makeRate: 0.6 }))
     await openApp(page, 'vs NBA')
-    await expect(page.getByText('Yuly vs NBA average')).toBeVisible()
-    await expect(page.getByRole('img', { name: /^Areas led: Yuly \d+, NBA average \d+/ })).toBeVisible()
+    await expect(page.getByText('e2e-runner vs NBA average')).toBeVisible()
+    await expect(page.getByRole('img', { name: /^Areas led: e2e-runner \d+, NBA average \d+/ })).toBeVisible()
   })
 
   test('Deni opens with a 3D figure and his eight questions', async ({ page }) => {

@@ -3,12 +3,15 @@ from xml.etree import ElementTree
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.conftest import add_shot
+
 SVG = "{http://www.w3.org/2000/svg}"
 
 
 def post(client: TestClient, **fields):
-    body = {"player": "Ann", "x": 25, "y": 10, "made": True, **fields}
-    assert client.post("/shots", json=body).status_code == 201
+    # Straight into the database: a client cannot choose the player, but the chart
+    # has to cope with any stored name.
+    add_shot(client, **fields)
 
 
 def parse(client: TestClient, url: str = "/chart.svg") -> ElementTree.Element:

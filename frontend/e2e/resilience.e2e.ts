@@ -3,9 +3,11 @@ import { addShotViaForm, closeDrawer, drawer, expect, kpi, makeShots, notice, op
 
 test.describe('when the backend is not there', () => {
   test('the court says the shots could not load, the list names the address, and Try again recovers', async ({ page, api, guard }) => {
-    // Only the shot list's own request is refused on purpose; any other failed request still fails the test.
+    // Only the shot list's own request, and the check of the stored login that runs first, are refused on purpose;
+    // any other failed request still fails the test.
     guard.allow(/^request failed: GET \S+\/shots\?\S* net::ERR_CONNECTION_REFUSED$/)
-    await api.seed(makeShots('Yuly', 6, { seed: 81 }))
+    guard.allow(/^request failed: GET \S+\/auth\/me net::ERR_CONNECTION_REFUSED$/)
+    await api.seed(makeShots(6, { seed: 81 }))
     let down = true
     await page.route(`${BACKEND_URL}/**`, (route) => (down ? route.abort('connectionrefused') : route.fallback()))
     await page.goto('/')
@@ -27,7 +29,6 @@ test.describe('when the backend is not there', () => {
     let down = true
     await page.route(`${BACKEND_URL}/shots`, (route) => (down && route.request().method() === 'POST' ? route.abort('connectionrefused') : route.fallback()))
     const form = drawer(page).locator('form.shot-form').first()
-    await form.getByLabel('Player').fill('Yuly')
     await form.getByLabel(/^X \(/).fill('20')
     await form.getByLabel(/^Y \(/).fill('15')
     await form.getByLabel('Note (optional)').fill('typed while offline')
@@ -48,7 +49,7 @@ test.describe('when the backend is not there', () => {
     await page.route(`${BACKEND_URL}/shots`, (route) =>
       fail && route.request().method() === 'POST' ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"boom"}' }) : route.fallback(),
     )
-    await addShotViaForm(page, { player: 'Yuly', x: 20, y: 15, made: true, note: 'retry me' })
+    await addShotViaForm(page, { x: 20, y: 15, made: true, note: 'retry me' })
     await expect(drawer(page).locator('form.shot-form').first().getByRole('alert')).toBeVisible()
     fail = false
     await drawer(page).locator('form.shot-form').first().getByRole('button', { name: 'Add shot' }).click()
@@ -61,8 +62,8 @@ test.describe('when the data changed behind the page’s back', () => {
   test('deleting a shot that someone else already deleted says so, and the list is refreshed', async ({ page, api, guard }) => {
     guard.allow(/^http 404 DELETE \S+\/shots\/\d+$/)
     const [gone] = await api.seed([
-      { player: 'Yuly', x: 25, y: 6, made: true, note: 'already gone' },
-      { player: 'Yuly', x: 20, y: 20, made: false, note: 'still here' },
+      { x: 25, y: 6, made: true, note: 'already gone' },
+      { x: 20, y: 20, made: false, note: 'still here' },
     ])
     await openApp(page)
     await openDrawer(page, 'list')
@@ -79,7 +80,7 @@ test.describe('when the data changed behind the page’s back', () => {
 
   test('editing a shot that no longer exists says so and does not bring it back', async ({ page, api, guard }) => {
     guard.allow(/^http 404 PATCH \S+\/shots\/\d+$/)
-    const [gone] = await api.seed([{ player: 'Yuly', x: 25, y: 6, made: true, note: 'ghost' }, { player: 'Yuly', x: 10, y: 10, made: true, note: 'other' }])
+    const [gone] = await api.seed([{ x: 25, y: 6, made: true, note: 'ghost' }, { x: 10, y: 10, made: true, note: 'other' }])
     await openApp(page)
     await openDrawer(page, 'list')
     await shotRow(page, 'ghost').getByRole('button', { name: /^Edit/ }).click()
@@ -95,9 +96,12 @@ test.describe('when the data changed behind the page’s back', () => {
 
 test.describe('slow and large', () => {
   test('a slow backend shows a loading state instead of an empty or broken page', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 8, { seed: 82 }))
+    await api.seed(makeShots(8, { seed: 82 }))
+    // The backend answers when the test says so, not after a guessed number of seconds, so there is no race with a slow machine.
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
     await page.route(`${BACKEND_URL}/shots*`, async (route) => {
-      await new Promise((r) => setTimeout(r, 2500))
+      await gate
       await route.fallback()
     })
     await page.goto('/')
@@ -105,6 +109,7 @@ test.describe('slow and large', () => {
     await openDrawer(page, 'list')
     await expect(drawer(page).getByText('Loading shots…')).toBeVisible()
     await expect(drawer(page).getByText('No shots yet.')).toHaveCount(0)
+    release()
     await closeDrawer(page)
     await expect(kpi(page, 'SHOTS')).toHaveText('8', { timeout: 20_000 })
   })
@@ -125,7 +130,7 @@ test.describe('slow and large', () => {
 
   test('300 shots load across three backend pages and every one is counted', async ({ page, api }) => {
     test.setTimeout(180_000)
-    await api.seed(makeShots('Yuly', 300, { seed: 83 }))
+    await api.seed(makeShots(300, { seed: 83 }))
     await openApp(page)
     await expect(kpi(page, 'SHOTS')).toHaveText('300')
     await openDrawer(page, 'list')

@@ -16,7 +16,6 @@ const today = () => new Date().toLocaleDateString('en-CA')
 
 export default function ShotForm({ shot, submitLabel, onSubmit, onCancel }: Props) {
   const id = useId()
-  const [player, setPlayer] = useState(shot?.player ?? '')
   const [x, setX] = useState(shot ? String(shot.x) : '')
   const [y, setY] = useState(shot ? String(shot.y) : '')
   const [made, setMade] = useState(shot?.made ?? true)
@@ -31,7 +30,6 @@ export default function ShotForm({ shot, submitLabel, onSubmit, onCancel }: Prop
     setError(null)
     try {
       await onSubmit({
-        player: player.trim(),
         x: Number(x),
         y: Number(y),
         made,
@@ -39,7 +37,7 @@ export default function ShotForm({ shot, submitLabel, onSubmit, onCancel }: Prop
         note,
       })
       if (!shot) {
-        // A new shot saved: empty the form, but keep the date and player for the next one.
+        // A new shot saved: empty the form, but keep the date for the next one.
         setX('')
         setY('')
         setNote('')
@@ -54,17 +52,6 @@ export default function ShotForm({ shot, submitLabel, onSubmit, onCancel }: Prop
 
   return (
     <form className="shot-form" onSubmit={handleSubmit} aria-busy={busy}>
-      <div className="field">
-        <label htmlFor={`${id}-player`}>Player</label>
-        <input
-          id={`${id}-player`}
-          value={player}
-          onChange={(e) => setPlayer(e.target.value)}
-          maxLength={50}
-          required
-          autoComplete="off"
-        />
-      </div>
       <div className="field">
         <label htmlFor={`${id}-date`}>Game date</label>
         <input

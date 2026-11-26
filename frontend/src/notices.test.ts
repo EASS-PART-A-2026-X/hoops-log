@@ -1,21 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { deletedText, shooterSwitchedText, withShooterSwitch } from './notices'
+import { deletedText } from './notices'
 import { tabTarget } from './focusTrap'
 
-describe('withShooterSwitch', () => {
-  it('keeps the delete confirmation and adds the switch sentence', () => {
-    expect(withShooterSwitch(deletedText(7), 'Noam', 'Alice')).toBe(
-      'Deleted shot #7. Noam has no shots left, so the shots of Alice are shown.',
-    )
-  })
-  it('is idempotent', () => {
-    const once = withShooterSwitch(deletedText(7), 'Noam', 'Alice')
-    expect(withShooterSwitch(once, 'Noam', 'Alice')).toBe(once)
-  })
-  it('replaces any other notice, or none', () => {
-    const sentence = shooterSwitchedText('Noam', 'Alice')
-    expect(withShooterSwitch(null, 'Noam', 'Alice')).toBe(sentence)
-    expect(withShooterSwitch('Saved shot #3 for Bob.', 'Noam', 'Alice')).toBe(sentence)
+describe('deletedText', () => {
+  it('names the shot', () => {
+    expect(deletedText(7)).toBe('Deleted shot #7.')
   })
 })
 

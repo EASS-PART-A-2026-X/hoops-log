@@ -54,7 +54,7 @@ export default defineConfig({
   projects: [
     {
       name: 'fast',
-      testMatch: ['**/smoke.e2e.ts', '**/api.e2e.ts', '**/log-journey.e2e.ts', '**/monkey.e2e.ts'],
+      testMatch: ['**/smoke.e2e.ts', '**/api.e2e.ts', '**/auth.e2e.ts', '**/demo.e2e.ts', '**/log-journey.e2e.ts', '**/monkey.e2e.ts'],
       // One short monkey seed; the full run does them all.
       grepInvert: /monkey, seed [2-9]/,
     },
@@ -76,7 +76,9 @@ export default defineConfig({
           command: `uv run fastapi run --host 127.0.0.1 --port ${BACKEND_PORT}`,
           cwd: '../backend',
           url: `${BACKEND_URL}/health`,
-          env: { DATABASE_URL: `sqlite:///${dbFile}` },
+          // The tests make a few accounts and log in often, all from one address: the limits that slow down password guessing are
+          // raised here (the real numbers are checked by the backend's own tests).
+          env: { DATABASE_URL: `sqlite:///${dbFile}`, REGISTER_ATTEMPTS: '1000', LOGIN_ATTEMPTS: '1000', LOGIN_FAILURES: '1000' },
           // Never reuse a server that is already there: it could be one with real data.
           reuseExistingServer: false,
           timeout: 60_000,

@@ -11,6 +11,8 @@ interface Props {
   onLocate: (id: number | null) => void
   onSave: (id: number, input: ShotInput) => Promise<void>
   onDelete: (id: number) => Promise<void>
+  /** The demo's shots can be looked at (and shown on the map) but not changed. */
+  readOnly?: boolean
 }
 
 function Row({
@@ -19,7 +21,10 @@ function Row({
   onLocate,
   onSave,
   onDelete,
-}: { shot: Shot; selected: boolean } & Pick<Props, 'onLocate' | 'onSave' | 'onDelete'>) {
+  readOnly,
+}: { shot: Shot; selected: boolean } & Pick<Props, 'onLocate' | 'onSave' | 'onDelete' | 'readOnly'>) {
+  // What a screen reader calls this shot. The demo's ids are negative made-up numbers: they are not read out.
+  const name = readOnly ? 'this shot' : `shot #${shot.id}`
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -52,13 +57,11 @@ function Row({
       </span>
       <div className="shot-main">
         <div className="shot-title">
-          {/* React renders text as text, so a name like <b>x</b> shows literally. */}
-          <strong>{shot.player}</strong>
           <span className={shot.made ? 'result made' : 'result missed'}>{shot.made ? 'Made' : 'Missed'}</span>
           <span className={shot.shot_type === '3PT' ? 'badge three' : 'badge'}>
             {shot.shot_type}
           </span>
-          <span className="shot-id">#{shot.id}</span>
+          {!readOnly && <span className="shot-id">#{shot.id}</span>}
         </div>
         <div className="shot-meta">
           {shot.game_date} · {zoneLabel(shot.zone)} · ({shot.x}, {shot.y})
@@ -92,14 +95,20 @@ function Row({
           <>
             <button type="button" className="btn" onClick={() => onLocate(selected ? null : shot.id)}>
               {selected ? 'Unselect' : 'Show on map'}
-              <span className="sr-only">{selected ? '' : ' for'} shot #{shot.id}</span>
+              <span className="sr-only">
+                {selected ? '' : ' for'} {name}
+              </span>
             </button>
-            <button type="button" className="btn" onClick={() => setEditing(true)}>
-              Edit<span className="sr-only"> shot #{shot.id}</span>
-            </button>
-            <button type="button" className="btn" onClick={() => setConfirming(true)}>
-              Delete<span className="sr-only"> shot #{shot.id}</span>
-            </button>
+            {!readOnly && (
+              <>
+                <button type="button" className="btn" onClick={() => setEditing(true)}>
+                  Edit<span className="sr-only"> shot #{shot.id}</span>
+                </button>
+                <button type="button" className="btn" onClick={() => setConfirming(true)}>
+                  Delete<span className="sr-only"> shot #{shot.id}</span>
+                </button>
+              </>
+            )}
           </>
         )}
       </div>
@@ -110,7 +119,7 @@ function Row({
 /** Rows shown at a time: a short first page, then "Show more". */
 const PAGE = 20
 
-export default function ShotList({ shots, resetKey, selectedId, onLocate, onSave, onDelete }: Props) {
+export default function ShotList({ shots, resetKey, selectedId, onLocate, onSave, onDelete, readOnly }: Props) {
   const [shown, setShown] = useState(PAGE)
   const [seenKey, setSeenKey] = useState(resetKey)
   if (seenKey !== resetKey) {
@@ -135,6 +144,7 @@ export default function ShotList({ shots, resetKey, selectedId, onLocate, onSave
             onLocate={onLocate}
             onSave={onSave}
             onDelete={onDelete}
+            readOnly={readOnly}
           />
         ))}
       </ul>
