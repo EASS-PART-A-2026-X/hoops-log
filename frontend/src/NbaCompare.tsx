@@ -126,7 +126,7 @@ export default function NbaCompare({ shots, shooter, benchmarkId, onBenchmark, o
       {!shots ? (
         <p className="state">Loading shots…</p>
       ) : shots.length === 0 ? (
-        <p className="state">{shooter ? `No shots for ${shooter} yet.` : 'No shots yet.'} Log some on the My log tab and they show up here.</p>
+        <p className="state">No shots yet. Log some on the My log tab, or press DEMO to see this page with made-up shots.</p>
       ) : (
         <>
           <div className="vs-head">

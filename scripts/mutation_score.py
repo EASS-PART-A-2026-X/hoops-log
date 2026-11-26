@@ -24,7 +24,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 BACKEND = Path.cwd()
-DEFAULT_TARGETS = ["app/court.py", "app/models.py", "app/chart.py", "app/routers"]
+DEFAULT_TARGETS = [
+    "app/court.py",
+    "app/models.py",
+    "app/chart.py",
+    "app/users.py",
+    "app/security.py",
+    "app/deps.py",
+    "app/routers",
+]
 SWAPS: dict[type, type] = {
     ast.Lt: ast.LtE,
     ast.LtE: ast.Lt,

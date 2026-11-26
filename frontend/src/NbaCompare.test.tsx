@@ -109,9 +109,9 @@ describe('NbaCompare against a chosen player', () => {
 })
 
 describe('NbaCompare without shots', () => {
-  it('says the log is empty for the chosen shooter', () => {
+  it('says the log is empty, and points at the demo', () => {
     renderCompare([])
-    expect(screen.getByText(/No shots for Yuly yet\./)).toBeTruthy()
+    expect(screen.getByText(/No shots yet\. Log some on the My log tab, or press DEMO/)).toBeTruthy()
   })
 
   it('says the log is empty when showing every player', () => {

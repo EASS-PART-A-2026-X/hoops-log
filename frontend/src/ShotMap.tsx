@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BACKEND_URL } from './api'
+import { ApiError, fetchChartSvg } from './api'
 import type { Shot } from './api'
 import type { CourtScene, FilmState, MapMode } from './court/CourtScene'
 import { latestIndices, summarizeFilm } from './court/film'
@@ -26,8 +26,8 @@ interface Props {
   /** A player the heat map compares each spot with, instead of a typical shooter. */
   baseline: { name: string; typical: Typical } | null
   /** Everyone in the log, and whose shots to show ('' = everyone). The choice lives in App. */
-  player: string
-  onPlayerChange: (player: string) => void
+  /** Shown instead of the plain "no shots yet" sentence when the account has none (the first-time welcome). */
+  empty?: React.ReactNode
   /** Whether the log tab is showing. ShotMap stays mounted when it is hidden, and the film must not. */
   visible: boolean
   /** The page is covered (title screen): the 3D court stops drawing. */
@@ -98,7 +98,7 @@ const RESULTS: [ResultFilter, string][] = [
 ]
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v}%`)
 
-export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, player, onPlayerChange, visible, suspended = false, paused = false }: Props) {
+export default function ShotMap({ shots, loadError, retrying, onRetry, selectedId, onSelect, baseline, empty, visible, suspended = false, paused = false }: Props) {
   const [area, setArea] = useState<AreaFilter>('all')
   const [result, setResult] = useState<ResultFilter>('all')
   const [mode, setMode] = useState<MapMode>('beams')
@@ -134,7 +134,8 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   const sceneRef = useRef<CourtScene | null>(null)
   const introDone = useRef(false)
 
-  const activePlayer = player
+  // Every shot of the account is the same player's, so there is no player to filter by.
+  const activePlayer = ''
   const filtered = useMemo(
     () => applyFilters(shots ?? [], { area, result, player: activePlayer }),
     [shots, area, result, activePlayer],
@@ -249,12 +250,10 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
   )
 
   const hovered = hover ? filtered[hover.index] : undefined
-  // "Show on map" for a shot the map hides: either its player is not the shown shooter, or the
-  // area/result filters hide it.
+  // "Show on map" for a shot the area/result filters hide.
   const selectedShot = selectedId === null ? undefined : (shots ?? []).find((s) => s.id === selectedId)
-  const hiddenByPlayer = !!selectedShot && !!activePlayer && selectedShot.player !== activePlayer
   const hiddenSelected = !!selectedShot && !filtered.some((s) => s.id === selectedId)
-  // Only the map's own filters; "Shots of" is shared with the other tabs and is not touched.
+  // Only the map's own filters.
   const clearFilters = () => {
     setArea('all')
     setResult('all')
@@ -333,13 +332,16 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [filmOpen, visible, film, closeFilm])
+  // The flat chart comes from a login-protected route, and an <img> cannot send the token: fetch it, show it from memory.
+  const chart = useChartImage(failed !== null, activePlayer)
   const loading = shots === null
+  // The first-time welcome replaces the plain "no shots yet" line, with or without WebGL.
+  const welcome = !!empty && shots !== null && shots.length === 0
   const label = loading
     ? loadError
       ? 'Shot map. The shots could not be loaded.'
       : 'Shot map, loading'
     : `Shot map. ${summary.attempts} shots, ${summary.made} made${hottest ? `, hottest zone ${hottest.label}` : ''}. The shot list and zone breakdown give the same data as text.`
-  const chartUrl = `${BACKEND_URL}/chart.svg${activePlayer ? `?player=${encodeURIComponent(activePlayer)}` : ''}`
 
   return (
     <section className="map card" aria-labelledby="map-title">
@@ -393,7 +395,15 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                   Reload to try 3D again
                 </button>
               )}
-              <img src={chartUrl} alt={`Shot chart: green circles are made shots, red crosses are misses.`} />
+              {chart.src ? (
+                <img src={chart.src} alt="Shot chart: green circles are made shots, red crosses are misses." />
+              ) : chart.error ? (
+                <p className="state error" role="alert">
+                  {chart.error}
+                </p>
+              ) : (
+                <p className="state">Loading the chart…</p>
+              )}
             </div>
           ) : (
             <div className={`stage-frame${cellHover && mode === 'heat' ? ' cell-hover' : ''}${film ? ' film-on' : ''}`}>
@@ -406,7 +416,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
                   </button>
                 </div>
               ) : (
-                (loading || !ready) && <p className="stage-msg">Loading the court…</p>
+                (loading || !ready) && !welcome && <p className="stage-msg">Loading the court…</p>
               )}
               {selectedId !== null && !hiddenSelected && (
                 <button type="button" className="btn stage-clear" onClick={() => onSelect(null)}>
@@ -415,25 +425,15 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               )}
               {hiddenSelected && selectedShot && (
                 <div className="stage-notice">
-                  {hiddenByPlayer
-                    ? `Shot #${selectedId} is by ${selectedShot.player}, not ${activePlayer}.`
-                    : `Shot #${selectedId} is hidden by the area or result filter.`}
-                  {hiddenByPlayer ? (
-                    <button type="button" className="link" onClick={() => onPlayerChange(selectedShot.player)}>
-                      Show {selectedShot.player}'s shots
-                    </button>
-                  ) : (
-                    <button type="button" className="link" onClick={clearFilters}>
-                      Clear filters
-                    </button>
-                  )}
+                  Shot #{selectedId} is hidden by the area or result filter.
+                  <button type="button" className="link" onClick={clearFilters}>
+                    Clear filters
+                  </button>
                 </div>
               )}
-              {ready && !loading && filtered.length === 0 && (
+              {ready && !loading && filtered.length === 0 && !welcome && (
                 <p className="stage-msg">
-                  {(shots ?? []).length === 0
-                    ? 'No shots yet. Add one and the court lights up.'
-                    : 'No shots match these filters.'}
+                  {(shots ?? []).length === 0 ? 'No shots yet. Add one and the court lights up.' : 'No shots match these filters.'}
                 </p>
               )}
               <p className="stage-hint" aria-hidden="true">
@@ -549,7 +549,7 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
               )}
             </div>
           )}
-
+          {welcome && empty}
         </div>
 
         <aside className="zones" aria-label="Zone breakdown">
@@ -577,4 +577,30 @@ export default function ShotMap({ shots, loadError, retrying, onRetry, selectedI
       </div>
     </section>
   )
+}
+
+/** The backend's flat chart as an image address, fetched with the login token. Only runs while the fallback is shown. */
+function useChartImage(wanted: boolean, player: string): { src: string | null; error: string | null } {
+  const [state, setState] = useState<{ key: string; src: string | null; error: string | null }>({ key: '', src: null, error: null })
+  const key = `${wanted}|${player}`
+  useEffect(() => {
+    if (!wanted) return
+    let cancelled = false
+    let url: string | null = null
+    fetchChartSvg(player)
+      .then((svg) => {
+        if (cancelled) return
+        url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+        setState({ key, src: url, error: null })
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) setState({ key, src: null, error: caught instanceof ApiError ? caught.message : 'Could not load the chart.' })
+      })
+    return () => {
+      cancelled = true
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [wanted, player, key])
+  // An answer for another player (or from before) is not shown while the new one loads.
+  return state.key === key ? { src: state.src, error: state.error } : { src: null, error: null }
 }

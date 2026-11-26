@@ -93,3 +93,36 @@ describe('ShotList resetKey', () => {
     expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeTruthy()
   })
 })
+
+describe('ShotList read only (the demo)', () => {
+  const demo = (id: number): Shot => ({ ...shot(id), id: -id, player: 'Demo Player' })
+
+  it('has no Edit or Delete, no ids on screen, and does not read the made-up ids out', () => {
+    render(<ShotList shots={[demo(1), demo(2)]} resetKey="" selectedId={null} onLocate={vi.fn()} onSave={vi.fn()} onDelete={vi.fn()} readOnly />)
+    expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull()
+    expect(document.body.textContent).not.toContain('#-')
+    expect(document.body.textContent).not.toContain('#')
+    const locate = screen.getAllByRole('button', { name: /Show on map/ })
+    expect(locate).toHaveLength(2)
+    for (const button of locate) expect(button.textContent).toMatch(/Show on map\s*for this shot/)
+  })
+
+  it('can still show a shot on the map and unselect it', async () => {
+    const onLocate = vi.fn()
+    const user = userEvent.setup()
+    const { rerender } = render(<ShotList shots={[demo(1)]} resetKey="" selectedId={null} onLocate={onLocate} onSave={vi.fn()} onDelete={vi.fn()} readOnly />)
+    await user.click(screen.getByRole('button', { name: /Show on map/ }))
+    expect(onLocate).toHaveBeenCalledWith(-1)
+    rerender(<ShotList shots={[demo(1)]} resetKey="" selectedId={-1} onLocate={onLocate} onSave={vi.fn()} onDelete={vi.fn()} readOnly />)
+    await user.click(screen.getByRole('button', { name: /Unselect/ }))
+    expect(onLocate).toHaveBeenLastCalledWith(null)
+  })
+
+  it('a normal list still has them, with the shot number read out', () => {
+    renderList(shots(2))
+    expect(screen.getAllByRole('button', { name: /^Edit/ })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /^Delete/ })).toHaveLength(2)
+    for (const button of screen.getAllByRole('button', { name: /Show on map/ })) expect(button.textContent).toMatch(/Show on map\s*for shot #\d/)
+  })
+})

@@ -24,7 +24,7 @@ function expected(rows: ShotRow[]) {
 
 test.describe('the 3D court', () => {
   test('the stat tiles match what the backend holds', async ({ page, api }) => {
-    const rows = await api.seed(makeShots('Yuly', 37, { seed: 12, makeRate: 0.55 }))
+    const rows = await api.seed(makeShots(37, { seed: 12, makeRate: 0.55 }))
     const want = expected(rows)
     await openApp(page)
     await expect(kpi(page, 'SHOTS')).toHaveText(String(want.attempts))
@@ -35,7 +35,7 @@ test.describe('the 3D court', () => {
   })
 
   test('the zone list adds up to the shots on the court', async ({ page, api }) => {
-    const rows = await api.seed(makeShots('Yuly', 45, { seed: 13 }))
+    const rows = await api.seed(makeShots(45, { seed: 13 }))
     await openApp(page)
     const zones = page.getByRole('complementary', { name: 'Zone breakdown' })
     await expect(zones).toBeVisible()
@@ -47,7 +47,7 @@ test.describe('the 3D court', () => {
   })
 
   test('the Area and Result filters change the tiles, and "All shots / Made + missed" brings everything back', async ({ page, api }) => {
-    const rows = await api.seed(makeShots('Yuly', 50, { seed: 14 }))
+    const rows = await api.seed(makeShots(50, { seed: 14 }))
     const threes = rows.filter((r) => r.shot_type === '3PT')
     const paint = rows.filter((r) => r.zone === 'paint' || r.zone === 'restricted_area')
     await openApp(page)
@@ -73,7 +73,7 @@ test.describe('the 3D court', () => {
   })
 
   test('a filter with nothing in it says so instead of showing a broken court', async ({ page, api }) => {
-    await api.seed([{ player: 'Yuly', x: 25, y: 6, made: true }])
+    await api.seed([{ x: 25, y: 6, made: true }])
     await openApp(page)
     await chip(page, 'Result', 'Missed').click()
     await expect(kpi(page, 'SHOTS')).toHaveText('0')
@@ -81,7 +81,7 @@ test.describe('the 3D court', () => {
   })
 
   test('the three map styles each draw something and the choice sticks while the page is open', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 30, { seed: 15 }))
+    await api.seed(makeShots(30, { seed: 15 }))
     await openApp(page)
     await waitForCourt(page)
     const style = page.getByRole('combobox', { name: /Map style/ })
@@ -95,7 +95,7 @@ test.describe('the 3D court', () => {
   })
 
   test('Replay and Watch session play and can be closed with Escape', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 12, { seed: 16 }))
+    await api.seed(makeShots(12, { seed: 16 }))
     await openApp(page)
     await waitForCourt(page)
     await page.getByRole('button', { name: /Replay/ }).click()
@@ -117,7 +117,7 @@ test.describe('the 3D court', () => {
   })
 
   test('the film can be watched to the end and ends on a summary with Watch again and Close', async ({ page, api }) => {
-    await api.seed(makeShots('Yuly', 3, { seed: 17 }))
+    await api.seed(makeShots(3, { seed: 17 }))
     await openApp(page)
     await waitForCourt(page)
     await page.getByRole('button', { name: /Watch session/ }).click()
@@ -133,7 +133,7 @@ test.describe('the 3D court', () => {
 test.describe('without WebGL', () => {
   test('the flat chart from the backend is shown instead, and the filters that need 3D are switched off', async ({ page, api, guard }) => {
     guard.allow(/Error creating WebGL context/)
-    await api.seed(makeShots('Yuly', 10, { seed: 18 }))
+    await api.seed(makeShots(10, { seed: 18 }))
     await page.addInitScript(() => {
       const original = HTMLCanvasElement.prototype.getContext
       HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
@@ -143,7 +143,8 @@ test.describe('without WebGL', () => {
     })
     await openApp(page)
     await expect(page.getByText(/flat chart instead/i)).toBeVisible({ timeout: 20_000 })
-    await expect(page.locator('img[src*="/chart.svg"]')).toBeVisible()
+    // The chart is fetched with the login token and shown from memory (an <img> cannot send the token).
+    await expect(page.locator('img[alt^="Shot chart"][src^="blob:"]')).toBeVisible()
     await expect(chip(page, 'Result', 'Made')).toBeDisabled()
   })
 })

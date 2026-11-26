@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, MAX_PAGES, PAGE_SIZE, createShot, deleteShot, updateShot } from './api'
-import type { ShotInput } from './api'
+import type { ShotInput, User } from './api'
 import NbaCompare from './NbaCompare'
 import { PLAYERS } from './court/players'
 import { typicalOf } from './court/nba'
 import Logo from './Logo'
-import ShooterSelect from './ShooterSelect'
 import { tabTarget } from './focusTrap'
-import { deletedText, withShooterSwitch } from './notices'
-import { listShooters, pickDefaultShooter, resolveShooter } from './shooter'
+import { deletedText } from './notices'
 import PlayersPage from './PlayersPage'
 import ShotForm from './ShotForm'
 import ShotList from './ShotList'
@@ -21,6 +19,10 @@ import { shouldShowTitle } from './game/titleSeen'
 import { TROPHIES } from './game/achievements'
 import { trophiesOf, xpOf } from './game/profile'
 import ScoreBug, { MuteButton } from './ScoreBug'
+import LogoutButton from './auth/LogoutButton'
+import DemoBanner from './demo/DemoBanner'
+import EmptyLog from './demo/EmptyLog'
+import { DEMO_NAME, useDemoShots } from './demo/useDemoShots'
 import { play, unlockAudio } from './game/audio'
 import { useCelebrations } from './game/useCelebrations'
 import { levelInfo } from './game/xp'
@@ -37,13 +39,28 @@ interface Notice {
   text: string
 }
 
-export default function App() {
-  const { shots, truncated, loading, loadError, refresh } = useShots()
+interface AppProps {
+  /** Who is logged in (null when it is not known yet), shown on the log out button. */
+  user?: User | null
+  onLogout?: () => void
+  /** The title screen was already shown (by the login flow), so do not show it again. */
+  skipTitle?: boolean
+  /** Keep the court covered until this turns false: it then makes its entrance. */
+  hold?: boolean
+}
+
+export default function App({ user = null, onLogout, skipTitle = false, hold = false }: AppProps = {}) {
+  // Your own shots, and (only when the demo is on) the made-up ones. The demo never mixes with yours.
+  const mine = useShots()
+  const [demo, setDemo] = useState(false)
+  const demoData = useDemoShots(demo)
+  const shots = demo ? demoData.shots : mine.shots
+  const truncated = demo ? false : mine.truncated
+  const loading = demo ? demoData.loading : mine.loading
+  const loadError = demo ? demoData.loadError : mine.loadError
+  const refresh = demo ? demoData.retry : mine.refresh
   const [notice, setNotice] = useState<Notice | null>(null)
   const [tab, setTab] = useState<'log' | 'nba' | 'players'>('log')
-  // Whose shots everything shows. null = not chosen yet, so use the default (the player with the
-  // most shots); '' = every player's shots together; otherwise a player's name.
-  const [shooterChoice, setShooterChoice] = useState<string | null>(null)
   // The player the vs NBA tab compares you with; null means the league average.
   const [benchmarkId, setBenchmarkId] = useState<number | null>(null)
   // Face-offs already played this session, so they do not replay every time the vs NBA tab is opened.
@@ -52,6 +69,8 @@ export default function App() {
   // The side drawer with the shot list and the add form: closed by default, so the page is just the map.
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerView, setDrawerView] = useState<'list' | 'add'>('list')
+  // The demo's shots cannot be added to: its drawer only ever shows the list.
+  const view = demo ? 'list' : drawerView
   const toggleRef = useRef<HTMLButtonElement>(null)
   // The trophy wall: a second drawer, from its own button in the top bar. Only one drawer is open at a time.
   const [trophyOpen, setTrophyOpen] = useState(false)
@@ -70,11 +89,9 @@ export default function App() {
   // After a write, show the backend's fresh data, not our guess of it.
   async function add(input: ShotInput) {
     const saved = await createShot(input)
-    setNotice({ kind: 'ok', text: `Saved shot #${saved.id} for ${saved.player}.` })
+    setNotice({ kind: 'ok', text: `Saved shot #${saved.id}.` })
     play(saved.made ? 'swish' : 'rim')
     await refresh()
-    // The map shows one player's shots: switch to the saved shot's player so the new shot is visible.
-    setShooterChoice(saved.player)
     setDrawerView('list') // show the new row
   }
 
@@ -216,31 +233,28 @@ export default function App() {
   function locate(id: number | null) {
     setPickedId(id)
     if (id === null) return
-    // A shot by someone else is hidden on the map, so show that player's shots.
-    const player = shots?.find((s) => s.id === id)?.player
-    if (player !== undefined && shooter !== '' && player !== shooter) setShooterChoice(player)
     setDrawerOpen(false) // the drawer would cover the map
     setScrollTarget({ id: 'map-title', block: 'start' })
   }
 
-  const shooters = useMemo(() => listShooters(shots), [shots])
-  const defaultShooter = useMemo(() => pickDefaultShooter(shots), [shots])
-  const shooter = resolveShooter(shooterChoice, shooters, defaultShooter)
-  // Make the shown shooter the explicit choice, so a save or delete never silently changes whose
-  // shots are shown. A chosen player with no shots left is replaced by the default, and the user is told.
-  // (Set during render, which React allows for a component's own state.)
-  if (shooters.length > 0 && !loadError && shooter !== shooterChoice) {
-    setShooterChoice(shooter)
-    if (shooterChoice !== null) {
-      // A delete confirmation stays visible: the sentence is added to it (and adding twice is a no-op).
-      setNotice((prev) => ({
-        kind: 'ok',
-        text: withShooterSwitch(prev?.kind === 'ok' ? prev.text : null, shooterChoice, shooter),
-      }))
-    }
+  // Whose shots everything shows: always the account's own (or the demo's). There is nothing to choose.
+  const shooter = demo ? DEMO_NAME : (user?.username ?? '')
+  const shooterShots = shots
+  const barName = <span className="bug-name">{shooter || 'You'}</span>
+
+  // The demo and the shot list are two different lists: switching drops what was selected in the other one.
+  function setDemoOn(on: boolean) {
+    setDemo(on)
+    setPickedId(null)
+    setDrawerOpen(false)
+    setTrophyOpen(false)
+    setDrawerView('list')
   }
-  const shooterShots = useMemo(() => (shots === null || !shooter ? shots : shots.filter((s) => s.player === shooter)), [shots, shooter])
-  const shooterPicker = <ShooterSelect compact shots={shots} value={shooter} onChange={setShooterChoice} />
+  function startAdding() {
+    setTrophyOpen(false)
+    setDrawerView('add')
+    setDrawerOpen(true)
+  }
 
   const benchPlayer = PLAYERS.find((p) => p.id === benchmarkId)
   const baseline = useMemo(
@@ -251,14 +265,15 @@ export default function App() {
   // The drawer shows the same shots as the map: the chosen player's, or everyone's.
   const made = shooterShots?.filter((s) => s.made).length ?? 0
   const level = useMemo(() => levelInfo(xpOf(shooterShots ?? [])), [shooterShots])
-  const celebrations = useCelebrations(shots, truncated)
+  // Trophies and level-ups are for your own shots: the demo's made-up ones never set them off.
+  const celebrations = useCelebrations(mine.shots, mine.truncated)
   const trophyList = useMemo(() => trophiesOf(shooterShots ?? []), [shooterShots])
   const trophyCount = trophyList.filter((t) => t.unlocked).length
   // The title screen: shown once per tab. The app is already loading behind it.
-  const [title, setTitle] = useState(shouldShowTitle)
+  const [title, setTitle] = useState(() => !skipTitle && shouldShowTitle())
   // True from the moment the player presses start, while the wipe is still running.
   const [started, setStarted] = useState(false)
-  const covered = title && !started
+  const covered = (title && !started) || hold
   const coachContext = useMemo(() => ({ shots: shooterShots ?? [], shooter }), [shooterShots, shooter])
   const coach = useCoach()
   useCoachChatter({
@@ -276,12 +291,12 @@ export default function App() {
   const [coachOpen, setCoachOpen] = useState(false)
   useCoachEvents({
     coach,
-    shots,
-    truncated,
+    shots: mine.shots,
+    truncated: mine.truncated,
     ready: !covered,
     tab,
-    name: shooter,
-    shotCount: shooterShots?.length ?? 0,
+    name: user?.username ?? '',
+    shotCount: mine.shots?.length ?? 0,
     rank: level.title,
     toasts: celebrations.toasts,
   })
@@ -313,7 +328,7 @@ export default function App() {
           armed={!covered}
           partial={truncated}
           name={shooter}
-          picker={shooterPicker}
+          picker={barName}
           made={made}
           attempts={shooterShots?.length ?? 0}
           level={level}
@@ -345,7 +360,19 @@ export default function App() {
             {shooterShots && <span className="drawer-count">{shooterShots.length}</span>}
           </button>
         )}
-        <MuteButton />
+        <div className="bar-tools">
+          <button
+            type="button"
+            className="demo-btn"
+            aria-pressed={demo}
+            title={demo ? 'Leave the demo and go back to your own shots' : 'See what a full court looks like, with made-up shots'}
+            onClick={() => setDemoOn(!demo)}
+          >
+            DEMO
+          </button>
+          <MuteButton />
+          {onLogout && <LogoutButton name={user?.username ?? null} onLogout={onLogout} />}
+        </div>
         <nav className="tabs" aria-label="Pages">
           <button type="button" aria-current={tab === 'log' ? 'page' : undefined} onClick={() => setTab('log')}>
             My log
@@ -358,6 +385,8 @@ export default function App() {
           </button>
         </nav>
       </header>
+
+      {demo && <DemoBanner onExit={() => setDemoOn(false)} />}
 
       {/* Outside the tab views, so a notice is seen (and its timer is not wasted) on every tab. */}
       <div role="status" aria-live="polite" className="notice-slot">
@@ -399,8 +428,7 @@ export default function App() {
         <div className="log-view" hidden={tab !== 'log'}>
           <ShotMap
             shots={shots}
-            player={shooter}
-            onPlayerChange={setShooterChoice}
+            empty={demo ? undefined : <EmptyLog onAdd={startAdding} onDemo={() => setDemoOn(true)} />}
             loadError={loadError}
             retrying={loading}
             onRetry={() => void refresh()}
@@ -427,12 +455,14 @@ export default function App() {
           >
             <div className="drawer-head">
               <div className="chips" role="group" aria-label="Drawer view">
-                <button type="button" className="chip" aria-pressed={drawerView === 'list'} onClick={() => setDrawerView('list')}>
+                <button type="button" className="chip" aria-pressed={view === 'list'} onClick={() => setDrawerView('list')}>
                   Shots{shooterShots ? ` (${shooterShots.length})` : ''}
                 </button>
-                <button type="button" className="chip" aria-pressed={drawerView === 'add'} onClick={() => setDrawerView('add')}>
-                  Add a shot
-                </button>
+                {!demo && (
+                  <button type="button" className="chip" aria-pressed={view === 'add'} onClick={() => setDrawerView('add')}>
+                    Add a shot
+                  </button>
+                )}
               </div>
               <button type="button" className="drawer-close" onClick={() => setDrawerOpen(false)}>
                 <span aria-hidden="true">✕</span>
@@ -441,12 +471,13 @@ export default function App() {
             </div>
 
             <div className="drawer-body">
-              <section hidden={drawerView !== 'add'} aria-labelledby="add-title">
+              <section hidden={view !== 'add'} aria-labelledby="add-title">
                 <h2 id="add-title">Add a shot</h2>
+                <p className="add-note">Only you will see this shot. It never goes into the demo.</p>
                 <ShotForm submitLabel="Add shot" onSubmit={add} />
               </section>
 
-              <section hidden={drawerView !== 'list'} aria-labelledby="list-title">
+              <section hidden={view !== 'list'} aria-labelledby="list-title">
                 <div className="list-head">
                   <h2 id="list-title">Shots</h2>
                   {shooterShots && shooterShots.length > 0 && (
@@ -474,7 +505,7 @@ export default function App() {
                 {!shots && loading && <p className="state">Loading shots…</p>}
 
                 {shooterShots && shooterShots.length === 0 && !loadError && (
-                  <p className="state">No shots yet. Open "Add a shot" to log your first one.</p>
+                  <p className="state">No shots yet. Open "Add a shot" to log your first one, or try the demo to see a full court.</p>
                 )}
 
                 {shooterShots && shooterShots.length > 0 && (
@@ -486,6 +517,7 @@ export default function App() {
                     onLocate={locate}
                     onSave={save}
                     onDelete={remove}
+                    readOnly={demo}
                   />
                 )}
               </section>

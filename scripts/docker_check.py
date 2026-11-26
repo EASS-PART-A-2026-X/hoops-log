@@ -26,6 +26,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE, NAME, VOLUME, PORT = "hoops-log-ci", "hoops-log-ci", "hoops-log-ci-data", 18000
 URL = f"http://127.0.0.1:{PORT}"
+# The API needs a login: the check signs up (or logs in, when the volume already has
+# the account) and sends the token with every request.
+ACCOUNT = {
+    "email": "docker-check@example.com",
+    "username": "docker-check",
+    "password": "a long throwaway password",
+}
+token = ""
 
 
 def docker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -41,20 +49,33 @@ def start(volume: bool) -> None:
     for _ in range(60):
         try:
             if request("GET", "/health")[0] == 200:
+                sign_in()
                 return
         except OSError:
             time.sleep(0.5)
     raise SystemExit("container did not become healthy")
 
 
+def sign_in() -> None:
+    """Get a token: register the account, or log in when it already exists."""
+    global token
+    token = ""
+    body = {**ACCOUNT, "password_confirm": ACCOUNT["password"]}
+    status, answer = request("POST", "/auth/register", body)
+    if status == 409:
+        login = {"login": ACCOUNT["username"], "password": ACCOUNT["password"]}
+        status, answer = request("POST", "/auth/login", login)
+    if status not in (200, 201):
+        raise SystemExit(f"could not sign in to the container: HTTP {status}")
+    token = answer["token"]  # type: ignore[index]
+
+
 def request(method: str, path: str, body: dict | None = None) -> tuple[int, object]:
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(
-        URL + path,
-        data=data,
-        method=method,
-        headers={"Content-Type": "application/json"},
-    )
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(URL + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             return resp.status, json.loads(resp.read() or "null")
@@ -62,18 +83,20 @@ def request(method: str, path: str, body: dict | None = None) -> tuple[int, obje
         return err.code, None
 
 
-def players() -> list[str]:
-    """Every player name, reading all pages (the API returns at most 100 a page)."""
+def notes() -> list[str]:
+    """Every shot's note (the name each check gives its shots), reading all pages
+    (the API returns at most 100 a page)."""
     names: list[str] = []
     while True:
         page = request("GET", f"/shots?limit=100&offset={len(names)}")[1]
         if not page:
             return names
-        names += [s["player"] for s in page]  # type: ignore[union-attr]
+        names += [s["note"] for s in page]  # type: ignore[union-attr]
 
 
-def shot(player: str) -> dict:
-    return {"player": player, "x": 25, "y": 10, "made": True}
+def shot(note: str) -> dict:
+    # The player is always the account's username, so the note tells the shots apart.
+    return {"note": note, "x": 25, "y": 10, "made": True}
 
 
 def cleanup() -> None:
@@ -85,7 +108,7 @@ MIN_WRITES = 10  # a kill test that killed nothing in flight proves nothing
 
 
 def chaos() -> tuple[int, list[str], str]:
-    """Return (acknowledged count, acknowledged players missing after the kill, problem).
+    """Return (acknowledged count, acknowledged shots missing after the kill, problem).
 
     `problem` is empty when the test ran properly: at least MIN_WRITES writes were
     acknowledged before the kill, and none failed for any reason other than the kill.
@@ -129,7 +152,7 @@ def chaos() -> tuple[int, list[str], str]:
     elif count_at_kill < MIN_WRITES:
         problem = f"only {count_at_kill} writes acknowledged before the kill"
     start(volume=True)
-    present = set(players())
+    present = set(notes())
     return len(acknowledged), [p for p in acknowledged if p not in present], problem
 
 
@@ -143,13 +166,13 @@ def main() -> int:
         start(volume=True)
         request("POST", "/shots", shot("persist"))
         start(volume=True)  # rm -f + run again, same volume
-        ok = "persist" in players()
+        ok = "persist" in notes()
         results.append(("shot survives rm + run on the same volume", ok, ""))
 
         start(volume=False)
         request("POST", "/shots", shot("ephemeral"))
         start(volume=False)
-        ok = "ephemeral" not in players()
+        ok = "ephemeral" not in notes()
         results.append(("without the volume the shot is gone", ok, ""))
 
         start(volume=True)

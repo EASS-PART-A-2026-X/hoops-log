@@ -17,7 +17,8 @@ const STEPS = Number(process.env.E2E_MONKEY_STEPS ?? 70)
 /** The fast project (every pull request) runs one seed, and a shorter one. */
 const FAST_STEPS = 25
 
-const CLICKABLE = 'button, [role=option], [role=combobox], [role=radio], input[type=radio], input[type=checkbox], summary, a[href^="/"], .player-you, li.player-you'
+// The Log out button is left alone: it would end the very session the monkey is checking afterwards (auth.e2e.ts covers it).
+const CLICKABLE = 'button:not(.account-btn), [role=option], [role=combobox], [role=radio], input[type=radio], input[type=checkbox], summary, a[href^="/"], .player-you, li.player-you'
 const TYPEABLE = 'input:not([type=radio]):not([type=checkbox]):not([type=hidden]), textarea'
 const KEYS = ['Escape', 'Tab', 'Shift+Tab', 'Enter', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'b', 'a', 'x', 'Home', 'End', 'PageDown']
 const SIZES: [number, number][] = [
@@ -85,7 +86,7 @@ for (const seed of SEEDS) {
     const next = rng(seed)
     const log: string[] = []
     let skipped = 0
-    await api.seed([...makeShots('Yuly', 24, { seed: seed * 7 + 1 }), ...makeShots('Noam', 9, { seed: seed * 7 + 2 })])
+    await api.seed(makeShots(33, { seed: seed * 7 + 1 }))
     await openApp(page)
     // Quick timeouts for the random actions only: a click that cannot happen should be given up on fast. Loading the page is
     // slow on a slow machine and keeps the normal timeouts.
@@ -119,9 +120,8 @@ for (const seed of SEEDS) {
           const form = page.locator('#shots-drawer form.shot-form').first()
           const good = next() < 0.55
           const num = (max: number) => (good ? String(Math.round(next() * max * 10) / 10) : (pickFrom(next, TEXTS) ?? ''))
-          const values = { player: pickFrom(next, ['Yuly', 'Noam', 'Maya', ...TEXTS])!, x: num(50), y: num(47), note: pickFrom(next, TEXTS)! }
+          const values = { x: num(50), y: num(47), note: pickFrom(next, TEXTS)! }
           note(`form ${JSON.stringify(values).slice(0, 80)}`)
-          await form.getByLabel('Player').fill(values.player, { timeout: 1500 })
           await form.getByLabel(/^X \(/).fill(values.x, { timeout: 1500 }).catch(() => {})
           await form.getByLabel(/^Y \(/).fill(values.y, { timeout: 1500 }).catch(() => {})
           await form.getByLabel('Note (optional)').fill(values.note, { timeout: 1500 })
@@ -160,8 +160,8 @@ for (const seed of SEEDS) {
             throw new Hard(error.message)
           })
         } else {
-          note('someone else adds a shot')
-          await api.add({ player: next() < 0.5 ? 'Yuly' : 'Maya', x: Math.round(next() * 50), y: Math.round(next() * 47), made: next() < 0.5 }).catch((error: Error) => {
+          note('the same account adds a shot from another client')
+          await api.add({ x: Math.round(next() * 50), y: Math.round(next() * 47), made: next() < 0.5 }).catch((error: Error) => {
             throw new Hard(error.message)
           })
         }
@@ -199,8 +199,6 @@ for (const seed of SEEDS) {
     await page.goto('/')
     await expect(page.getByRole('navigation', { name: 'Pages' })).toBeVisible()
     const rows = await api.list()
-    await page.getByRole('combobox', { name: /^Shots of:/ }).click()
-    await page.getByRole('option').first().click() // "Every player"
     await expect(kpi(page, 'SHOTS')).toHaveText(String(rows.length))
     await openDrawer(page, 'list')
     await expect(page.locator('#shots-drawer').getByRole('button', { name: /^Shots \(/ })).toContainText(`(${rows.length})`)
