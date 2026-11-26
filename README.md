@@ -1,7 +1,20 @@
 # Hoops Log
 
-[![ci](https://github.com/EASS-PART-A-2026-X/hoops-log/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EASS-PART-A-2026-X/hoops-log/actions/workflows/ci.yml)
-[![e2e](https://github.com/EASS-PART-A-2026-X/hoops-log/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/EASS-PART-A-2026-X/hoops-log/actions/workflows/e2e.yml)
+[![ci: backend tests, mutation score and Docker](https://img.shields.io/github/actions/workflow/status/EASS-PART-A-2026-X/hoops-log/ci.yml?branch=main&label=ci%3A%20tests%20%2B%20mutation%20%2B%20docker)](https://github.com/EASS-PART-A-2026-X/hoops-log/actions/workflows/ci.yml)
+[![e2e: real-browser suite](https://img.shields.io/github/actions/workflow/status/EASS-PART-A-2026-X/hoops-log/e2e.yml?branch=main&label=e2e%3A%20real%20browser)](https://github.com/EASS-PART-A-2026-X/hoops-log/actions/workflows/e2e.yml)
+[![ex1 tag](https://img.shields.io/badge/ex1-backend%20done-2ea44f)](https://github.com/EASS-PART-A-2026-X/hoops-log/tree/ex1)
+[![ex2 tag](https://img.shields.io/badge/ex2-frontend%20done-2ea44f)](https://github.com/EASS-PART-A-2026-X/hoops-log/tree/ex2)
+[![latest tag](https://img.shields.io/github/v/tag/EASS-PART-A-2026-X/hoops-log?label=latest%20tag)](https://github.com/EASS-PART-A-2026-X/hoops-log/tags)
+
+![Python 3.14](https://img.shields.io/badge/Python-3.14-3776ab?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003b57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ed?logo=docker&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-20232a?logo=react&logoColor=61dafb)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)
+![Three.js](https://img.shields.io/badge/Three.js-000000?logo=threedotjs&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646cff?logo=vite&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-2ead33?logo=playwright&logoColor=white)
 
 A shot chart for basketball players and coaches: log your shots, see where you score, and compare yourself with NBA players. A FastAPI backend stores the shots; a React app draws them on a 3D court.
 
